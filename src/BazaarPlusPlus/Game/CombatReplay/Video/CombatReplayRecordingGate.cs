@@ -33,11 +33,11 @@ internal readonly struct CombatReplayRecordingGateResult
 
 /// <summary>
 /// The single source of truth for "can a replay video recording actually start". macOS requires
-/// the in-process Metal/VideoToolbox plugin; Windows and other platforms retain the async GPU
-/// readback + FFmpeg path. Every pre-check that promises a recording (HistoryPanel record button,
+/// Metal/VideoToolbox and Windows requires D3D11/Media Foundation. Other platforms retain the
+/// async GPU readback + FFmpeg path. Every pre-check that promises a recording (HistoryPanel record button,
 /// the BazaarAgent record endpoint's 202) must evaluate this same gate so it cannot promise a
-/// recording that the capture path will silently reject. FFmpeg probing is relevant only outside
-/// macOS and must be prewarmed off-thread before this gate runs on the Unity thread.
+/// recording that the capture path will silently reject. FFmpeg probing is relevant only on
+/// unsupported native platforms and must be prewarmed off-thread before this gate runs.
 /// </summary>
 internal static class CombatReplayRecordingGate
 {
@@ -46,9 +46,20 @@ internal static class CombatReplayRecordingGate
         string? videoDirectoryPath
     )
     {
-        if (ReplayVideoBackendPolicy.Current == ReplayVideoBackend.MacNative)
+        var backend = ReplayVideoBackendPolicy.Current;
+        if (backend == ReplayVideoBackend.MacNative)
         {
             if (!MacMetalVideoEncoder.TryGetAvailability(out _))
+                return new(CombatReplayRecordingBlocker.NativeRecorderUnavailable, null, null);
+
+            return string.IsNullOrWhiteSpace(videoDirectoryPath)
+                ? new(CombatReplayRecordingBlocker.VideoDirectoryUnset, null, null)
+                : new(CombatReplayRecordingBlocker.None, null, videoDirectoryPath);
+        }
+
+        if (backend == ReplayVideoBackend.WindowsNative)
+        {
+            if (!WindowsMediaFoundationVideoEncoder.TryGetAvailability(out _))
                 return new(CombatReplayRecordingBlocker.NativeRecorderUnavailable, null, null);
 
             return string.IsNullOrWhiteSpace(videoDirectoryPath)

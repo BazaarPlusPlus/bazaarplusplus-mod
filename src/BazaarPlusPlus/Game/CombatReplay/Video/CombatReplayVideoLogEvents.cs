@@ -477,6 +477,10 @@ internal static class CombatReplayVideoLogEvents
         BppLogCardinality.High,
         BppLogCorrelationPolicy.Short
     );
+    internal static readonly BppLogFieldDefinition NativeStatsEncoderName = Field(
+        16,
+        "encoder_name"
+    );
     internal static readonly BppLogEventDefinition VideoCaptureNativePipelineObserved = new(
         BppLogFeatureScope.CombatReplay,
         "combat_replay.video_capture.native_pipeline_observed",
@@ -497,6 +501,7 @@ internal static class CombatReplayVideoLogEvents
             NativeStatsTextureCopyP95Us,
             NativeStatsTextureCopyP99Us,
             NativeStatsBattleId,
+            NativeStatsEncoderName,
         ]
     );
 

@@ -23,7 +23,9 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
     private IReplayVideoEncoder? _encoder;
     private FfmpegRawVideoEncoder? _ffmpegEncoder;
     private MacMetalVideoEncoder? _metalEncoder;
+    private WindowsMediaFoundationVideoEncoder? _windowsEncoder;
     private CommandBuffer? _metalCommandBuffer;
+    private CommandBuffer? _windowsCommandBuffer;
 
     // Frame pool (eliminates the per-frame width*height*4 allocation) and the
     // wall-clock CFR pacer (decouples capture rhythm from the constant fps feed
@@ -35,7 +37,7 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
     private readonly ReplayVideoCopyTimingAccumulator _readbackCopyTiming = new();
     private readonly ReplayVideoCopyTimingAccumulator _cfrCopyTiming = new();
     private readonly ReplayVideoCopyTimingAccumulator _renderFrameTiming = new();
-    private readonly ReplayVideoCopyTimingAccumulator _metalTextureCopyTiming = new();
+    private readonly ReplayVideoCopyTimingAccumulator _nativeTextureCopyTiming = new();
 
     // The single non-pooled staging buffer that OnReadbackComplete overwrites in
     // place. It is never enqueued and never returned to the pool; every emit
@@ -56,7 +58,7 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
     private int _nativeBackpressureDroppedFrames;
     private int _nativeEnqueueRejects;
     private int _nativePacerResyncDroppedFrames;
-    private long _metalOutputFrameIndex;
+    private long _nativeOutputFrameIndex;
     private int? _previousMaxQueuedFrames;
     private bool _started;
     private bool _disposed;
@@ -88,7 +90,7 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
 
         EnsureOutputDirectory();
         var backend = ReplayVideoBackendPolicy.Current;
-        if (backend == ReplayVideoBackend.Ffmpeg)
+        if (backend is ReplayVideoBackend.Ffmpeg or ReplayVideoBackend.WindowsNative)
         {
             _captureRenderTexture = new RenderTexture(
                 _request.Width,
@@ -136,13 +138,30 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
             );
             _encoder = _metalEncoder;
         }
+        else if (backend == ReplayVideoBackend.WindowsNative)
+        {
+            _windowsEncoder = new WindowsMediaFoundationVideoEncoder(
+                _request.VideoId,
+                _request.OutputFilePath,
+                _request.Width,
+                _request.Height,
+                _request.Fps,
+                _request.EncoderProfile.TargetBitrateKbps
+                    ?? FfmpegVideoEncoderProfile.CalculateTargetBitrateKbps(
+                        _request.Width,
+                        _request.Height,
+                        _request.Fps
+                    )
+            );
+            _encoder = _windowsEncoder;
+        }
         else
         {
             _ffmpegEncoder = new FfmpegRawVideoEncoder(
                 _request.VideoId,
                 _request.FfmpegExecutable
                     ?? throw new InvalidOperationException(
-                        "FFmpeg is required by the non-macOS replay encoder."
+                        "FFmpeg is required by the fallback replay encoder."
                     ),
                 _request.OutputFilePath,
                 _request.Width,
@@ -167,6 +186,17 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
                 _previousMaxQueuedFrames = QualitySettings.maxQueuedFrames;
                 QualitySettings.maxQueuedFrames = Math.Max(3, _previousMaxQueuedFrames.Value);
             }
+            else if (_windowsEncoder != null)
+            {
+                var sourceTexture = _captureRenderTexture?.GetNativeTexturePtr() ?? IntPtr.Zero;
+                _windowsEncoder.Start(sourceTexture);
+                _windowsCommandBuffer = new CommandBuffer
+                {
+                    name = "BPP Replay D3D11 Media Foundation Submit",
+                };
+                _previousMaxQueuedFrames = QualitySettings.maxQueuedFrames;
+                QualitySettings.maxQueuedFrames = Math.Max(3, _previousMaxQueuedFrames.Value);
+            }
             else
                 _ffmpegEncoder!.Start();
         }
@@ -183,12 +213,15 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
                 );
             }
             _metalEncoder?.SealCapture();
+            _windowsEncoder?.SealCapture();
             ReleaseMetalCommandBuffer();
+            ReleaseWindowsCommandBuffer();
             RestoreMetalCaptureScheduling();
             _encoder.Dispose();
             _encoder = null;
             _ffmpegEncoder = null;
             _metalEncoder = null;
+            _windowsEncoder = null;
             ReleaseRenderTexture();
             throw;
         }
@@ -216,25 +249,29 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
                         _request.EncoderProfile.RateControlSummary
                     ),
                     CombatReplayVideoLogEvents.StatsFrameBytes.Bind(
-                        _metalEncoder == null
+                        _metalEncoder == null && _windowsEncoder == null
                             ? _frameByteLength
                             : CalculateNv12FrameBytes(_request.Width, _request.Height)
                     ),
                     CombatReplayVideoLogEvents.StatsPoolCapacity.Bind(
-                        _metalEncoder?.SlotCount ?? _request.BufferPlan.PoolCapacity
+                        _metalEncoder?.SlotCount
+                            ?? _windowsEncoder?.SlotCount
+                            ?? _request.BufferPlan.PoolCapacity
                     ),
                     CombatReplayVideoLogEvents.StatsQueueCapacity.Bind(
-                        _metalEncoder?.SlotCount ?? _request.BufferPlan.QueueCapacity
+                        _metalEncoder?.SlotCount
+                            ?? _windowsEncoder?.SlotCount
+                            ?? _request.BufferPlan.QueueCapacity
                     ),
                     CombatReplayVideoLogEvents.StatsPoolPayloadBytes.Bind(
-                        _metalEncoder != null
-                            ? (long)_metalEncoder.SlotCount
+                        _metalEncoder != null || _windowsEncoder != null
+                            ? (long)(_metalEncoder?.SlotCount ?? _windowsEncoder!.SlotCount)
                                 * CalculateNv12FrameBytes(_request.Width, _request.Height)
                             : _request.BufferPlan.PoolPayloadBytes
                     ),
                     CombatReplayVideoLogEvents.StatsPoolBudgetExceeded.Bind(
-                        _metalEncoder != null
-                            ? (long)_metalEncoder.SlotCount
+                        _metalEncoder != null || _windowsEncoder != null
+                            ? (long)(_metalEncoder?.SlotCount ?? _windowsEncoder!.SlotCount)
                                 * CalculateNv12FrameBytes(_request.Width, _request.Height)
                                 > ReplayVideoBufferPlan.DefaultPoolBudgetBytes
                             : _request.BufferPlan.BudgetExceeded
@@ -244,7 +281,7 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
                     CombatReplayVideoLogEvents.StatsReadbackCopyP95Us.Bind(0),
                     CombatReplayVideoLogEvents.StatsCfrCopyP95Us.Bind(0),
                     CombatReplayVideoLogEvents.StatsStagingBufferBytes.Bind(
-                        _metalEncoder == null ? _frameByteLength : 0
+                        _metalEncoder == null && _windowsEncoder == null ? _frameByteLength : 0
                     ),
                     CombatReplayVideoLogEvents.StatsMaxReadbackPayloadBytes.Bind(0),
                     CombatReplayVideoLogEvents.StatsRenderTextureEstimatedBytes.Bind(
@@ -280,6 +317,11 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
             CaptureMetalFrames(now, _metalEncoder);
             return;
         }
+        if (_windowsEncoder != null)
+        {
+            CaptureWindowsFrames(now, _windowsEncoder);
+            return;
+        }
 
         if (now >= _nextCaptureTime)
         {
@@ -306,7 +348,7 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
 
         var sourceSequence = Interlocked.Increment(ref _issuedSequence);
         var tick = pacer.Tick(now, true, sourceSequence, ref _lastEmittedSeq);
-        var plan = MacMetalFrameSubmissionPlan.Create(
+        var plan = NativeFrameSubmissionPlan.Create(
             tick.EmitCount,
             tick.RepeatCount,
             tick.DroppedCount
@@ -321,19 +363,19 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
         var commandBuffer = _metalCommandBuffer;
         if (commandBuffer == null)
         {
-            DropMetalSubmission(plan);
+            DropNativeSubmission(plan);
             _failureReasonCode ??= ReplayVideoRecordingReasonCode.CaptureFailed;
             return;
         }
 
         commandBuffer.Clear();
         var copyStarted = Stopwatch.GetTimestamp();
-        var firstFrameIndex = _metalOutputFrameIndex;
+        var firstFrameIndex = _nativeOutputFrameIndex;
         if (!encoder.TryAcquireFrame(out var lease))
         {
             _nativeLeaseMisses++;
             _nativeBackpressureDroppedFrames += plan.EncodeFrameCount;
-            DropMetalSubmission(plan);
+            DropNativeSubmission(plan);
             return;
         }
 
@@ -348,11 +390,11 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
         {
             encoder.ReleaseFrame(lease);
             _nativeEnqueueRejects++;
-            DropMetalSubmission(plan);
+            DropNativeSubmission(plan);
             return;
         }
 
-        _metalOutputFrameIndex += plan.TimelineFrameCount;
+        _nativeOutputFrameIndex += plan.TimelineFrameCount;
 
         try
         {
@@ -377,14 +419,100 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
         finally
         {
             _cfrCopyTiming.ObserveSince(copyStarted);
-            _metalTextureCopyTiming.ObserveSince(copyStarted);
+            _nativeTextureCopyTiming.ObserveSince(copyStarted);
         }
     }
 
-    private void DropMetalSubmission(MacMetalFrameSubmissionPlan plan)
+    private void DropNativeSubmission(NativeFrameSubmissionPlan plan)
     {
         _droppedFrames += plan.DroppedFrameCountOnSubmissionFailure;
-        _metalOutputFrameIndex += plan.TimelineFrameCount;
+        _nativeOutputFrameIndex += plan.TimelineFrameCount;
+    }
+
+    private void CaptureWindowsFrames(
+        double now,
+        WindowsMediaFoundationVideoEncoder encoder
+    )
+    {
+        var pacer = _pacer;
+        var renderTexture = _captureRenderTexture;
+        if (pacer == null || renderTexture == null)
+            return;
+
+        var sourceSequence = Interlocked.Increment(ref _issuedSequence);
+        var tick = pacer.Tick(now, true, sourceSequence, ref _lastEmittedSeq);
+        var plan = NativeFrameSubmissionPlan.Create(
+            tick.EmitCount,
+            tick.RepeatCount,
+            tick.DroppedCount
+        );
+        _nativePacerResyncDroppedFrames += plan.PacerDroppedFrameCount;
+        if (plan.EncodeFrameCount <= 0)
+        {
+            _droppedFrames += plan.PacerDroppedFrameCount;
+            return;
+        }
+
+        var commandBuffer = _windowsCommandBuffer;
+        if (commandBuffer == null)
+        {
+            DropNativeSubmission(plan);
+            _failureReasonCode ??= ReplayVideoRecordingReasonCode.CaptureFailed;
+            return;
+        }
+
+        commandBuffer.Clear();
+        var copyStarted = Stopwatch.GetTimestamp();
+        if (!encoder.TryAcquireFrame(out var lease))
+        {
+            _nativeLeaseMisses++;
+            _nativeBackpressureDroppedFrames += plan.EncodeFrameCount;
+            DropNativeSubmission(plan);
+            return;
+        }
+
+        if (
+            !encoder.TryPrepareRenderEvent(
+                lease,
+                _nativeOutputFrameIndex,
+                plan.EncodeFrameCount,
+                out var eventData
+            )
+        )
+        {
+            encoder.ReleaseFrame(lease);
+            _nativeEnqueueRejects++;
+            DropNativeSubmission(plan);
+            return;
+        }
+        _nativeOutputFrameIndex += plan.TimelineFrameCount;
+
+        try
+        {
+            ScreenCapture.CaptureScreenshotIntoRenderTexture(renderTexture);
+            commandBuffer.IssuePluginEventAndData(
+                encoder.RenderEventFunction,
+                eventID: 1,
+                eventData
+            );
+            Graphics.ExecuteCommandBuffer(commandBuffer);
+            encoder.CommitRenderEvent(eventData);
+            _capturedFrames += plan.CapturedFrameCount;
+            _repeatedFrames += plan.RepeatedFrameCount;
+            _droppedFrames += plan.PacerDroppedFrameCount;
+        }
+        catch (Exception ex)
+        {
+            encoder.CancelRenderEvent(eventData);
+            _droppedFrames += plan.DroppedFrameCountOnSubmissionFailure;
+            _failureReasonCode ??= ReplayVideoRecordingReasonCode.CaptureFailed;
+            _failureException ??= ex;
+        }
+        finally
+        {
+            _cfrCopyTiming.ObserveSince(copyStarted);
+            _nativeTextureCopyTiming.ObserveSince(copyStarted);
+        }
     }
 
     private void EmitDueFrames(double now)
@@ -451,7 +579,7 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
 
             try
             {
-                if (_metalEncoder == null)
+                if (_metalEncoder == null && _windowsEncoder == null)
                     AsyncGPUReadback.WaitAllRequests();
             }
             catch (Exception ex)
@@ -472,6 +600,7 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
 
             var encoder = _encoder;
             var metalEncoder = _metalEncoder;
+            var windowsEncoder = _windowsEncoder;
             try
             {
                 encoder?.SignalEndOfStream();
@@ -487,10 +616,14 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
             }
 
             metalEncoder?.SealCapture();
+            windowsEncoder?.SealCapture();
             ReleaseMetalCommandBuffer();
+            ReleaseWindowsCommandBuffer();
             RestoreMetalCaptureScheduling();
             if (metalEncoder != null)
                 LogMetalCaptureStats();
+            if (windowsEncoder != null)
+                LogWindowsCaptureStats();
 
             ReleaseRenderTexture();
 
@@ -506,7 +639,7 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
                     _degradationReasonCode,
                     _failureException,
                     _frameByteLength,
-                    metalEncoder?.SlotCount ?? 0,
+                    metalEncoder?.SlotCount ?? windowsEncoder?.SlotCount ?? 0,
                     _readbackBackpressureSkips,
                     _readbackLimiter.MaxObserved,
                     _readbackCopyTiming.P95Microseconds,
@@ -515,6 +648,7 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
             );
             _ffmpegEncoder = null;
             _metalEncoder = null;
+            _windowsEncoder = null;
             return _finalizeDrain;
         }
     }
@@ -534,7 +668,7 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
             {
                 try
                 {
-                    if (_metalEncoder == null)
+                    if (_metalEncoder == null && _windowsEncoder == null)
                         AsyncGPUReadback.WaitAllRequests();
                 }
                 catch
@@ -543,7 +677,9 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
                 }
 
                 _metalEncoder?.SealCapture();
+                _windowsEncoder?.SealCapture();
                 ReleaseMetalCommandBuffer();
+                ReleaseWindowsCommandBuffer();
                 RestoreMetalCaptureScheduling();
                 try
                 {
@@ -556,6 +692,7 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
                 _encoder = null;
                 _ffmpegEncoder = null;
                 _metalEncoder = null;
+                _windowsEncoder = null;
             }
 
             // A handed-off encoder may still return a managed frame on its writer thread. The
@@ -564,6 +701,7 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
             _pacer = null;
             _latestFrameBuffer = null;
             ReleaseMetalCommandBuffer();
+            ReleaseWindowsCommandBuffer();
             RestoreMetalCaptureScheduling();
             ReleaseRenderTexture();
         }
@@ -693,7 +831,7 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
     // frame lands in the stream. Trailing wall-clock pad is deferred (v1).
     private void EmitFinalFrame()
     {
-        if (_metalEncoder != null)
+        if (_metalEncoder != null || _windowsEncoder != null)
             return;
 
         var encoder = _ffmpegEncoder;
@@ -759,13 +897,54 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
                         _renderFrameTiming.P99Microseconds
                     ),
                     CombatReplayVideoLogEvents.NativeStatsTextureCopyP50Us.Bind(
-                        _metalTextureCopyTiming.P50Microseconds
+                        _nativeTextureCopyTiming.P50Microseconds
                     ),
                     CombatReplayVideoLogEvents.NativeStatsTextureCopyP95Us.Bind(
-                        _metalTextureCopyTiming.P95Microseconds
+                        _nativeTextureCopyTiming.P95Microseconds
                     ),
                     CombatReplayVideoLogEvents.NativeStatsTextureCopyP99Us.Bind(
-                        _metalTextureCopyTiming.P99Microseconds
+                        _nativeTextureCopyTiming.P99Microseconds
+                    ),
+                ]
+        );
+    }
+
+    private void LogWindowsCaptureStats()
+    {
+        BppLog.DebugEvent(
+            CombatReplayVideoLogEvents.VideoCaptureNativePipelineObserved,
+            () =>
+                [
+                    CombatReplayVideoLogEvents.NativeStatsRecordingId.Bind(_request.VideoId),
+                    CombatReplayVideoLogEvents.NativeStatsStage.Bind("d3d11_mf_capture_sealed"),
+                    CombatReplayVideoLogEvents.NativeStatsBackpressureDroppedFrames.Bind(
+                        _nativeBackpressureDroppedFrames
+                    ),
+                    CombatReplayVideoLogEvents.NativeStatsDroppedFrames.Bind(_droppedFrames),
+                    CombatReplayVideoLogEvents.NativeStatsLeaseMisses.Bind(_nativeLeaseMisses),
+                    CombatReplayVideoLogEvents.NativeStatsEnqueueRejects.Bind(
+                        _nativeEnqueueRejects
+                    ),
+                    CombatReplayVideoLogEvents.NativeStatsPacerResyncDroppedFrames.Bind(
+                        _nativePacerResyncDroppedFrames
+                    ),
+                    CombatReplayVideoLogEvents.NativeStatsRenderFrameP50Us.Bind(
+                        _renderFrameTiming.P50Microseconds
+                    ),
+                    CombatReplayVideoLogEvents.NativeStatsRenderFrameP95Us.Bind(
+                        _renderFrameTiming.P95Microseconds
+                    ),
+                    CombatReplayVideoLogEvents.NativeStatsRenderFrameP99Us.Bind(
+                        _renderFrameTiming.P99Microseconds
+                    ),
+                    CombatReplayVideoLogEvents.NativeStatsTextureCopyP50Us.Bind(
+                        _nativeTextureCopyTiming.P50Microseconds
+                    ),
+                    CombatReplayVideoLogEvents.NativeStatsTextureCopyP95Us.Bind(
+                        _nativeTextureCopyTiming.P95Microseconds
+                    ),
+                    CombatReplayVideoLogEvents.NativeStatsTextureCopyP99Us.Bind(
+                        _nativeTextureCopyTiming.P99Microseconds
                     ),
                 ]
         );
@@ -842,6 +1021,16 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
             return;
 
         _metalCommandBuffer = null;
+        commandBuffer.Release();
+    }
+
+    private void ReleaseWindowsCommandBuffer()
+    {
+        var commandBuffer = _windowsCommandBuffer;
+        if (commandBuffer == null)
+            return;
+
+        _windowsCommandBuffer = null;
         commandBuffer.Release();
     }
 

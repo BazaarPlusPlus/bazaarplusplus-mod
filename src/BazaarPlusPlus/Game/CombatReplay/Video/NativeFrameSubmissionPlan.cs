@@ -3,10 +3,10 @@ namespace BazaarPlusPlus.Game.CombatReplay.Video;
 
 /// <summary>
 /// Separates frames that can be encoded from wall-clock slots skipped by the pacer. Successful
-/// Metal frames are packed at consecutive CFR timestamps, matching the FFmpeg path; putting a PTS
-/// gap behind a renderer hitch would make the preceding frame visibly freeze and inflate duration.
+/// native frames are packed at consecutive CFR timestamps; putting a PTS gap behind a renderer
+/// hitch would make the preceding frame visibly freeze and inflate duration.
 /// </summary>
-internal readonly record struct MacMetalFrameSubmissionPlan(
+internal readonly record struct NativeFrameSubmissionPlan(
     int EncodeFrameCount,
     int TimelineFrameCount,
     int CapturedFrameCount,
@@ -17,7 +17,7 @@ internal readonly record struct MacMetalFrameSubmissionPlan(
     internal int DroppedFrameCountOnSubmissionFailure =>
         checked(EncodeFrameCount + PacerDroppedFrameCount);
 
-    internal static MacMetalFrameSubmissionPlan Create(
+    internal static NativeFrameSubmissionPlan Create(
         int emitFrameCount,
         int repeatFrameCount,
         int pacerDroppedFrameCount
@@ -30,7 +30,7 @@ internal readonly record struct MacMetalFrameSubmissionPlan(
         if (pacerDroppedFrameCount < 0)
             throw new ArgumentOutOfRangeException(nameof(pacerDroppedFrameCount));
 
-        return new MacMetalFrameSubmissionPlan(
+        return new NativeFrameSubmissionPlan(
             emitFrameCount,
             emitFrameCount,
             emitFrameCount - repeatFrameCount,

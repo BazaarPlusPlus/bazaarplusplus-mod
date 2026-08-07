@@ -191,16 +191,23 @@ internal static class BazaarAgentReplayRecorderWiring
     }
 
     // Probe the platform backend the first time the host touches the facade. This facade is called
-    // on Unity's main thread, which is mandatory for the first macOS native-plugin load. Other
+    // on Unity's main thread, which is mandatory for the first native-plugin load. Other
     // platforms resolve FFmpeg and probe the actual-dimensions encoder profile off-thread.
     private static void PrewarmRecordingOnce(IBppServices services)
     {
         if (Interlocked.Exchange(ref _recordingPrewarmKicked, 1) != 0)
             return;
 
-        if (ReplayVideoBackendPolicy.Current == ReplayVideoBackend.MacNative)
+        var backend = ReplayVideoBackendPolicy.Current;
+        if (backend == ReplayVideoBackend.MacNative)
         {
             MacMetalVideoEncoder.TryGetAvailability(out _);
+            _recordingPrewarmCompleted = true;
+            return;
+        }
+        if (backend == ReplayVideoBackend.WindowsNative)
+        {
+            WindowsMediaFoundationVideoEncoder.TryGetAvailability(out _);
             _recordingPrewarmCompleted = true;
             return;
         }

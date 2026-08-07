@@ -80,6 +80,26 @@ internal sealed class FfmpegVideoEncoderProfile
         );
     }
 
+    internal static FfmpegVideoEncoderProfile NativeMediaFoundation(
+        int width,
+        int height,
+        int fps
+    )
+    {
+        var targetKbps = CalculateTargetBitrateKbps(width, height, fps);
+        return new(
+            "h264_media_foundation",
+            "nv12",
+            hardwareAccelerated: true,
+            crf: null,
+            preset: "realtime-vbr",
+            targetKbps,
+            maxBitrateKbps: (int)Math.Ceiling(targetKbps * 1.25d),
+            bufferSizeKbps: checked(targetKbps * 2),
+            extraArguments: string.Empty
+        );
+    }
+
     internal static IReadOnlyList<FfmpegVideoEncoderProfile> Candidates(
         VideoEncoderPlatform platform,
         int width,

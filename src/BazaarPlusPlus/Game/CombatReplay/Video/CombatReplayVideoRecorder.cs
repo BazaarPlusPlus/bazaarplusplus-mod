@@ -133,11 +133,14 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
         }
 
         // Unity only permits the first native-plugin load on its main thread. This method is
-        // called from the replay UI/runtime main-thread path, so macOS must probe synchronously;
+        // called from the replay UI/runtime main-thread path, so native plugins must probe synchronously;
         // only the slower FFmpeg discovery used by other platforms belongs in Task.Run.
-        if (backend == ReplayVideoBackend.MacNative)
+        if (backend is ReplayVideoBackend.MacNative or ReplayVideoBackend.WindowsNative)
         {
-            if (!MacMetalVideoEncoder.TryGetAvailability(out var nativeReason))
+            var available = backend == ReplayVideoBackend.MacNative
+                ? MacMetalVideoEncoder.TryGetAvailability(out var nativeReason)
+                : WindowsMediaFoundationVideoEncoder.TryGetAvailability(out nativeReason);
+            if (!available)
             {
                 return SetAvailability(
                     CurrentReplayRecorderAvailabilityPhase.Unavailable,
@@ -1496,6 +1499,10 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
         if (backend == ReplayVideoBackend.MacNative)
         {
             encoderProfile = FfmpegVideoEncoderProfile.NativeVideoToolbox(width, height, fps);
+        }
+        else if (backend == ReplayVideoBackend.WindowsNative)
+        {
+            encoderProfile = FfmpegVideoEncoderProfile.NativeMediaFoundation(width, height, fps);
         }
         else
         {
