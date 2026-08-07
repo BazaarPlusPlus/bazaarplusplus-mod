@@ -19,5 +19,13 @@
       Include="..\..\src\BazaarPlusPlus\Game\Input\HotkeyBindingFailureGate.cs"
       Link="HotkeyBindingFailureGate.cs"
     />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\Input\HotkeyActivationState.cs"
+      Link="HotkeyActivationState.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Core\Config\HotkeyActivationMode.cs"
+      Link="HotkeyActivationMode.cs"
+    />
   </ItemGroup>
 </Project>

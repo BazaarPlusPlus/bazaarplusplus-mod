@@ -8,6 +8,7 @@ using BazaarPlusPlus.Game.BilingualItemNames;
 using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.EventPreview;
 using BazaarPlusPlus.Game.HistoryPanel;
+using BazaarPlusPlus.Game.Input;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.LegendaryPosition;
 using BazaarPlusPlus.Game.NameOverride;
@@ -505,6 +506,7 @@ public class SettingsDockRegistryTests
             registry.Register(new EndOfRunScreenshotSettingsDockEntry());
             registry.Register(new HistoryPanelSettingsDockEntry());
             registry.Register(ItemEnchantPreviewSettingsDockEntry.Create());
+            registry.Register(UpgradePreviewActivationSettingsDockEntry.Create());
             registry.Register(EventPreviewSettingsDockEntry.Create());
             registry.Register(QuestPreviewSettingsDockEntry.Create(() => { }));
             registry.Register(LegendaryPositionSettingsDockEntry.Create(() => { }));
@@ -515,7 +517,7 @@ public class SettingsDockRegistryTests
                 .OrderBy(entry => entry.Order)
                 .ToArray();
 
-            Assert.Equal(Enumerable.Range(0, 16), presented.Select(entry => entry.Order));
+            Assert.Equal(Enumerable.Range(0, 17), presented.Select(entry => entry.Order));
             Assert.Equal(
                 new[]
                 {
@@ -528,6 +530,7 @@ public class SettingsDockRegistryTests
                     "EndOfRunScreenshot",
                     "BazaarDbUpload",
                     "EnchantPreview",
+                    "UpgradePreviewActivation",
                     "LegendaryPositionDisplay",
                     "ChineseLocaleMode",
                     "VoiceSubtitles",
@@ -1149,6 +1152,14 @@ public class SettingsDockRegistryTests
         "true>false>true>true"
     )]
     [InlineData(
+        "UpgradePreviewActivation",
+        BppSettingsDockOrder.UpgradePreviewActivation,
+        "Shift Mode",
+        "Shift 模式",
+        "HOLD SHIFT>TOGGLE SHIFT>HOLD SHIFT",
+        "false>true>false"
+    )]
+    [InlineData(
         "EventPreview",
         BppSettingsDockOrder.EventPreview,
         "Event Preview",
@@ -1328,6 +1339,7 @@ public class SettingsDockRegistryTests
             "NameOverride" => NameOverrideSettingsDockEntry.Create(() => { }),
             "LegendaryPositionDisplay" => LegendaryPositionSettingsDockEntry.Create(() => { }),
             "EnchantPreview" => ItemEnchantPreviewSettingsDockEntry.Create(),
+            "UpgradePreviewActivation" => UpgradePreviewActivationSettingsDockEntry.Create(),
             "EventPreview" => EventPreviewSettingsDockEntry.Create(),
             "QuestPreview" => QuestPreviewSettingsDockEntry.Create(() => { }),
             "CombatStatusBar" => CombatStatusBarSettingsDockEntry.Create(),

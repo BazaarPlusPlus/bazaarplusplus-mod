@@ -7,6 +7,8 @@ namespace BazaarPlusPlus.Core.Config;
 internal sealed class BppConfig : IBppConfig
 {
     internal const PreviewVisibilityMode DefaultEnchantPreviewMode = PreviewVisibilityMode.Always;
+    internal const HotkeyActivationMode DefaultUpgradePreviewActivationMode =
+        HotkeyActivationMode.Hold;
     internal const SubtitlePosition DefaultVoiceSubtitlesPosition = SubtitlePosition.TopCenter;
     internal const float DefaultFsrSharpness = 0.92f;
 
@@ -39,6 +41,12 @@ internal sealed class BppConfig : IBppConfig
     public ConfigEntry<string>? EnchantPreviewHotkeyPathConfig { get; private set; }
 
     public ConfigEntry<string>? UpgradePreviewHotkeyPathConfig { get; private set; }
+
+    public ConfigEntry<HotkeyActivationMode>? UpgradePreviewActivationModeConfig
+    {
+        get;
+        private set;
+    }
 
     public ConfigEntry<string>? ToggleCollectionPanelHotkeyPathConfig { get; private set; }
 
@@ -159,6 +167,12 @@ internal sealed class BppConfig : IBppConfig
             "UpgradePreview",
             "<Keyboard>/shift",
             "Binding path for upgrade preview tooltip mode."
+        );
+        UpgradePreviewActivationModeConfig = config.Bind(
+            "Hotkeys",
+            "UpgradePreviewActivationMode",
+            DefaultUpgradePreviewActivationMode,
+            "How Shift behaves across BazaarPlusPlus preview features. Hold = active only while Shift is held. Toggle = each Shift press switches the upgrade preview and music-note overlay on or off."
         );
         ToggleCollectionPanelHotkeyPathConfig = config.Bind(
             "Hotkeys",
