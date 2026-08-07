@@ -133,6 +133,9 @@ internal sealed partial class CollectionPanelView
 
         chip.style.paddingLeft = UiSpacing.Md;
         chip.style.paddingRight = UiSpacing.Md;
+        // The native Button text element used to provide intrinsic width. Once it is hidden in
+        // favor of the custom icon/label pair, reserve the chip width explicitly.
+        UiStyle.FixedWidth(chip.style, 72f);
         chip.style.flexDirection = FlexDirection.Row;
         chip.style.alignItems = Align.Center;
         chip.style.justifyContent = Justify.Center;
@@ -1408,6 +1411,7 @@ internal sealed partial class CollectionPanelView
             Colors.CollectionChipBackground,
             Colors.CollectionChipBackground
         );
+        UiStyle.BorderWidth(chip.style, selected ? Borders.Accent : Borders.Thin);
         UiStyle.Radius(chip.style, Radii.CollectionPortraitChip);
     }
 
