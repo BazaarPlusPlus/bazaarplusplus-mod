@@ -442,3 +442,33 @@ the corpse-adoption hole directly. Fix: owned gates now `Object.DestroyImmediate
 the corpse never survives into a GetComponent, which eliminates the whole deferred-destroy class
 (corpse adoption, end-of-frame exposure after restore, same-frame duplicate groups). Locked by
 architecture assertions (`Object.DestroyImmediate(_group)` required, deferred variant forbidden).
+
+### 2026-08-07 (sixth round): empty native tooltip frame after Combat Impact teardown
+
+User correction: the small brown diamond beneath Continue is not a socket/note-grid artifact. It
+is the native auxiliary tooltip frame after its layout has collapsed around inactive text nodes.
+
+Root cause, grounded in the live host and decompiled native controller:
+
+- Combat Impact deliberately deactivates native `headerText` and `bodyText` while rendering its
+  custom paired content (`NativePairedTooltipSession.TryOpen`).
+- The interrupted-hide path restores geometry but keeps those original nodes inactive so an
+  in-flight native fade cannot expose a detached title (`ForceSettle` → `Release(false)`).
+- The snapshot can therefore survive until the pooled controller's next native show.
+- `AuxiliaryTooltipController.ShowAuxiliaryTooltipController` only calls `SetText`; unlike the
+  divider, it never calls `SetActive(true)` for header/body. Restoring a captured inactive state
+  before that show leaves only the active background, which `VerticalLayoutGroup` shrinks to the
+  tiny diamond visible in the screenshot.
+
+The handoff contract must distinguish ordinary snapshot restoration from a confirmed new native
+show. On a confirmed show, restore native geometry/art and normalize header/body active before the
+native method sets its new strings; let the native method remain authoritative for divider state.
+This belongs in the shared paired-tooltip session, not in the Recap button, because the leaked
+inactive state originates in the shared pooled host and can affect any later native auxiliary
+tooltip.
+
+Asset-level cross-check (`BoardVanessa_0.prefab`): `Button_Recap` and `Button_Replay` each carry a
+`RecapReplayButtonController` with non-empty serialized headers (`Recap` / `Replay`), while
+`Button_Continue` has no such component at all. Therefore the frame shown beneath Continue cannot
+be a legitimate empty Continue tooltip; it is the shared auxiliary controller left visible after
+one of the neighboring hover requests.

@@ -299,17 +299,11 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
 
     public bool OnNativeAuxiliaryTooltipShowing(AuxiliaryTooltipController controller)
     {
-        if (!_session.OwnsAuxiliary(controller))
-        {
-            // Someone else is about to show the native auxiliary tooltip this session had only
-            // prepared. Handing the snapshot back here is what keeps the native layout's padding
-            // and anchors from staying permanently rewritten.
-            _session.ReleasePrepared(controller);
-            return false;
-        }
-
-        _session.Release(restoreNativeContent: true);
-        return true;
+        // A confirmed native show must receive a fully usable pooled host, not merely the exact
+        // content-active flags captured before Combat Impact took it over. Native Show assigns
+        // text but never reactivates header/body, so replaying an inactive snapshot produces an
+        // empty, layout-collapsed frame.
+        return _session.ReleaseForNativeShow(controller);
     }
 
     public bool OnNativeAuxiliaryTooltipHiding(AuxiliaryTooltipController controller)
