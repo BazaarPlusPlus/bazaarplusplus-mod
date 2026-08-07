@@ -173,18 +173,30 @@ internal sealed partial class CollectionPanelView
     {
         if (_keywordChipRow == null)
             return;
-        if (!KeywordChipsMatch(options))
+        if (
+            _keywordChipsBuiltWithRelated != _showRelatedKeywordChips
+            || !KeywordChipsMatch(options)
+        )
         {
             ClearKeywordFacetRow();
-            var addedOption = false;
-            var addedRelatedGroup = false;
+            _keywordChipsBuiltWithRelated = _showRelatedKeywordChips;
             foreach (var option in options)
             {
-                if (option.IsRelated && addedOption && !addedRelatedGroup)
+                if (option.IsRelated && !_showRelatedKeywordChips)
                 {
-                    _keywordRelatedSectionLabel = CreateKeywordRelatedSectionLabel();
-                    _keywordChipRow.Add(_keywordRelatedSectionLabel);
-                    addedRelatedGroup = true;
+                    var ellipsis = CreateTagFacetChipButton(() =>
+                    {
+                        _showRelatedKeywordChips = true;
+                        _keywordChipsBuiltWithRelated = false;
+                        ClearKeywordFacetRow();
+                        EnsureKeywordChips(options);
+                    });
+                    var ellipsisLabel = ellipsis.Q<Label>(TagChipLabelName);
+                    if (ellipsisLabel != null)
+                        ellipsisLabel.text = "…";
+                    ellipsis.tooltip = CollectionPanelText.KeywordRelatedSection();
+                    _keywordChipRow.Add(ellipsis);
+                    break;
                 }
 
                 var captured = option;
@@ -193,7 +205,6 @@ internal sealed partial class CollectionPanelView
                 _keywordChips[captured] = chip;
                 _keywordChipOrder.Add(captured);
                 _keywordChipRow.Add(chip);
-                addedOption = true;
             }
         }
     }
@@ -210,9 +221,19 @@ internal sealed partial class CollectionPanelView
 
     private bool KeywordChipsMatch(IReadOnlyList<CollectionKeywordFacetOption> visible)
     {
-        if (visible.Count != _keywordChipOrder.Count)
+        var expectedCount = _showRelatedKeywordChips ? visible.Count : 0;
+        if (!_showRelatedKeywordChips)
+        {
+            foreach (var option in visible)
+            {
+                if (option.IsRelated)
+                    break;
+                expectedCount++;
+            }
+        }
+        if (expectedCount != _keywordChipOrder.Count)
             return false;
-        for (var i = 0; i < visible.Count; i++)
+        for (var i = 0; i < expectedCount; i++)
             if (visible[i] != _keywordChipOrder[i])
                 return false;
         return true;
@@ -239,32 +260,7 @@ internal sealed partial class CollectionPanelView
         }
         _keywordChips.Clear();
         _keywordChipOrder.Clear();
-        _keywordRelatedSectionLabel = null;
         _keywordChipRow?.Clear();
-    }
-
-    private static Label CreateKeywordRelatedSectionLabel()
-    {
-        var label = CreateLabel(Sizes.FontSmall, FontStyle.Bold, Colors.HistorySubtitleText);
-        label.text = CollectionPanelText.KeywordRelatedSection();
-        label.style.width = Length.Percent(100f);
-        label.style.flexBasis = Length.Percent(100f);
-        label.style.marginTop = UiSpacing.Xs;
-        label.style.marginBottom = UiSpacing.Xs;
-        label.style.whiteSpace = WhiteSpace.NoWrap;
-        label.style.overflow = Overflow.Hidden;
-        label.style.opacity = 0.72f;
-        return label;
-    }
-
-    private static VisualElement CreateFacetGroupSpacer()
-    {
-        var spacer = new VisualElement { pickingMode = PickingMode.Ignore };
-        spacer.style.width = Length.Percent(100f);
-        spacer.style.flexBasis = Length.Percent(100f);
-        spacer.style.height = UiSpacing.Sm;
-        spacer.style.flexShrink = 0f;
-        return spacer;
     }
 
     private void EnsureSourceChips(IReadOnlyList<CollectionSourceOptionViewModel> sources)

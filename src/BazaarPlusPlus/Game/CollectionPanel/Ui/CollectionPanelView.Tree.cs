@@ -1,5 +1,4 @@
 #nullable enable
-using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Game.CollectionPanel.Grid;
 using BazaarPlusPlus.Game.Supporters.Ui;
@@ -47,7 +46,7 @@ internal sealed partial class CollectionPanelView
         titleRow.style.alignItems = Align.Center;
         rail.Add(titleRow);
 
-        _title = CreateLabel(Sizes.FontTitle, FontStyle.Normal, Colors.GameTitleText);
+        _title = CreateLabel(Sizes.FontTitle, FontStyle.Normal, Colors.White);
         _title.style.flexGrow = 1f;
         _title.style.flexShrink = 1f;
         _title.style.minWidth = 0f;
@@ -117,7 +116,7 @@ internal sealed partial class CollectionPanelView
         // Hero context stays visible while the remaining filters scroll.
         _heroFilterSection = CreateFilterSection(
             rail,
-            CollectionPanelText.HeroHeader(),
+            string.Empty,
             UiSpacing.Xl,
             out _heroChipRow,
             out _heroFilterLabel
@@ -125,6 +124,27 @@ internal sealed partial class CollectionPanelView
         _heroChipRow.style.flexWrap = Wrap.NoWrap;
         _heroChipRow.style.justifyContent = Justify.FlexStart;
         _heroChipRow.RegisterCallback<GeometryChangedEvent>(OnHeroChipRowGeometryChanged);
+
+        // Keep hero, size, and quality in one visual card. The child section contributes only its
+        // chip row, without introducing a nested card or a second heading.
+        _tierFilterSection = CreateFilterSection(
+            _heroFilterSection,
+            string.Empty,
+            UiSpacing.Lg,
+            out var tierSizeChipRow,
+            out _tierFilterLabel,
+            out _,
+            card: false
+        );
+        tierSizeChipRow.style.flexWrap = Wrap.Wrap;
+        tierSizeChipRow.style.justifyContent = Justify.FlexStart;
+        _sizeChipRow = CreateCombinedFilterChipSegment();
+        _tierChipRow = CreateCombinedFilterChipSegment();
+        tierSizeChipRow.Add(_sizeChipRow);
+        tierSizeChipRow.Add(_tierChipRow);
+        _tierChipRow.style.marginLeft = UiSpacing.Sm;
+        _tierChipRow.style.flexWrap = Wrap.NoWrap;
+        _tierChipRow.style.justifyContent = Justify.FlexStart;
 
         var controlsScroll = new ScrollView(ScrollViewMode.Vertical);
         controlsScroll.style.flexGrow = 1f;
@@ -139,30 +159,11 @@ internal sealed partial class CollectionPanelView
         _controlsDragScroller = new ScrollViewDragScroller(controlsScroll);
         rail.Add(controlsScroll);
 
-        // Size + quality filter. Both chip sets use content widths and flow together without a
-        // divider.
-        _tierFilterSection = CreateFilterSection(
-            controlsScroll,
-            CollectionPanelText.TierSizeHeader(),
-            UiSpacing.Lg,
-            out var tierSizeChipRow,
-            out _tierFilterLabel
-        );
-        tierSizeChipRow.style.flexWrap = Wrap.Wrap;
-        tierSizeChipRow.style.justifyContent = Justify.FlexStart;
-        _sizeChipRow = CreateCombinedFilterChipSegment();
-        _tierChipRow = CreateCombinedFilterChipSegment();
-        tierSizeChipRow.Add(_sizeChipRow);
-        tierSizeChipRow.Add(_tierChipRow);
-        _tierChipRow.style.marginLeft = UiSpacing.Sm;
-        _tierChipRow.style.flexWrap = Wrap.NoWrap;
-        _tierChipRow.style.justifyContent = Justify.FlexStart;
-
         // Keyword filter (EHiddenTag gameplay keywords). This is the common secondary filter for
         // Items and Skills, so keep it directly below Quality.
         _keywordFilterSection = CreateFilterSection(
             controlsScroll,
-            CollectionPanelText.KeywordHeader(),
+            string.Empty,
             UiSpacing.Lg,
             out _keywordChipRow,
             out _keywordFilterLabel,
@@ -181,7 +182,7 @@ internal sealed partial class CollectionPanelView
         // Player-facing type chips get their own titled card; the chip flow itself is unchanged.
         _tagFilterSection = CreateFilterChipSection(
             controlsScroll,
-            CollectionPanelText.TagHeader(),
+            string.Empty,
             UiSpacing.Lg,
             out _tagChipRow
         );
@@ -191,7 +192,7 @@ internal sealed partial class CollectionPanelView
         // Source filter (merchant portraits on Items, trainer portraits on Skills).
         _sourceFilterSection = CreateFilterSection(
             controlsScroll,
-            CollectionPanelText.SourceHeader(ECardType.Item),
+            string.Empty,
             UiSpacing.Lg,
             out _sourceChipRow,
             out _sourceFilterLabel
@@ -303,7 +304,7 @@ internal sealed partial class CollectionPanelView
         container.style.flexGrow = 1f;
         container.style.flexShrink = 1f;
         container.style.minWidth = 0f;
-        container.style.height = Sizes.CollectionTagChipHeight;
+        container.style.height = Sizes.CollectionSearchRowHeight;
         container.pickingMode = PickingMode.Position;
 
         var frame = new VisualElement();
@@ -312,7 +313,7 @@ internal sealed partial class CollectionPanelView
         frame.style.flexGrow = 1f;
         frame.style.flexShrink = 1f;
         frame.style.minWidth = 0f;
-        frame.style.height = Sizes.CollectionTagChipHeight;
+        frame.style.height = Sizes.CollectionSearchRowHeight;
         frame.style.backgroundColor = Colors.CollectionChipBackground;
         UiStyle.Border(frame.style, Borders.Thin, Colors.CollectionChipBorder);
         UiStyle.Radius(frame.style, Radii.CollectionChip);
@@ -413,7 +414,7 @@ internal sealed partial class CollectionPanelView
         group.style.flexDirection = FlexDirection.Row;
         group.style.alignItems = Align.Stretch;
         group.style.flexShrink = 0f;
-        group.style.height = Sizes.CollectionTagChipHeight;
+        group.style.height = Sizes.CollectionSearchRowHeight;
         group.style.overflow = Overflow.Hidden;
         UiStyle.FixedWidth(group.style, Sizes.CollectionSortButtonWidth * 2f);
         UiStyle.Radius(group.style, Radii.CollectionChip);
@@ -500,7 +501,7 @@ internal sealed partial class CollectionPanelView
             text,
             onClick,
             Sizes.CollectionSortButtonWidth,
-            Sizes.CollectionTagChipHeight
+            Sizes.CollectionSearchRowHeight
         );
         button.style.flexShrink = 0f;
         StyleCollectionGroupChip(
@@ -523,8 +524,9 @@ internal sealed partial class CollectionPanelView
         string title,
         float marginTop,
         out VisualElement chipRow,
-        out Label label
-    ) => CreateFilterSection(parent, title, marginTop, out chipRow, out label, out _);
+        out Label label,
+        bool card = true
+    ) => CreateFilterSection(parent, title, marginTop, out chipRow, out label, out _, card);
 
     private static VisualElement CreateFilterSection(
         VisualElement parent,
@@ -532,17 +534,21 @@ internal sealed partial class CollectionPanelView
         float marginTop,
         out VisualElement chipRow,
         out Label label,
-        out VisualElement headerRow
+        out VisualElement headerRow,
+        bool card = true
     )
     {
         var section = new VisualElement();
         section.style.flexDirection = FlexDirection.Column;
         section.style.flexShrink = 0f;
         section.style.marginTop = marginTop;
-        section.style.backgroundColor = Colors.CollectionFilterCardBackground;
-        UiStyle.Border(section.style, Borders.Thin, Colors.CollectionFilterCardBorder);
-        UiStyle.Radius(section.style, Radii.Md);
-        UiStyle.Padding(section.style, UiSpacing.Md);
+        if (card)
+        {
+            section.style.backgroundColor = Colors.CollectionFilterCardBackground;
+            UiStyle.Border(section.style, Borders.Thin, Colors.CollectionFilterCardBorder);
+            UiStyle.Radius(section.style, Radii.Md);
+            UiStyle.Padding(section.style, UiSpacing.Md);
+        }
         parent.Add(section);
 
         headerRow = new VisualElement();
@@ -550,6 +556,7 @@ internal sealed partial class CollectionPanelView
         headerRow.style.alignItems = Align.Center;
         headerRow.style.alignSelf = Align.Stretch;
         headerRow.style.marginBottom = UiSpacing.Sm;
+        headerRow.style.display = DisplayStyle.None;
         section.Add(headerRow);
 
         label = CreateLabel(
@@ -737,6 +744,7 @@ internal sealed partial class CollectionPanelView
         header.style.flexDirection = FlexDirection.Row;
         header.style.alignItems = Align.Center;
         header.style.marginBottom = UiSpacing.Sm;
+        header.style.display = DisplayStyle.None;
         section.Add(header);
 
         var label = CreateLabel(
@@ -771,7 +779,7 @@ internal sealed partial class CollectionPanelView
             string.Empty,
             _commands.ToggleRunDayFilter,
             Sizes.DayIconWidth,
-            Sizes.CollectionTagChipHeight
+            Sizes.CollectionSearchRowHeight
         );
         button.tooltip = CollectionPanelText.DayHeader();
         StyleCollectionChip(button, Colors.CollectionChipBackground, Colors.CollectionChipText);

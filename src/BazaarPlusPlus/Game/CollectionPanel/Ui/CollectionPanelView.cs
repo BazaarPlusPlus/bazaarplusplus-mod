@@ -50,7 +50,6 @@ internal sealed partial class CollectionPanelView : IDisposable
     private Label? _heroFilterLabel;
     private Label? _tierFilterLabel;
     private Label? _keywordFilterLabel;
-    private Label? _keywordRelatedSectionLabel;
     private VisualElement? _keywordMatchModeButton;
     private VisualElement? _heroChipRow;
     private VisualElement? _tierChipRow;
@@ -86,6 +85,8 @@ internal sealed partial class CollectionPanelView : IDisposable
     private readonly List<ECardTag> _tagChipOrder = new();
     private readonly Dictionary<CollectionKeywordFacetOption, Button> _keywordChips = new();
     private readonly List<CollectionKeywordFacetOption> _keywordChipOrder = new();
+    private bool _showRelatedKeywordChips;
+    private bool _keywordChipsBuiltWithRelated;
 
     private readonly Dictionary<string, Button> _sourceChips = new(StringComparer.Ordinal);
     private readonly Dictionary<string, VisualElement> _sourceChipIcons = new(
@@ -161,7 +162,7 @@ internal sealed partial class CollectionPanelView : IDisposable
                 _parent,
                 BppOverlaySorting.NativeCardPreview,
                 Sizes.FontTitle,
-                Colors.GameTitleText,
+                Colors.White,
                 UnicodeFontCoverage.ContainsCjk(CollectionPanelText.Title())
                     ? NativeGameTypography.OwnedTextRole.Body
                     : NativeGameTypography.OwnedTextRole.Heading,
@@ -443,8 +444,6 @@ internal sealed partial class CollectionPanelView : IDisposable
                 : CollectionPanelText.TierHeader();
         if (_keywordFilterLabel != null)
             _keywordFilterLabel.text = CollectionPanelText.KeywordHeader();
-        if (_keywordRelatedSectionLabel != null)
-            _keywordRelatedSectionLabel.text = CollectionPanelText.KeywordRelatedSection();
 
         UpdateContentSpacerHeight(model.ContentHeight);
 
