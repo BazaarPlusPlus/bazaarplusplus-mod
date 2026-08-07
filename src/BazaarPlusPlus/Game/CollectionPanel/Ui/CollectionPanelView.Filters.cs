@@ -130,6 +130,9 @@ internal sealed partial class CollectionPanelView
         var icon = new VisualElement { pickingMode = PickingMode.Ignore };
         UiStyle.FixedSize(icon.style, 16f, 16f);
         icon.style.marginRight = UiSpacing.Xs;
+        chip.style.flexDirection = FlexDirection.Row;
+        chip.style.alignItems = Align.Center;
+        chip.style.justifyContent = Justify.Center;
         icon.generateVisualContent += context => DrawSizeIcon(context, icon, size);
         chip.Insert(0, icon);
         return chip;
@@ -213,8 +216,14 @@ internal sealed partial class CollectionPanelView
         if (!KeywordChipsMatch(options))
         {
             ClearKeywordFacetRow();
+            var addedRelatedGroup = false;
             foreach (var option in options)
             {
+                if (option.IsRelated && !addedRelatedGroup)
+                {
+                    _keywordChipRow.Add(CreateFacetGroupSpacer());
+                    addedRelatedGroup = true;
+                }
                 var captured = option;
                 var chip = CreateTagFacetChipButton(() => _commands.ToggleKeyword(captured));
                 ApplyTagChipContent(chip, ResolveTagDisplay(captured));
@@ -223,6 +232,16 @@ internal sealed partial class CollectionPanelView
                 _keywordChipRow.Add(chip);
             }
         }
+    }
+
+    private static VisualElement CreateFacetGroupSpacer()
+    {
+        var spacer = new VisualElement { pickingMode = PickingMode.Ignore };
+        spacer.style.width = Length.Percent(100f);
+        spacer.style.flexBasis = Length.Percent(100f);
+        spacer.style.height = UiSpacing.Md;
+        spacer.style.flexShrink = 0f;
+        return spacer;
     }
 
     private bool TagChipsMatch(IReadOnlyList<ECardTag> visible)
@@ -1347,11 +1366,10 @@ internal sealed partial class CollectionPanelView
         if (_dayToggleButton == null)
             return;
 
-        if (_dayToggleLabel != null)
-        {
-            _dayToggleLabel.text =
-                $"DAY\n{day?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "—"}";
-        }
+        if (_dayToggleCaption != null)
+            _dayToggleCaption.text = "DAY";
+        if (_dayToggleValue != null)
+            _dayToggleValue.text = day?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "—";
         StyleCollectionChip(
             _dayToggleButton,
             active ? Colors.CollectionChipSelectedBackground : Colors.CollectionChipBackground,

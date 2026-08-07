@@ -316,7 +316,7 @@ internal sealed partial class CollectionPanelView
         frame.style.minWidth = 0f;
         frame.style.height = Sizes.CollectionSearchRowHeight;
         frame.style.backgroundColor = Colors.CollectionChipBackground;
-        UiStyle.Border(frame.style, Borders.Thin, Colors.CollectionChipBorder);
+        UiStyle.Border(frame.style, Borders.Thin, Color.black);
         UiStyle.Radius(frame.style, Radii.CollectionChip);
         UiStyle.HorizontalPadding(frame.style, UiSpacing.Md);
         container.Add(frame);
@@ -367,16 +367,16 @@ internal sealed partial class CollectionPanelView
         void RefreshFrame()
         {
             var background = Colors.CollectionChipBackground;
-            var border = Colors.CollectionChipBorder;
+            var border = Color.black;
             if (focused)
             {
                 background = Colors.CollectionChipSelectedBackground;
-                border = Colors.CollectionChipSelectedBorder;
+                border = Color.black;
             }
             else if (hovered)
             {
                 background = Colors.CollectionChipHoverBackground;
-                border = Colors.CollectionChipHoverBorder;
+                border = Color.black;
             }
 
             frame.style.backgroundColor = background;
@@ -755,6 +755,7 @@ internal sealed partial class CollectionPanelView
             Colors.CollectionFilterTitleText
         );
         label.text = title;
+        label.style.marginLeft = UiSpacing.Xl;
         label.style.whiteSpace = WhiteSpace.NoWrap;
         header.Add(label);
 
@@ -787,15 +788,24 @@ internal sealed partial class CollectionPanelView
         var defaultText = button.Q<TextElement>();
         if (defaultText != null)
             defaultText.style.display = DisplayStyle.None;
-        var label = new Label();
-        _dayToggleLabel = label;
-        label.style.flexGrow = 1f;
-        label.style.whiteSpace = WhiteSpace.Normal;
-        label.style.unityTextAlign = TextAnchor.MiddleCenter;
-        label.style.fontSize = Sizes.FontCorner;
-        label.style.color = Colors.CollectionChipText;
-        label.pickingMode = PickingMode.Ignore;
-        button.Add(label);
+        var content = new VisualElement { pickingMode = PickingMode.Ignore };
+        content.style.flexDirection = FlexDirection.Column;
+        content.style.alignItems = Align.Center;
+        content.style.justifyContent = Justify.Center;
+        content.style.flexGrow = 1f;
+        var caption = new Label("DAY") { pickingMode = PickingMode.Ignore };
+        caption.style.fontSize = Sizes.FontTiny;
+        caption.style.unityTextAlign = TextAnchor.MiddleCenter;
+        caption.style.color = Colors.CollectionChipText;
+        var value = new Label { pickingMode = PickingMode.Ignore };
+        value.style.fontSize = Sizes.FontBody;
+        value.style.unityTextAlign = TextAnchor.MiddleCenter;
+        value.style.color = Colors.CollectionChipText;
+        _dayToggleCaption = caption;
+        _dayToggleValue = value;
+        content.Add(caption);
+        content.Add(value);
+        button.Add(content);
         StyleCollectionChip(button, Colors.CollectionChipBackground, Colors.CollectionChipText);
         return button;
     }

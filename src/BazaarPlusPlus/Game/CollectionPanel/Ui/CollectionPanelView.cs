@@ -45,7 +45,8 @@ internal sealed partial class CollectionPanelView : IDisposable
     private TextField? _searchField;
     private Label? _searchPlaceholderLabel;
     private Button? _dayToggleButton;
-    private Label? _dayToggleLabel;
+    private Label? _dayToggleCaption;
+    private Label? _dayToggleValue;
     private Button? _sortQualityButton;
     private Button? _sortSizeButton;
     private Label? _heroFilterLabel;
