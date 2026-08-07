@@ -134,7 +134,7 @@ public sealed class NativePairedTooltipArchitectureTests
             StringComparison.Ordinal
         );
         var methodEnd = host.IndexOf(
-            "internal void ReleasePrepared",
+            "internal bool ReleaseForNativeShow",
             methodStart,
             StringComparison.Ordinal
         );
@@ -201,6 +201,61 @@ public sealed class NativePairedTooltipArchitectureTests
         Assert.True(
             reuseCheck >= 0 && reuseClose > reuseCheck && recreate > reuseClose,
             "a matching held gate must be reused closed before the restore-then-recreate fallback"
+        );
+    }
+
+    [Fact]
+    public void A_new_native_show_reactivates_pooled_text_nodes_before_assigning_content()
+    {
+        var host = File.ReadAllText(
+            Path.Combine(
+                MainSourceRoot(RepoRoot()),
+                "GameInterop",
+                "Tooltips",
+                "NativePairedTooltipHost.cs"
+            )
+        );
+        var releaseStart = host.IndexOf(
+            "internal bool ReleaseForNativeShow",
+            StringComparison.Ordinal
+        );
+        var releaseEnd = host.IndexOf(
+            "// ── Open / content",
+            releaseStart,
+            StringComparison.Ordinal
+        );
+        Assert.True(releaseStart >= 0 && releaseEnd > releaseStart);
+        var release = host[releaseStart..releaseEnd];
+        Assert.Contains("RestorePreparedNativeHostForNativeShow(controller);", release);
+
+        var restoreStart = host.IndexOf(
+            "internal void RestoreForNativeShow()",
+            StringComparison.Ordinal
+        );
+        Assert.True(restoreStart >= 0);
+        var restore = host[restoreStart..];
+        Assert.Contains("Restore(restoreContentVisibility: false);", restore);
+        Assert.Contains("Controller.headerText.gameObject.SetActive(true);", restore);
+        Assert.Contains("Controller.bodyText.gameObject.SetActive(true);", restore);
+        Assert.DoesNotContain("Controller.dividerParent.SetActive", restore);
+    }
+
+    [Fact]
+    public void Native_auxiliary_anomaly_storms_are_partitioned_by_category_and_phase()
+    {
+        var events = File.ReadAllText(
+            Path.Combine(
+                MainSourceRoot(RepoRoot()),
+                "Game",
+                "PostCombatImpact",
+                "PostCombatImpactLogEvents.cs"
+            )
+        );
+
+        Assert.Contains(
+            "new BppLogStormPolicy([AnomalyCategory, AnomalyPhase])",
+            events,
+            StringComparison.Ordinal
         );
     }
 
