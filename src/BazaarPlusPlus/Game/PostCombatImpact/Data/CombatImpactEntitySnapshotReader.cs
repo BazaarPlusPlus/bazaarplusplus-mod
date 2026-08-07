@@ -1,14 +1,18 @@
 #nullable enable
 using BazaarGameClient.Domain.Models.Cards;
 using BazaarGameShared.Domain.Cards.Interfaces;
+using BazaarGameShared.Domain.Core;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Effect;
 using BazaarGameShared.Domain.Effect.Actions;
 using BazaarGameShared.Domain.Effect.AuraActions;
 using BazaarGameShared.Domain.Values.ReferenceValues;
+using BazaarGameShared.Infra.Messages.CombatSimEvents;
+using BazaarGameShared.Infra.Messages.Shared;
 using BazaarPlusPlus.GameInterop.Cards;
 using BazaarPlusPlus.GameInterop.Heroes;
 using BazaarPlusPlus.Localization;
+using TheBazaar;
 using TheBazaar.Tooltips;
 
 namespace BazaarPlusPlus.Game.PostCombatImpact.Data;
@@ -27,7 +31,7 @@ internal static class CombatImpactEntitySnapshotReader
         return CombatImpactEntityName.RemoveNativeEnchantmentPrefix(nativeTooltipTitle);
     }
 
-    internal static IReadOnlyDictionary<string, CombatImpactEntity> Read()
+    internal static IReadOnlyDictionary<string, CombatImpactEntity> Read(CombatSim simulation)
     {
         var entities = new Dictionary<string, CombatImpactEntity>(StringComparer.Ordinal);
         var order = 0;
@@ -43,49 +47,10 @@ internal static class CombatImpactEntitySnapshotReader
         {
             if (card?.InstanceId.Value is not { Length: > 0 } instanceId)
                 continue;
-
-            var template = card.Template;
-            var name = ResolveTitle(template?.Localization?.Title);
-            if (string.IsNullOrWhiteSpace(name))
-                name = template?.InternalName;
-            if (string.IsNullOrWhiteSpace(name))
-                name = card.Type == ECardType.Skill ? T("技能", "Skill") : T("物品", "Item");
-
-            var item = card as ItemCard;
-            var effectAttributes = ReadEffectAttributeTypes(card, item);
-            var activeEffects = ReadActiveEffects(card);
-            entities[instanceId] = new CombatImpactEntity(
-                instanceId,
-                name!,
-                card.Type.ToString(),
-                null,
-                order++,
-                card.TemplateId,
-                card.Tier,
-                card.Type is ECardType.Item or ECardType.SocketEffect
-                    ? CardSizeSpan.Resolve(card.Size)
-                    : 1,
-                item?.Enchantment,
-                card.Attributes == null
-                    ? null
-                    : new Dictionary<ECardAttributeType, int>(card.Attributes),
-                card.Owner?.CombatantId,
-                effectAttributes.Abilities,
-                effectAttributes.Auras,
-                effectAttributes.ReferenceValuedAuraEffectIds,
-                card.LeftSocketId,
-                CombatImpactEntityTags.ResolveHiddenTags(card),
-                card.Section,
-                CombatImpactEntityTags.ResolveTags(card),
-                CombatImpactAttributionRuleReader.ReadSourceRules(
-                    activeEffects.Abilities,
-                    activeEffects.Auras
-                ),
-                card.Type == ECardType.SocketEffect
-                    ? CombatImpactAttributionRuleReader.ReadUseRules(activeEffects.Abilities)
-                    : null
-            );
+            AddCard(entities, card, order++);
         }
+
+        order = AddTransformedEntities(simulation, entities, order, CreateTransformedCard);
 
         var playerHero = NormalizeHero(TheBazaar.Data.Run?.Player?.Hero);
         AddPlayer(entities, ECombatantId.Player, playerHero, T("己方", "You"), order++);
@@ -95,6 +60,124 @@ internal static class CombatImpactEntitySnapshotReader
             opponentName = ResolveOpponentName(opponentHero);
         AddPlayer(entities, ECombatantId.Opponent, opponentHero, opponentName, order);
         return entities;
+    }
+
+    internal static int AddTransformedEntities(
+        CombatSim simulation,
+        IDictionary<string, CombatImpactEntity> entities,
+        int order,
+        Func<SimEventCardTransformation, Card?> createCard
+    )
+    {
+        foreach (var snapshot in CombatImpactTransformedCardSnapshotReader.Read(simulation))
+            AddTransformedEntity(snapshot, entities, ref order, createCard);
+
+        return order;
+    }
+
+    private static Card CreateTransformedCard(SimEventCardTransformation transformed)
+    {
+        try
+        {
+            return DTOUtils.CreateCard(
+                transformed.InstanceId,
+                transformed.TemplateId,
+                transformed.Type
+            );
+        }
+        catch
+        {
+            return transformed.Type switch
+            {
+                ECardType.Item => new ItemCard(),
+                ECardType.Skill => new SkillCard(),
+                ECardType.SocketEffect => new SocketEffect(),
+                _ => new Card(),
+            };
+        }
+    }
+
+    private static void AddTransformedEntity(
+        CombatImpactTransformedCardSnapshot snapshot,
+        IDictionary<string, CombatImpactEntity> entities,
+        ref int order,
+        Func<SimEventCardTransformation, Card?> createCard
+    )
+    {
+        var transformed = snapshot.Card;
+        if (
+            string.IsNullOrWhiteSpace(transformed.InstanceId)
+            || entities.ContainsKey(transformed.InstanceId)
+        )
+            return;
+
+        var card = createCard(transformed);
+        if (card == null)
+            return;
+
+        card.InstanceId = InstanceId.TryParse(transformed.InstanceId);
+        if (Guid.TryParse(transformed.TemplateId, out var templateId))
+            card.TemplateId = templateId;
+        card.Type = transformed.Type;
+        if (snapshot.Update != null)
+            card.Update(snapshot.Update);
+        card.LeftSocketId = transformed.Socket ?? card.LeftSocketId;
+        card.Section = transformed.Section ?? card.Section;
+
+        AddCard(entities, card, order++, transformed.CombatantId);
+    }
+
+    private static void AddCard(
+        IDictionary<string, CombatImpactEntity> entities,
+        Card card,
+        int order,
+        ECombatantId? combatantOverride = null
+    )
+    {
+        if (card.InstanceId.Value is not { Length: > 0 } instanceId)
+            return;
+
+        var template = card.Template;
+        var name = ResolveTitle(template?.Localization?.Title);
+        if (string.IsNullOrWhiteSpace(name))
+            name = template?.InternalName;
+        if (string.IsNullOrWhiteSpace(name))
+            name = card.Type == ECardType.Skill ? T("技能", "Skill") : T("物品", "Item");
+
+        var item = card as ItemCard;
+        var effectAttributes = ReadEffectAttributeTypes(card, item);
+        var activeEffects = ReadActiveEffects(card);
+        entities[instanceId] = new CombatImpactEntity(
+            instanceId,
+            name!,
+            card.Type.ToString(),
+            null,
+            order,
+            card.TemplateId,
+            card.Tier,
+            card.Type is ECardType.Item or ECardType.SocketEffect
+                ? CardSizeSpan.Resolve(card.Size)
+                : 1,
+            item?.Enchantment,
+            card.Attributes == null
+                ? null
+                : new Dictionary<ECardAttributeType, int>(card.Attributes),
+            combatantOverride ?? card.Owner?.CombatantId,
+            effectAttributes.Abilities,
+            effectAttributes.Auras,
+            effectAttributes.ReferenceValuedAuraEffectIds,
+            card.LeftSocketId,
+            CombatImpactEntityTags.ResolveHiddenTags(card),
+            card.Section,
+            CombatImpactEntityTags.ResolveTags(card),
+            CombatImpactAttributionRuleReader.ReadSourceRules(
+                activeEffects.Abilities,
+                activeEffects.Auras
+            ),
+            card.Type == ECardType.SocketEffect
+                ? CombatImpactAttributionRuleReader.ReadUseRules(activeEffects.Abilities)
+                : null
+        );
     }
 
     private static ActiveEffects ReadActiveEffects(Card card)

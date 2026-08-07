@@ -42,14 +42,40 @@ public sealed class CombatImpactEffectIconKeyTests
         Assert.Equal(iconKey, CombatImpactEffectIconKey.ResolveAttribute(attributeKey, null));
     }
 
-    [Fact]
-    public void Enchant_variant_uses_variant_icon_key()
+    [Theory]
+    [InlineData("Deadly", "CritChance")]
+    [InlineData("Fiery", "Burn")]
+    [InlineData("Heavy", "Slow")]
+    [InlineData("Icy", "Freeze")]
+    [InlineData("Mossy", "Regen")]
+    [InlineData("Obsidian", "Damage")]
+    [InlineData("Restorative", "Healing")]
+    [InlineData("Shielded", "Shield")]
+    [InlineData("Toxic", "Poison")]
+    [InlineData("Turbo", "Haste")]
+    public void Combat_enchant_variants_use_their_effect_icon(string enchantment, string iconKey)
     {
         Assert.Equal(
-            "Fiery",
+            iconKey,
             CombatImpactEffectIconKey.Resolve(
                 CombatImpactKind.AttributeChange,
-                "EnchantTargets:Fiery"
+                $"EnchantTargets:{enchantment}"
+            )
+        );
+    }
+
+    [Theory]
+    [InlineData("Golden")]
+    [InlineData("Radiant")]
+    [InlineData("Shiny")]
+    [InlineData("Unknown")]
+    public void Enchant_variants_without_one_effect_use_the_generic_icon(string enchantment)
+    {
+        Assert.Equal(
+            "Enchant",
+            CombatImpactEffectIconKey.Resolve(
+                CombatImpactKind.AttributeChange,
+                $"EnchantTargets:{enchantment}"
             )
         );
     }
