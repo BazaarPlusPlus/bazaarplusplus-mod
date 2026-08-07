@@ -15,6 +15,7 @@ internal static class CombatImpactProjector
         IReadOnlyDictionary<string, CombatImpactEntity> entities
     )
     {
+        var transformLineage = CombatImpactTransformLineage.Build(simulation);
         var executions = ProjectExecutions(simulation, entities);
         var events = new List<CombatImpactEvent>();
         var diagnostics = new List<CombatImpactProjectionDiagnostic>();
@@ -253,15 +254,106 @@ internal static class CombatImpactProjector
         );
         RecoverDroppedAppliedEffectCriticals(events, authoritative);
 
+        var canonicalEvents = CanonicalizeEvents(events, transformLineage, entities);
+        var canonicalUseCounts = CanonicalizeUseCounts(useCounts, transformLineage, entities);
+        var canonicalAuthoritative = CanonicalizeAuthoritativeMetrics(
+            authoritative,
+            transformLineage,
+            entities
+        );
+
         var report = CombatImpactAggregator.Aggregate(
-            new CombatImpactProjectionInput(entities, events, useCounts, authoritative)
+            new CombatImpactProjectionInput(
+                entities,
+                canonicalEvents,
+                canonicalUseCounts,
+                canonicalAuthoritative
+            )
         );
         report = AttachPeriodicImpacts(
             report,
-            PeriodicEffectAttribution.Project(simulation, entities)
+            PeriodicEffectAttribution.Project(simulation, entities),
+            transformLineage,
+            entities
         );
         return report with { ProjectionDiagnostics = diagnostics.Distinct().ToArray() };
     }
+
+    private static IReadOnlyList<CombatImpactEvent> CanonicalizeEvents(
+        IEnumerable<CombatImpactEvent> events,
+        CombatImpactTransformLineage lineage,
+        IReadOnlyDictionary<string, CombatImpactEntity> entities
+    ) =>
+        events
+            .Select(item =>
+                item with
+                {
+                    SourceId = lineage.ResolveKnown(item.SourceId, entities),
+                    TargetId = lineage.ResolveKnown(item.TargetId, entities),
+                    RawDirectSourceId = lineage.ResolveOptional(item.RawDirectSourceId, entities),
+                    TriggerSourceId = lineage.ResolveOptional(item.TriggerSourceId, entities),
+                }
+            )
+            .ToArray();
+
+    private static IReadOnlyDictionary<string, int> CanonicalizeUseCounts(
+        IReadOnlyDictionary<string, int> useCounts,
+        CombatImpactTransformLineage lineage,
+        IReadOnlyDictionary<string, CombatImpactEntity> entities
+    ) =>
+        useCounts
+            .GroupBy(item => lineage.ResolveKnown(item.Key, entities), StringComparer.Ordinal)
+            .ToDictionary(
+                group => group.Key,
+                group => SaturatingInt(group.Sum(item => (long)item.Value)),
+                StringComparer.Ordinal
+            );
+
+    private static IReadOnlyDictionary<
+        string,
+        IReadOnlyList<CombatImpactAuthoritativeMetric>
+    > CanonicalizeAuthoritativeMetrics(
+        IReadOnlyDictionary<string, IReadOnlyList<CombatImpactAuthoritativeMetric>> metrics,
+        CombatImpactTransformLineage lineage,
+        IReadOnlyDictionary<string, CombatImpactEntity> entities
+    ) =>
+        metrics
+            .SelectMany(source =>
+                source.Value.Select(metric => new
+                {
+                    SourceId = lineage.ResolveKnown(source.Key, entities),
+                    Metric = metric,
+                })
+            )
+            .GroupBy(item => item.SourceId, StringComparer.Ordinal)
+            .ToDictionary(
+                source => source.Key,
+                source =>
+                    (IReadOnlyList<CombatImpactAuthoritativeMetric>)
+                        source
+                            .GroupBy(item => new
+                            {
+                                item.Metric.Kind,
+                                item.Metric.NativeAttributeKey,
+                                item.Metric.Unit,
+                                item.Metric.Basis,
+                                item.Metric.CanReconcileApplicationCount,
+                            })
+                            .Select(group =>
+                            {
+                                var key = group.Key;
+                                return new CombatImpactAuthoritativeMetric(
+                                    key.Kind,
+                                    key.NativeAttributeKey,
+                                    SaturatingInt(group.Sum(item => (long)item.Metric.Value)),
+                                    key.Unit,
+                                    key.Basis,
+                                    key.CanReconcileApplicationCount
+                                );
+                            })
+                            .ToArray(),
+                StringComparer.Ordinal
+            );
 
     private static void AddUseAttributionEvents(
         IReadOnlyDictionary<string, CombatImpactEntity> entities,
@@ -391,7 +483,9 @@ internal static class CombatImpactProjector
 
     private static CombatImpactReport AttachPeriodicImpacts(
         CombatImpactReport report,
-        PeriodicAttributionReport periodic
+        PeriodicAttributionReport periodic,
+        CombatImpactTransformLineage lineage,
+        IReadOnlyDictionary<string, CombatImpactEntity> entities
     )
     {
         return report with
@@ -413,7 +507,9 @@ internal static class CombatImpactProjector
                                         group
                                             .Targets.Select(target => target.Entity.CombatantId)
                                             .OfType<ECombatantId>()
-                                            .ToHashSet()
+                                            .ToHashSet(),
+                                        lineage,
+                                        entities
                                     )
                                     : null;
                                 return impact != null
@@ -434,12 +530,18 @@ internal static class CombatImpactProjector
         IReadOnlyDictionary<PeriodicImpactKey, CombatImpactPeriodicImpact> sourceImpacts,
         string sourceId,
         CombatImpactPeriodicKind kind,
-        IReadOnlyCollection<ECombatantId> targetCombatants
+        IReadOnlyCollection<ECombatantId> targetCombatants,
+        CombatImpactTransformLineage lineage,
+        IReadOnlyDictionary<string, CombatImpactEntity> entities
     )
     {
         var matches = sourceImpacts
             .Where(pair =>
-                string.Equals(pair.Key.SourceId, sourceId, StringComparison.Ordinal)
+                string.Equals(
+                    lineage.ResolveKnown(pair.Key.SourceId, entities),
+                    sourceId,
+                    StringComparison.Ordinal
+                )
                 && pair.Key.Kind == kind
                 && (targetCombatants.Count == 0 || targetCombatants.Contains(pair.Key.Combatant))
             )

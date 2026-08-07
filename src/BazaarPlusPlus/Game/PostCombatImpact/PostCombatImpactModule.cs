@@ -179,7 +179,7 @@ internal sealed class PostCombatImpactModule : IBppFeature, IPostCombatImpactMod
                     ? CombatImpactReport.Empty
                     : CombatImpactProjector.Project(
                         simulation,
-                        CombatImpactEntitySnapshotReader.Read()
+                        CombatImpactEntitySnapshotReader.Read(simulation)
                     );
             foreach (
                 var kind in LatestReport.ProjectionDiagnostics.Select(item => item.Kind).Distinct()

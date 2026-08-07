@@ -741,6 +741,197 @@ public sealed class CombatImpactProjectorTests
     }
 
     [Fact]
+    public void Transformed_source_impacts_and_stats_roll_up_to_the_visible_original_item()
+    {
+        var simulation = new CombatSim();
+        simulation
+            .Frames[0]
+            .Events.Add(
+                new CombatSimEventCardTransformed(
+                    "transform-context",
+                    "original-item",
+                    [
+                        new SimEventCardTransformation(
+                            "transformed-item",
+                            Guid.NewGuid().ToString(),
+                            ECardType.Item,
+                            ECombatantId.Player,
+                            EInventorySection.Hand,
+                            EContainerSocketId.Socket_1
+                        ),
+                    ]
+                )
+            );
+        simulation.Frames.Add(new CombatSimFrame());
+        simulation
+            .Frames[1]
+            .Events.Add(
+                Executed("transformed-item", EActionCommandType.CardFreeze, CardTarget("target"))
+            );
+        simulation.Frames.Add(new CombatSimFrame());
+        simulation
+            .Frames[2]
+            .Events.Add(
+                new CombatSimEventCardTransformReverted(
+                    new SimEventCardTransformation(
+                        "original-item",
+                        Guid.NewGuid().ToString(),
+                        ECardType.Item,
+                        ECombatantId.Player,
+                        EInventorySection.Hand,
+                        EContainerSocketId.Socket_1
+                    ),
+                    ["transformed-item"]
+                )
+            );
+        // Real replay payloads keep these as disjoint per-incarnation accounting windows.
+        simulation.CardStats["original-item"] = new Dictionary<ECardStats, int>
+        {
+            [ECardStats.UseCount] = 1,
+            [ECardStats.FrozenCardsCount] = 1,
+        };
+        simulation.CardStats["transformed-item"] = new Dictionary<ECardStats, int>
+        {
+            [ECardStats.UseCount] = 2,
+            [ECardStats.FrozenCardsCount] = 2,
+        };
+        var entities = Entities().ToDictionary(item => item.Key, item => item.Value);
+        entities["original-item"] = new CombatImpactEntity(
+            "original-item",
+            "Original Item",
+            "Item",
+            null,
+            5,
+            CombatantId: ECombatantId.Player
+        );
+        entities["transformed-item"] = new CombatImpactEntity(
+            "transformed-item",
+            "Temporary Form",
+            "Item",
+            null,
+            6,
+            CombatantId: ECombatantId.Player
+        );
+
+        var report = CombatImpactProjector.Project(simulation, entities);
+        var source = Assert.Single(
+            report.Sources,
+            candidate => candidate.Entity.Id == "original-item"
+        );
+        var freeze = Assert.Single(source.Groups);
+
+        Assert.DoesNotContain(
+            report.Sources,
+            candidate => candidate.Entity.Id == "transformed-item"
+        );
+        Assert.Equal(3, source.UseCount);
+        Assert.Equal(3, freeze.AuthoritativeMetric?.Value);
+        Assert.Equal("target", Assert.Single(freeze.Targets).Entity.Id);
+    }
+
+    [Fact]
+    public void Nested_transforms_and_transformed_targets_resolve_to_the_highest_visible_ancestor()
+    {
+        var simulation = new CombatSim();
+        simulation
+            .Frames[0]
+            .Events.Add(Transformed("original-target", "middle-target", ECombatantId.Opponent));
+        simulation.Frames.Add(new CombatSimFrame());
+        simulation
+            .Frames[1]
+            .Events.Add(Transformed("middle-target", "final-target", ECombatantId.Opponent));
+        simulation.Frames.Add(new CombatSimFrame());
+        simulation
+            .Frames[2]
+            .Events.Add(
+                Executed("source", EActionCommandType.CardSlow, CardTarget("final-target"))
+            );
+        var entities = Entities().ToDictionary(item => item.Key, item => item.Value);
+        entities["original-target"] = new CombatImpactEntity(
+            "original-target",
+            "Original Target",
+            "Item",
+            null,
+            5,
+            CombatantId: ECombatantId.Opponent
+        );
+        entities["middle-target"] = new CombatImpactEntity(
+            "middle-target",
+            "Middle Target",
+            "Item",
+            null,
+            6,
+            CombatantId: ECombatantId.Opponent
+        );
+        entities["final-target"] = new CombatImpactEntity(
+            "final-target",
+            "Final Target",
+            "Item",
+            null,
+            7,
+            CombatantId: ECombatantId.Opponent
+        );
+
+        var report = CombatImpactProjector.Project(simulation, entities);
+        var group = Assert.Single(Assert.Single(report.Sources).Groups);
+        var target = Assert.Single(group.Targets);
+
+        Assert.Equal("original-target", target.Entity.Id);
+        Assert.Equal("original-target", Assert.Single(report.Received).Entity.Id);
+    }
+
+    [Fact]
+    public void Malformed_transform_cycles_still_fold_to_one_deterministic_entity()
+    {
+        var simulation = new CombatSim();
+        simulation.Frames[0].Events.Add(Transformed("b-item", "a-item", ECombatantId.Player));
+        simulation.Frames.Add(new CombatSimFrame());
+        simulation.Frames[1].Events.Add(Transformed("a-item", "b-item", ECombatantId.Player));
+        simulation.Frames.Add(new CombatSimFrame());
+        simulation.Frames[2].Events.Add(Transformed("a-item", "c-item", ECombatantId.Player));
+        simulation.Frames.Add(new CombatSimFrame());
+        simulation
+            .Frames[3]
+            .Events.Add(Executed("a-item", EActionCommandType.CardFreeze, CardTarget("target")));
+        simulation
+            .Frames[3]
+            .Events.Add(Executed("b-item", EActionCommandType.CardFreeze, CardTarget("target")));
+        simulation
+            .Frames[3]
+            .Events.Add(Executed("c-item", EActionCommandType.CardFreeze, CardTarget("target")));
+        var entities = Entities().ToDictionary(item => item.Key, item => item.Value);
+        entities["a-item"] = new CombatImpactEntity(
+            "a-item",
+            "A Item",
+            "Item",
+            null,
+            5,
+            CombatantId: ECombatantId.Player
+        );
+        entities["b-item"] = new CombatImpactEntity(
+            "b-item",
+            "B Item",
+            "Item",
+            null,
+            6,
+            CombatantId: ECombatantId.Player
+        );
+        entities["c-item"] = new CombatImpactEntity(
+            "c-item",
+            "C Item",
+            "Item",
+            null,
+            7,
+            CombatantId: ECombatantId.Player
+        );
+
+        var source = Assert.Single(CombatImpactProjector.Project(simulation, entities).Sources);
+
+        Assert.Equal("a-item", source.Entity.Id);
+        Assert.Equal(3, Assert.Single(source.Groups).Count);
+    }
+
+    [Fact]
     public void Enchant_actions_preserve_the_unique_applied_enchantment_type()
     {
         var simulation = new CombatSim();
@@ -3777,6 +3968,26 @@ public sealed class CombatImpactProjectorTests
             ActionType = action,
             Target = target,
         };
+
+    private static CombatSimEventCardTransformed Transformed(
+        string originalId,
+        string transformedId,
+        ECombatantId combatantId
+    ) =>
+        new(
+            "transform-context",
+            originalId,
+            [
+                new SimEventCardTransformation(
+                    transformedId,
+                    "16b0d645-3a47-45a1-be2a-1e3ee311f33e",
+                    ECardType.Item,
+                    combatantId,
+                    EInventorySection.Hand,
+                    EContainerSocketId.Socket_1
+                ),
+            ]
+        );
 
     private static EffectTargetPlayer Player(ECombatantId target) => new() { Target = target };
 
