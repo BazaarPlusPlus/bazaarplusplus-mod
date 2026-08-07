@@ -84,6 +84,6 @@ internal static class AppStateHandlerInstaller
             timeout: PresentationReadyTimeout
         );
 
-        await ReplayItemPresentationReadiness.WaitForActiveSetupsAsync(PresentationReadyTimeout);
+        await ReplayCardPresentationReadiness.WaitForActiveTasksAsync(PresentationReadyTimeout);
     }
 }

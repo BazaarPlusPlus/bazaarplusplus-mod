@@ -4,10 +4,15 @@ using UnityEngine;
 
 namespace BazaarPlusPlus.Game.CombatReplay.Bootstrap;
 
-internal static class ReplayItemPresentationReadiness
+/// <summary>
+/// Tracks asynchronous native presentation work started while a saved replay is rebuilt.
+/// Item setup and socket-effect VFX loading must both finish before their pooled controllers
+/// can safely cross the replay-state boundary.
+/// </summary>
+internal static class ReplayCardPresentationReadiness
 {
     private static readonly object Sync = new();
-    private static readonly Dictionary<int, TrackedSetup> LatestSetups = [];
+    private static readonly Dictionary<int, TrackedPresentation> LatestTasks = [];
     private static bool _tracking;
 
     internal static IDisposable BeginTracking()
@@ -16,17 +21,17 @@ internal static class ReplayItemPresentationReadiness
         {
             if (_tracking)
                 throw new InvalidOperationException(
-                    "Replay item setup tracking is already active."
+                    "Replay card presentation tracking is already active."
                 );
 
-            LatestSetups.Clear();
+            LatestTasks.Clear();
             _tracking = true;
         }
 
         return new TrackingScope();
     }
 
-    internal static Task Track(ItemController controller, Task setup)
+    internal static Task Track(MonoBehaviour controller, Task setup)
     {
         if (controller == null)
             return setup;
@@ -37,17 +42,17 @@ internal static class ReplayItemPresentationReadiness
                 return setup;
 
             var tracked = AwaitOriginal(setup);
-            LatestSetups[controller.GetInstanceID()] = new TrackedSetup(controller, tracked);
+            LatestTasks[controller.GetInstanceID()] = new TrackedPresentation(controller, tracked);
             return tracked;
         }
     }
 
-    internal static async Task WaitForActiveSetupsAsync(TimeSpan timeout)
+    internal static async Task WaitForActiveTasksAsync(TimeSpan timeout)
     {
         var deadline = DateTime.UtcNow + timeout;
         while (true)
         {
-            var pending = SnapshotActivePendingSetups();
+            var pending = SnapshotActivePendingTasks();
             if (pending.Length > 0)
             {
                 await AwaitBeforeDeadlineAsync(Task.WhenAll(pending), deadline);
@@ -55,24 +60,24 @@ internal static class ReplayItemPresentationReadiness
             }
 
             await AwaitBeforeDeadlineAsync(WaitForRenderBoundaryAsync(), deadline);
-            if (SnapshotActivePendingSetups().Length == 0)
+            if (SnapshotActivePendingTasks().Length == 0)
                 return;
         }
     }
 
-    private static Task[] SnapshotActivePendingSetups()
+    private static Task[] SnapshotActivePendingTasks()
     {
         lock (Sync)
         {
             if (!_tracking)
-                throw new InvalidOperationException("Replay item setup tracking is not active.");
+                throw new InvalidOperationException(
+                    "Replay card presentation tracking is not active."
+                );
 
-            foreach (
-                var stale in LatestSetups.Where(pair => pair.Value.Controller == null).ToList()
-            )
-                LatestSetups.Remove(stale.Key);
+            foreach (var stale in LatestTasks.Where(pair => pair.Value.Controller == null).ToList())
+                LatestTasks.Remove(stale.Key);
 
-            return LatestSetups
+            return LatestTasks
                 .Values.Where(setup =>
                     setup.Controller != null
                     && setup.Controller.gameObject.activeInHierarchy
@@ -87,7 +92,7 @@ internal static class ReplayItemPresentationReadiness
     {
         var remaining = deadline - DateTime.UtcNow;
         if (remaining <= TimeSpan.Zero || await Task.WhenAny(task, Task.Delay(remaining)) != task)
-            throw new TimeoutException("Timed out while waiting for replay item presentation.");
+            throw new TimeoutException("Timed out while waiting for replay card presentation.");
 
         await task;
     }
@@ -113,7 +118,7 @@ internal static class ReplayItemPresentationReadiness
 
     private static async Task AwaitOriginal(Task setup) => await setup;
 
-    private sealed record TrackedSetup(ItemController Controller, Task Task);
+    private sealed record TrackedPresentation(MonoBehaviour Controller, Task Task);
 
     private sealed class TrackingScope : IDisposable
     {
@@ -126,7 +131,7 @@ internal static class ReplayItemPresentationReadiness
 
             lock (Sync)
             {
-                LatestSetups.Clear();
+                LatestTasks.Clear();
                 _tracking = false;
             }
             _disposed = true;
