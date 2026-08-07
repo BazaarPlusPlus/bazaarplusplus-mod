@@ -332,7 +332,11 @@ internal static class CombatImpactProjector
                     sourceOccurrences.TryGetValue(source.Entity.Id, out var occurrencesForSource)
                         ? source with
                         {
-                            TriggerSources = BuildTriggerSources(occurrencesForSource, entities),
+                            TriggerSources = BuildTriggerSources(
+                                occurrencesForSource,
+                                entities,
+                                source.Entity.Id
+                            ),
                             Groups = source
                                 .Groups.Select(group =>
                                 {
@@ -346,7 +350,8 @@ internal static class CombatImpactProjector
                                                 StringComparison.Ordinal
                                             )
                                         ),
-                                        entities
+                                        entities,
+                                        source.Entity.Id
                                     );
                                     return triggers.Count == 0
                                         ? group
@@ -365,9 +370,20 @@ internal static class CombatImpactProjector
 
     private static IReadOnlyList<CombatImpactTriggerSource> BuildTriggerSources(
         IEnumerable<TriggerOccurrence> occurrences,
-        IReadOnlyDictionary<string, CombatImpactEntity> entities
-    ) =>
-        occurrences
+        IReadOnlyDictionary<string, CombatImpactEntity> entities,
+        string sourceId
+    )
+    {
+        var items = occurrences.ToArray();
+        if (
+            items.Length == 0
+            || items.All(occurrence =>
+                string.Equals(occurrence.TriggerSourceId, sourceId, StringComparison.Ordinal)
+            )
+        )
+            return [];
+
+        return items
             .GroupBy(occurrence => occurrence.TriggerSourceId, StringComparer.Ordinal)
             .Select(trigger => new CombatImpactTriggerSource(
                 entities[trigger.Key],
@@ -380,6 +396,7 @@ internal static class CombatImpactProjector
             .ThenBy(trigger => trigger.Entity.Name, StringComparer.OrdinalIgnoreCase)
             .ThenBy(trigger => trigger.Entity.Id, StringComparer.Ordinal)
             .ToArray();
+    }
 
     private static bool TryCreateTriggerOccurrence(
         ProjectedExecution execution,
@@ -397,11 +414,7 @@ internal static class CombatImpactProjector
 
         var sourceId = execution.DirectSourceId;
         var triggerSourceId = execution.TriggerSourceId;
-        if (
-            string.Equals(sourceId, triggerSourceId, StringComparison.Ordinal)
-            || !IsActivityEntity(sourceId, entities)
-            || !IsActivityEntity(triggerSourceId, entities)
-        )
+        if (!IsActivityEntity(sourceId, entities) || !IsActivityEntity(triggerSourceId, entities))
             return false;
 
         occurrence = new TriggerOccurrence(

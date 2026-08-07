@@ -1773,6 +1773,71 @@ public sealed class CombatImpactProjectorTests
     }
 
     [Fact]
+    public void Mixed_self_and_external_trigger_sources_keep_self_to_reconcile_charge_counts()
+    {
+        var simulation = new CombatSim();
+        simulation
+            .Frames[0]
+            .Events.Add(
+                Executed(
+                    "source",
+                    EActionCommandType.CardCharge,
+                    CardTarget("source"),
+                    triggerSource: "trigger"
+                )
+            );
+        simulation.Frames.Add(new CombatSimFrame());
+        simulation
+            .Frames[1]
+            .Events.Add(
+                Executed(
+                    "source",
+                    EActionCommandType.CardCharge,
+                    CardTarget("source"),
+                    triggerSource: "source"
+                )
+            );
+        simulation.Frames.Add(new CombatSimFrame());
+        simulation
+            .Frames[2]
+            .Events.Add(
+                Executed(
+                    "source",
+                    EActionCommandType.CardCharge,
+                    CardTarget("source"),
+                    triggerSource: "trigger"
+                )
+            );
+
+        var source = Assert.Single(
+            CombatImpactProjector
+                .Project(
+                    simulation,
+                    EntitiesWithSourceAttribute(ECardAttributeType.ChargeAmount, 1_000)
+                )
+                .Sources
+        );
+        var charge = Assert.Single(source.Groups);
+
+        Assert.Equal(3, charge.Count);
+        Assert.Equal(3, source.TriggerCount);
+        Assert.Equal(3, charge.TriggerSources.Sum(trigger => trigger.Count));
+        Assert.Collection(
+            charge.TriggerSources,
+            trigger =>
+            {
+                Assert.Equal("Trigger Item", trigger.Entity.Name);
+                Assert.Equal(2, trigger.Count);
+            },
+            self =>
+            {
+                Assert.Equal("Fairies", self.Entity.Name);
+                Assert.Equal(1, self.Count);
+            }
+        );
+    }
+
+    [Fact]
     public void Same_trigger_source_in_separate_frames_counts_as_separate_activations()
     {
         var simulation = new CombatSim();
@@ -1986,7 +2051,9 @@ public sealed class CombatImpactProjectorTests
 
         Assert.Equal(10, source.UseCount);
         Assert.Equal(10, source.EffectCount);
+        Assert.Empty(source.TriggerSources);
         Assert.Equal(10, haste.Count);
+        Assert.Empty(haste.TriggerSources);
         Assert.Equal(10_000, haste.ObservedValue);
         Assert.Equal(CombatImpactValueUnit.Milliseconds, haste.Unit);
         Assert.Equal(10, haste.AuthoritativeMetric?.Value);
