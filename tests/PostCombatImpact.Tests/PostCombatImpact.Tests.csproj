@@ -32,6 +32,10 @@
       Link="CombatImpactModels.cs"
     />
     <Compile
+      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactReportRegistry.cs"
+      Link="CombatImpactReportRegistry.cs"
+    />
+    <Compile
       Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactAggregator.cs"
       Link="CombatImpactAggregator.cs"
     />
