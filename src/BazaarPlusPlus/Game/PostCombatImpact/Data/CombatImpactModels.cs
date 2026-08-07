@@ -52,6 +52,7 @@ internal enum CombatImpactActivitySourceResolution
 {
     Direct,
     TriggerFallback,
+    PrerequisiteSkill,
 }
 
 internal enum CombatImpactTriggerScope
@@ -129,6 +130,70 @@ internal sealed record CombatImpactPeriodicImpact(
     string ModelVersion
 );
 
+internal sealed record CombatImpactPrerequisiteSkillSourceRule(
+    string EffectId,
+    Guid SkillTemplateId,
+    IReadOnlyCollection<ETier> SkillTiers
+)
+{
+    internal bool Matches(CombatImpactEntity entity) =>
+        entity.TypeLabel == "Skill"
+        && entity.TemplateId == SkillTemplateId
+        && (SkillTiers.Count == 0 || SkillTiers.Contains(entity.Tier));
+}
+
+internal sealed record CombatImpactItemTagCondition(
+    EListComparisonOperator Operator,
+    IReadOnlyCollection<ECardTag>? PublicTags = null,
+    IReadOnlyCollection<EHiddenTag>? HiddenTags = null
+)
+{
+    internal bool Matches(CombatImpactEntity entity)
+    {
+        if (PublicTags is { Count: > 0 })
+            return Matches(PublicTags, entity.Tags);
+        if (HiddenTags is { Count: > 0 })
+            return Matches(HiddenTags, entity.HiddenTags);
+        return false;
+    }
+
+    private bool Matches<T>(IReadOnlyCollection<T> required, IReadOnlyCollection<T>? actual)
+        where T : struct, Enum
+    {
+        var present = actual == null ? new HashSet<T>() : new HashSet<T>(actual);
+        return Operator switch
+        {
+            EListComparisonOperator.All => required.All(present.Contains),
+            EListComparisonOperator.Any => required.Any(present.Contains),
+            EListComparisonOperator.None => required.All(tag => !present.Contains(tag)),
+            _ => false,
+        };
+    }
+}
+
+internal sealed record CombatImpactUseAttributionRule(
+    CombatImpactPrerequisiteSkillSourceRule SourceRule,
+    CombatImpactItemTagCondition ItemCondition,
+    int FixedTempoAmount
+);
+
+internal enum CombatImpactProjectionDiagnosticKind
+{
+    MissingPrerequisiteSkill,
+    AmbiguousPrerequisiteSkill,
+    MissingUseCount,
+    ExplicitApplicationsExceedUseCount,
+    RuleExecutionMismatch,
+    NonDisplayableAuthoritativeMetric,
+}
+
+internal sealed record CombatImpactProjectionDiagnostic(
+    CombatImpactProjectionDiagnosticKind Kind,
+    string SourceId,
+    string EffectId,
+    string? TriggerSourceId = null
+);
+
 internal sealed record CombatImpactEntity(
     string Id,
     string Name,
@@ -145,8 +210,34 @@ internal sealed record CombatImpactEntity(
     IReadOnlyDictionary<string, ECardAttributeType>? AuraAttributeTypesByEffectId = null,
     IReadOnlyCollection<string>? ReferenceValuedAuraEffectIds = null,
     EContainerSocketId? SocketId = null,
-    IReadOnlyCollection<EHiddenTag>? HiddenTags = null
+    IReadOnlyCollection<EHiddenTag>? HiddenTags = null,
+    EInventorySection? Section = null,
+    IReadOnlyCollection<ECardTag>? Tags = null,
+    IReadOnlyDictionary<
+        string,
+        CombatImpactPrerequisiteSkillSourceRule
+    >? PrerequisiteSkillSourceRulesByEffectId = null,
+    IReadOnlyCollection<CombatImpactUseAttributionRule>? UseAttributionRules = null
 );
+
+internal static class CombatImpactTags
+{
+    internal static IReadOnlyCollection<ECardTag>? Merge(
+        IReadOnlyCollection<ECardTag>? runtime,
+        IReadOnlyCollection<ECardTag>? template,
+        IReadOnlyCollection<ECardTag>? enchantment
+    )
+    {
+        var tags = new HashSet<ECardTag>();
+        if (runtime != null)
+            tags.UnionWith(runtime);
+        if (template != null)
+            tags.UnionWith(template);
+        if (enchantment != null)
+            tags.UnionWith(enchantment);
+        return tags.Count == 0 ? null : tags.ToArray();
+    }
+}
 
 internal static class CombatImpactHiddenTags
 {
@@ -421,6 +512,9 @@ internal sealed record CombatImpactReport(
 )
 {
     internal IReadOnlyList<PeriodicAttributionGap> PeriodicResiduals { get; init; } = [];
+
+    internal IReadOnlyList<CombatImpactProjectionDiagnostic> ProjectionDiagnostics { get; init; } =
+    [];
 
     internal static readonly CombatImpactReport Empty = new(
         Array.Empty<CombatImpactSource>(),

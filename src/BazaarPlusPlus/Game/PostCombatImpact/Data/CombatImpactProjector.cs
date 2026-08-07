@@ -10,13 +10,6 @@ namespace BazaarPlusPlus.Game.PostCombatImpact.Data;
 
 internal static class CombatImpactProjector
 {
-    private static readonly Guid FMinorTemplateId = Guid.Parse(
-        "37251594-5ff0-4604-804e-7259ee666f60"
-    );
-    private static readonly Guid FNoteSocketEffectTemplateId = Guid.Parse(
-        "04eca54a-69bf-4874-8b6d-56d284bb58be"
-    );
-
     internal static CombatImpactReport Project(
         CombatSim simulation,
         IReadOnlyDictionary<string, CombatImpactEntity> entities
@@ -24,9 +17,72 @@ internal static class CombatImpactProjector
     {
         var executions = ProjectExecutions(simulation, entities);
         var events = new List<CombatImpactEvent>();
+        var diagnostics = new List<CombatImpactProjectionDiagnostic>();
+        var explicitUseApplications = new Dictionary<UseAttributionKey, int>();
+        var blockedUseRules = new HashSet<RuleEffectKey>();
 
-        foreach (var execution in executions)
+        foreach (var originalExecution in executions)
         {
+            var execution = originalExecution;
+            var sourceResolution = TryResolvePrerequisiteSkillSource(execution, entities);
+            if (sourceResolution.Diagnostic != null)
+                diagnostics.Add(sourceResolution.Diagnostic);
+            if (sourceResolution.Skill != null)
+            {
+                execution = execution with
+                {
+                    SourceId = sourceResolution.Skill.Id,
+                    PrerequisiteSkillSource = true,
+                };
+            }
+
+            if (sourceResolution.UseRule != null)
+            {
+                if (
+                    sourceResolution.Skill != null
+                    && TryProjectExplicitUseAttribution(
+                        execution,
+                        sourceResolution.Implementation!,
+                        sourceResolution.Skill,
+                        sourceResolution.UseRule,
+                        entities,
+                        out var mappedEvent
+                    )
+                )
+                {
+                    events.Add(mappedEvent);
+                    var key = new UseAttributionKey(
+                        sourceResolution.Implementation!.Id,
+                        sourceResolution.UseRule.SourceRule.EffectId,
+                        execution.TriggerSourceId!,
+                        sourceResolution.Skill.Id
+                    );
+                    explicitUseApplications[key] =
+                        explicitUseApplications.GetValueOrDefault(key) + 1;
+                    continue;
+                }
+
+                var implementation = sourceResolution.Implementation!;
+                blockedUseRules.Add(
+                    new RuleEffectKey(
+                        implementation.Id,
+                        sourceResolution.UseRule.SourceRule.EffectId
+                    )
+                );
+                if (sourceResolution.Skill != null)
+                {
+                    diagnostics.Add(
+                        new CombatImpactProjectionDiagnostic(
+                            CombatImpactProjectionDiagnosticKind.RuleExecutionMismatch,
+                            implementation.Id,
+                            sourceResolution.UseRule.SourceRule.EffectId,
+                            execution.TriggerSourceId
+                        )
+                    );
+                }
+                execution = originalExecution;
+            }
+
             if (
                 execution.SourceId == null
                 || execution.TargetId == null
@@ -69,7 +125,7 @@ internal static class CombatImpactProjector
         }
 
         AddCardActionCostEvents(simulation, entities, events);
-        AddAuraAttributeEvents(simulation, entities, events);
+        AddAuraAttributeEvents(simulation, entities, events, diagnostics);
 
         var useCounts = new Dictionary<string, int>(StringComparer.Ordinal);
         var authoritative = new Dictionary<string, IReadOnlyList<CombatImpactAuthoritativeMetric>>(
@@ -169,10 +225,32 @@ internal static class CombatImpactProjector
                 );
             }
             if (metrics.Count > 0)
+            {
                 authoritative[sourceId] = metrics;
+                if (
+                    entities.TryGetValue(sourceId, out var metricSource)
+                    && metricSource.TypeLabel is not ("Item" or "Skill")
+                )
+                {
+                    diagnostics.AddRange(
+                        metrics.Select(metric => new CombatImpactProjectionDiagnostic(
+                            CombatImpactProjectionDiagnosticKind.NonDisplayableAuthoritativeMetric,
+                            sourceId,
+                            metric.NativeAttributeKey
+                        ))
+                    );
+                }
+            }
         }
 
-        AddFMinorTempoEvents(entities, useCounts, events);
+        AddUseAttributionEvents(
+            entities,
+            useCounts,
+            explicitUseApplications,
+            blockedUseRules,
+            events,
+            diagnostics
+        );
         RecoverDroppedAppliedEffectCriticals(events, authoritative);
 
         var report = CombatImpactAggregator.Aggregate(
@@ -182,82 +260,133 @@ internal static class CombatImpactProjector
             report,
             PeriodicEffectAttribution.Project(simulation, entities)
         );
-        return report;
+        return report with { ProjectionDiagnostics = diagnostics.Distinct().ToArray() };
     }
 
-    private static void AddFMinorTempoEvents(
+    private static void AddUseAttributionEvents(
         IReadOnlyDictionary<string, CombatImpactEntity> entities,
         IReadOnlyDictionary<string, int> useCounts,
-        ICollection<CombatImpactEvent> events
+        IReadOnlyDictionary<UseAttributionKey, int> explicitApplications,
+        ISet<RuleEffectKey> blockedRules,
+        ICollection<CombatImpactEvent> events,
+        ICollection<CombatImpactProjectionDiagnostic> diagnostics
     )
     {
-        foreach (
-            var skill in entities.Values.Where(entity =>
-                entity.TemplateId == FMinorTemplateId
-                && entity.TypeLabel == "Skill"
-                && entity.CombatantId.HasValue
-                && entity.Attributes?.TryGetValue(ECardAttributeType.Custom_0, out var amount)
-                    == true
-                && amount > 0
-            )
-        )
+        foreach (var implementation in entities.Values)
         {
-            var combatantId = skill.CombatantId!.Value;
-            var noteSockets = entities
-                .Values.Where(entity =>
-                    entity.TemplateId == FNoteSocketEffectTemplateId
-                    && entity.CombatantId == combatantId
-                    && entity.SocketId.HasValue
-                )
-                .Select(entity => entity.SocketId!.Value)
-                .ToHashSet();
-            if (noteSockets.Count == 0)
+            if (
+                implementation.TypeLabel != "SocketEffect"
+                || implementation.UseAttributionRules is not { Count: > 0 }
+                || implementation.CombatantId is not { } combatantId
+                || implementation.Section != EInventorySection.Hand
+                || !implementation.SocketId.HasValue
+            )
                 continue;
 
             foreach (
-                var item in entities.Values.Where(entity =>
-                    entity.TypeLabel == "Item"
-                    && entity.CombatantId == combatantId
-                    && entity.SocketId.HasValue
-                    && entity.HiddenTags?.Contains(EHiddenTag.Haste) == true
-                    && OccupiesAnySocket(entity, noteSockets)
-                    && useCounts.TryGetValue(entity.Id, out var uses)
-                    && uses > 0
+                var ruleGroup in implementation.UseAttributionRules.GroupBy(
+                    rule => rule.SourceRule.EffectId,
+                    StringComparer.Ordinal
                 )
             )
             {
-                var amount = skill.Attributes![ECardAttributeType.Custom_0];
-                var uses = useCounts[item.Id];
-                for (var index = 0; index < uses; index++)
+                if (ruleGroup.Take(2).Count() != 1)
+                    continue;
+                var rule = ruleGroup.Single();
+                if (
+                    blockedRules.Contains(
+                        new RuleEffectKey(implementation.Id, rule.SourceRule.EffectId)
+                    )
+                )
+                    continue;
+
+                var skills = FindPrerequisiteSkills(implementation, rule.SourceRule, entities);
+                if (skills.Length == 0)
+                    continue;
+                if (skills.Length > 1)
                 {
-                    events.Add(
-                        new CombatImpactEvent(
-                            CombatImpactKind.AttributeChange,
-                            skill.Id,
-                            PlayerId(combatantId),
-                            amount,
-                            CombatImpactValueUnit.Amount,
-                            "TempoApplyAmount",
-                            ValueBasis: CombatImpactValueBasis.ConfiguredActionAmount
+                    diagnostics.Add(
+                        new CombatImpactProjectionDiagnostic(
+                            CombatImpactProjectionDiagnosticKind.AmbiguousPrerequisiteSkill,
+                            implementation.Id,
+                            rule.SourceRule.EffectId
                         )
-                        {
-                            Surface = CombatImpactEventSurface.AppliedEffect,
-                            OccurrenceBasis = CombatImpactOccurrenceBasis.ReconstructedTransition,
-                        }
                     );
+                    continue;
+                }
+
+                var skill = skills[0];
+                foreach (
+                    var item in entities.Values.Where(entity =>
+                        entity.TypeLabel == "Item"
+                        && entity.CombatantId == combatantId
+                        && entity.Section == EInventorySection.Hand
+                        && entity.SocketId.HasValue
+                        && rule.ItemCondition.Matches(entity)
+                        && SpansOverlap(entity, implementation)
+                    )
+                )
+                {
+                    var key = new UseAttributionKey(
+                        implementation.Id,
+                        rule.SourceRule.EffectId,
+                        item.Id,
+                        skill.Id
+                    );
+                    var explicitCount = explicitApplications.GetValueOrDefault(key);
+                    if (!useCounts.TryGetValue(item.Id, out var uses))
+                    {
+                        if (explicitCount > 0)
+                        {
+                            diagnostics.Add(
+                                new CombatImpactProjectionDiagnostic(
+                                    CombatImpactProjectionDiagnosticKind.MissingUseCount,
+                                    implementation.Id,
+                                    rule.SourceRule.EffectId,
+                                    item.Id
+                                )
+                            );
+                        }
+                        continue;
+                    }
+                    if (explicitCount > uses)
+                    {
+                        diagnostics.Add(
+                            new CombatImpactProjectionDiagnostic(
+                                CombatImpactProjectionDiagnosticKind.ExplicitApplicationsExceedUseCount,
+                                implementation.Id,
+                                rule.SourceRule.EffectId,
+                                item.Id
+                            )
+                        );
+                        continue;
+                    }
+
+                    for (var index = explicitCount; index < uses; index++)
+                    {
+                        events.Add(
+                            CreateUseAttributionEvent(
+                                implementation,
+                                skill,
+                                item,
+                                rule,
+                                frameIndex: null,
+                                CombatImpactOccurrenceBasis.ReconstructedTransition
+                            )
+                        );
+                    }
                 }
             }
         }
     }
 
-    private static bool OccupiesAnySocket(
-        CombatImpactEntity item,
-        IReadOnlyCollection<EContainerSocketId> sockets
-    )
+    private static bool SpansOverlap(CombatImpactEntity left, CombatImpactEntity right)
     {
-        var start = (int)item.SocketId!.Value;
-        var end = start + Math.Max(1, item.DisplaySpan);
-        return sockets.Any(socket => (int)socket >= start && (int)socket < end);
+        var leftStart = (int)left.SocketId!.Value;
+        var leftEnd = leftStart + Math.Max(1, left.DisplaySpan);
+        var rightStart = (int)right.SocketId!.Value;
+        var rightEnd = rightStart + Math.Max(1, right.DisplaySpan);
+        return leftStart < rightEnd && rightStart < leftEnd;
     }
 
     private static CombatImpactReport AttachPeriodicImpacts(
@@ -421,7 +550,9 @@ internal static class CombatImpactProjector
                         resolved,
                         item.Source?.Value,
                         item.TriggerSource?.Value,
-                        frameIndex
+                        frameIndex,
+                        item.EffectId,
+                        item.ActionType
                     )
                 );
             }
@@ -824,6 +955,162 @@ internal static class CombatImpactProjector
         return states.Count <= maximumStates;
     }
 
+    private static PrerequisiteSkillSourceResolution TryResolvePrerequisiteSkillSource(
+        ProjectedExecution execution,
+        IReadOnlyDictionary<string, CombatImpactEntity> entities
+    ) =>
+        TryResolvePrerequisiteSkillSource(
+            execution.DirectSourceId,
+            execution.TriggerSourceId,
+            execution.EffectId,
+            entities
+        );
+
+    private static PrerequisiteSkillSourceResolution TryResolvePrerequisiteSkillSource(
+        string? directSourceId,
+        string? triggerSourceId,
+        string? effectId,
+        IReadOnlyDictionary<string, CombatImpactEntity> entities
+    )
+    {
+        if (string.IsNullOrWhiteSpace(effectId))
+            return default;
+        if (IsActivityEntity(directSourceId, entities))
+            return default;
+
+        CombatImpactEntity? implementation = null;
+        foreach (var candidateId in new[] { directSourceId, triggerSourceId })
+        {
+            if (
+                string.IsNullOrWhiteSpace(candidateId)
+                || !entities.TryGetValue(candidateId!, out var candidate)
+                || candidate.TypeLabel is "Item" or "Skill"
+                || candidate.PrerequisiteSkillSourceRulesByEffectId?.ContainsKey(effectId!) != true
+            )
+                continue;
+
+            implementation = candidate;
+            break;
+        }
+
+        if (
+            implementation == null
+            || !implementation.PrerequisiteSkillSourceRulesByEffectId!.TryGetValue(
+                effectId!,
+                out var sourceRule
+            )
+        )
+            return default;
+
+        var skills = FindPrerequisiteSkills(implementation, sourceRule, entities);
+        var matchingUseRules =
+            implementation
+                .UseAttributionRules?.Where(candidate =>
+                    string.Equals(candidate.SourceRule.EffectId, effectId, StringComparison.Ordinal)
+                )
+                .Take(2)
+                .ToArray()
+            ?? [];
+        var useRule = matchingUseRules.Length == 1 ? matchingUseRules[0] : null;
+        if (skills.Length == 1)
+            return new PrerequisiteSkillSourceResolution(implementation, skills[0], useRule, null);
+
+        return new PrerequisiteSkillSourceResolution(
+            implementation,
+            null,
+            useRule,
+            new CombatImpactProjectionDiagnostic(
+                skills.Length == 0
+                    ? CombatImpactProjectionDiagnosticKind.MissingPrerequisiteSkill
+                    : CombatImpactProjectionDiagnosticKind.AmbiguousPrerequisiteSkill,
+                implementation.Id,
+                effectId!,
+                triggerSourceId
+            )
+        );
+    }
+
+    private static CombatImpactEntity[] FindPrerequisiteSkills(
+        CombatImpactEntity implementation,
+        CombatImpactPrerequisiteSkillSourceRule rule,
+        IReadOnlyDictionary<string, CombatImpactEntity> entities
+    ) =>
+        entities
+            .Values.Where(candidate =>
+                candidate.CombatantId == implementation.CombatantId && rule.Matches(candidate)
+            )
+            .OrderBy(candidate => candidate.Order)
+            .ToArray();
+
+    private static bool TryProjectExplicitUseAttribution(
+        ProjectedExecution execution,
+        CombatImpactEntity implementation,
+        CombatImpactEntity skill,
+        CombatImpactUseAttributionRule rule,
+        IReadOnlyDictionary<string, CombatImpactEntity> entities,
+        out CombatImpactEvent mappedEvent
+    )
+    {
+        mappedEvent = null!;
+        if (
+            implementation.CombatantId is not { } combatantId
+            || implementation.Section != EInventorySection.Hand
+            || !implementation.SocketId.HasValue
+            || string.IsNullOrWhiteSpace(execution.TriggerSourceId)
+            || !entities.TryGetValue(execution.TriggerSourceId!, out var triggerItem)
+            || triggerItem.TypeLabel != "Item"
+            || triggerItem.CombatantId != combatantId
+            || triggerItem.Section != EInventorySection.Hand
+            || !triggerItem.SocketId.HasValue
+            || !rule.ItemCondition.Matches(triggerItem)
+            || !SpansOverlap(triggerItem, implementation)
+            || execution.TargetId != PlayerId(combatantId)
+            || execution.Kind != CombatImpactKind.AttributeChange
+            || (
+                execution.ActionType != EActionCommandType.PlayerModifyAttribute
+                && !OptionalCombatTempoTypes.IsApplyAction(execution.ActionType)
+            )
+        )
+            return false;
+
+        mappedEvent = CreateUseAttributionEvent(
+            implementation,
+            skill,
+            triggerItem,
+            rule,
+            execution.FrameIndex,
+            CombatImpactOccurrenceBasis.ExplicitExecution
+        );
+        return true;
+    }
+
+    private static CombatImpactEvent CreateUseAttributionEvent(
+        CombatImpactEntity implementation,
+        CombatImpactEntity skill,
+        CombatImpactEntity triggerItem,
+        CombatImpactUseAttributionRule rule,
+        int? frameIndex,
+        CombatImpactOccurrenceBasis occurrenceBasis
+    ) =>
+        new(
+            CombatImpactKind.AttributeChange,
+            skill.Id,
+            PlayerId(skill.CombatantId!.Value),
+            rule.FixedTempoAmount,
+            CombatImpactValueUnit.Amount,
+            "TempoApplyAmount",
+            ValueBasis: CombatImpactValueBasis.ConfiguredActionAmount
+        )
+        {
+            Surface = CombatImpactEventSurface.AppliedEffect,
+            OccurrenceBasis = occurrenceBasis,
+            RawDirectSourceId = implementation.Id,
+            TriggerSourceId = triggerItem.Id,
+            TriggerFrameIndex = frameIndex,
+            ActivitySourceResolution = CombatImpactActivitySourceResolution.PrerequisiteSkill,
+            TriggerScope = CombatImpactTriggerScope.AttributedExternal,
+        };
+
     private static string? ResolveActivitySource(
         string? directSourceId,
         string? triggerSourceId,
@@ -843,6 +1130,22 @@ internal static class CombatImpactProjector
         IReadOnlyDictionary<string, CombatImpactEntity> entities
     )
     {
+        if (execution.PrerequisiteSkillSource)
+        {
+            return new TriggerProvenance(
+                CombatImpactActivitySourceResolution.PrerequisiteSkill,
+                string.IsNullOrWhiteSpace(execution.TriggerSourceId)
+                        ? CombatImpactTriggerScope.NoTriggerEvidence
+                    : string.Equals(
+                        execution.SourceId,
+                        execution.TriggerSourceId,
+                        StringComparison.Ordinal
+                    )
+                        ? CombatImpactTriggerScope.AttributedSelf
+                    : CombatImpactTriggerScope.AttributedExternal
+            );
+        }
+
         var directIsActivity = IsActivityEntity(execution.DirectSourceId, entities);
         var triggerIsActivity = IsActivityEntity(execution.TriggerSourceId, entities);
         if (!directIsActivity && triggerIsActivity)
@@ -981,7 +1284,8 @@ internal static class CombatImpactProjector
     private static void AddAuraAttributeEvents(
         CombatSim simulation,
         IReadOnlyDictionary<string, CombatImpactEntity> entities,
-        ICollection<CombatImpactEvent> events
+        ICollection<CombatImpactEvent> events,
+        ICollection<CombatImpactProjectionDiagnostic> diagnostics
     )
     {
         foreach (var frame in simulation.Frames)
@@ -990,13 +1294,45 @@ internal static class CombatImpactProjector
             var playerCandidates = new List<AuraPlayerAttributeCandidate>();
             foreach (var aura in frame.Events.OfType<CombatSimEventEffectAuraExecuted>())
             {
-                var sourceId = ResolveActivitySource(
-                    aura.Source?.Value,
-                    aura.TriggerSource?.Value,
+                var directSourceId = aura.Source?.Value;
+                var triggerSourceId = aura.TriggerSource?.Value;
+                var sourceId = ResolveActivitySource(directSourceId, triggerSourceId, entities);
+                var prerequisite = TryResolvePrerequisiteSkillSource(
+                    directSourceId,
+                    triggerSourceId,
+                    aura.EffectId,
                     entities
                 );
+                if (prerequisite.Diagnostic != null)
+                    diagnostics.Add(prerequisite.Diagnostic);
+                if (prerequisite.Skill != null)
+                    sourceId = prerequisite.Skill.Id;
                 if (sourceId == null)
                     continue;
+                var provenance =
+                    prerequisite.Skill != null
+                        ? new TriggerProvenance(
+                            CombatImpactActivitySourceResolution.PrerequisiteSkill,
+                            string.IsNullOrWhiteSpace(triggerSourceId)
+                                    ? CombatImpactTriggerScope.NoTriggerEvidence
+                                : string.Equals(sourceId, triggerSourceId, StringComparison.Ordinal)
+                                    ? CombatImpactTriggerScope.AttributedSelf
+                                : CombatImpactTriggerScope.AttributedExternal
+                        )
+                        : ResolveTriggerProvenance(
+                            new ProjectedExecution(
+                                sourceId,
+                                null,
+                                null,
+                                default,
+                                directSourceId,
+                                triggerSourceId,
+                                0,
+                                aura.EffectId,
+                                default
+                            ),
+                            entities
+                        );
                 var hasExpectedCardAttribute = TryResolveAuraAttributeType(
                     aura,
                     entities,
@@ -1025,7 +1361,10 @@ internal static class CombatImpactProjector
                                 new AuraPlayerAttributeCandidate(
                                     sourceId,
                                     playerId,
-                                    playerChanges[0]
+                                    playerChanges[0],
+                                    directSourceId,
+                                    triggerSourceId,
+                                    provenance
                                 )
                             );
                         }
@@ -1085,7 +1424,14 @@ internal static class CombatImpactProjector
                     }
 
                     candidates.Add(
-                        new AuraAttributeCandidate(sourceId, cardTarget.Target.Value, cardChange)
+                        new AuraAttributeCandidate(
+                            sourceId,
+                            cardTarget.Target.Value,
+                            cardChange,
+                            directSourceId,
+                            triggerSourceId,
+                            provenance
+                        )
                     );
                 }
             }
@@ -1110,6 +1456,10 @@ internal static class CombatImpactProjector
                     {
                         Surface = CombatImpactEventSurface.CardAttribute,
                         OccurrenceBasis = CombatImpactOccurrenceBasis.ReconstructedTransition,
+                        RawDirectSourceId = candidate.DirectSourceId,
+                        TriggerSourceId = candidate.TriggerSourceId,
+                        ActivitySourceResolution = candidate.Provenance.SourceResolution,
+                        TriggerScope = candidate.Provenance.Scope,
                     }
                 );
             }
@@ -1134,6 +1484,10 @@ internal static class CombatImpactProjector
                     {
                         Surface = CombatImpactEventSurface.PlayerAttribute,
                         OccurrenceBasis = CombatImpactOccurrenceBasis.ReconstructedTransition,
+                        RawDirectSourceId = candidate.DirectSourceId,
+                        TriggerSourceId = candidate.TriggerSourceId,
+                        ActivitySourceResolution = candidate.Provenance.SourceResolution,
+                        TriggerScope = candidate.Provenance.Scope,
                     }
                 );
             }
@@ -2098,13 +2452,19 @@ internal static class CombatImpactProjector
     private readonly record struct AuraAttributeCandidate(
         string SourceId,
         string TargetId,
-        CombatSimCardAttributeUpdate Change
+        CombatSimCardAttributeUpdate Change,
+        string? DirectSourceId,
+        string? TriggerSourceId,
+        TriggerProvenance Provenance
     );
 
     private readonly record struct AuraPlayerAttributeCandidate(
         string SourceId,
         string TargetId,
-        CombatSimPlayerAttributeUpdate Change
+        CombatSimPlayerAttributeUpdate Change,
+        string? DirectSourceId,
+        string? TriggerSourceId,
+        TriggerProvenance Provenance
     );
 
     private readonly record struct ProjectedExecution(
@@ -2114,8 +2474,29 @@ internal static class CombatImpactProjector
         ResolvedImpactValue Resolved,
         string? DirectSourceId,
         string? TriggerSourceId,
-        int FrameIndex
+        int FrameIndex,
+        string? EffectId,
+        EActionCommandType ActionType
+    )
+    {
+        internal bool PrerequisiteSkillSource { get; init; }
+    }
+
+    private readonly record struct PrerequisiteSkillSourceResolution(
+        CombatImpactEntity? Implementation,
+        CombatImpactEntity? Skill,
+        CombatImpactUseAttributionRule? UseRule,
+        CombatImpactProjectionDiagnostic? Diagnostic
     );
+
+    private readonly record struct UseAttributionKey(
+        string ImplementationId,
+        string EffectId,
+        string TriggerSourceId,
+        string SkillId
+    );
+
+    private readonly record struct RuleEffectKey(string ImplementationId, string EffectId);
 
     private readonly record struct TriggerProvenance(
         CombatImpactActivitySourceResolution SourceResolution,

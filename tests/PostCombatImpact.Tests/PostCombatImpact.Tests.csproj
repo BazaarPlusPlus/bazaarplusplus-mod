@@ -17,6 +17,9 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/BazaarPlusPlus/BazaarPlusPlus.csproj" />
+    <Reference Include="BazaarGameClient">
+      <HintPath>$(ManagedPath)/BazaarGameClient.dll</HintPath>
+    </Reference>
     <Reference Include="BazaarGameShared">
       <HintPath>$(ManagedPath)/BazaarGameShared.dll</HintPath>
     </Reference>
@@ -35,6 +38,14 @@
     <Compile
       Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactProjector.cs"
       Link="CombatImpactProjector.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactAttributionRuleReader.cs"
+      Link="CombatImpactAttributionRuleReader.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactEntityTags.cs"
+      Link="CombatImpactEntityTags.cs"
     />
     <Compile
       Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/PeriodicEffectAttribution.cs"

@@ -6,6 +6,7 @@ namespace BazaarPlusPlus.Game.PostCombatImpact;
 internal enum PostCombatImpactReasonCode
 {
     ProjectionException,
+    ProjectionAttributionGap,
     Shown,
     ShownWithoutAttributedImpact,
     RuntimeUnavailable,
@@ -60,11 +61,19 @@ internal static class PostCombatImpactLogEvents
         BppLogCardinality.Low
     );
 
+    internal static readonly BppLogFieldDefinition ProjectionCategory = new(
+        3,
+        "projection_category",
+        BppLogFieldPrivacy.Public,
+        BppLogCorrelationPolicy.None,
+        BppLogCardinality.Low
+    );
+
     internal static readonly BppLogEventDefinition ProjectionDegraded = new(
         BppLogFeatureScope.PostCombatImpact,
         "post_combat_impact.projection.degraded",
-        [ReasonCode],
-        new BppLogStormPolicy([ReasonCode])
+        [ReasonCode, ProjectionCategory],
+        new BppLogStormPolicy([ReasonCode, ProjectionCategory])
     );
 
     internal static readonly BppLogEventDefinition InteractionObserved = new(

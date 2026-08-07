@@ -1,6 +1,6 @@
 #nullable enable
 using BazaarGameClient.Domain.Models.Cards;
-using BazaarGameShared.Domain.Cards.Item;
+using BazaarGameShared.Domain.Cards.Interfaces;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Effect;
 using BazaarGameShared.Domain.Effect.Actions;
@@ -53,6 +53,7 @@ internal static class CombatImpactEntitySnapshotReader
 
             var item = card as ItemCard;
             var effectAttributes = ReadEffectAttributeTypes(card, item);
+            var activeEffects = ReadActiveEffects(card);
             entities[instanceId] = new CombatImpactEntity(
                 instanceId,
                 name!,
@@ -61,7 +62,9 @@ internal static class CombatImpactEntitySnapshotReader
                 order++,
                 card.TemplateId,
                 card.Tier,
-                item == null ? 1 : CardSizeSpan.Resolve(item.Size),
+                card.Type is ECardType.Item or ECardType.SocketEffect
+                    ? CardSizeSpan.Resolve(card.Size)
+                    : 1,
                 item?.Enchantment,
                 card.Attributes == null
                     ? null
@@ -71,7 +74,16 @@ internal static class CombatImpactEntitySnapshotReader
                 effectAttributes.Auras,
                 effectAttributes.ReferenceValuedAuraEffectIds,
                 card.LeftSocketId,
-                ResolveHiddenTags(card)
+                CombatImpactEntityTags.ResolveHiddenTags(card),
+                card.Section,
+                CombatImpactEntityTags.ResolveTags(card),
+                CombatImpactAttributionRuleReader.ReadSourceRules(
+                    activeEffects.Abilities,
+                    activeEffects.Auras
+                ),
+                card.Type == ECardType.SocketEffect
+                    ? CombatImpactAttributionRuleReader.ReadUseRules(activeEffects.Abilities)
+                    : null
             );
         }
 
@@ -85,21 +97,24 @@ internal static class CombatImpactEntitySnapshotReader
         return entities;
     }
 
-    internal static IReadOnlyCollection<EHiddenTag>? ResolveHiddenTags(Card card)
+    private static ActiveEffects ReadActiveEffects(Card card)
     {
-        IReadOnlyCollection<EHiddenTag>? enchantmentHiddenTags = null;
-        if (
-            card is ItemCard { Enchantment: { } enchantment }
-            && card.Template is TCardItem { Enchantments: not null } itemTemplate
-            && itemTemplate.Enchantments.TryGetValue(enchantment, out var enchantmentTemplate)
-        )
-            enchantmentHiddenTags = enchantmentTemplate?.HiddenTags;
+        try
+        {
+            if (card.Template is IHasTierData tiered)
+            {
+                return new ActiveEffects(
+                    tiered.GetAbilityTemplatesByTier(card.Tier),
+                    tiered.GetAuraTemplatesByTier(card.Tier)
+                );
+            }
+        }
+        catch
+        {
+            // Fall through to the complete template graph when tier data is incomplete.
+        }
 
-        return CombatImpactHiddenTags.Merge(
-            card.HiddenTags,
-            card.Template?.HiddenTags,
-            enchantmentHiddenTags
-        );
+        return new ActiveEffects(card.Template?.Abilities?.Values, card.Template?.Auras?.Values);
     }
 
     private static EffectAttributeTypes ReadEffectAttributeTypes(Card card, ItemCard? item)
@@ -324,5 +339,10 @@ internal static class CombatImpactEntitySnapshotReader
         IReadOnlyDictionary<string, ECardAttributeType>? Abilities,
         IReadOnlyDictionary<string, ECardAttributeType>? Auras,
         IReadOnlyCollection<string>? ReferenceValuedAuraEffectIds
+    );
+
+    private readonly record struct ActiveEffects(
+        IEnumerable<TCardAbility>? Abilities,
+        IEnumerable<TCardAura>? Auras
     );
 }
