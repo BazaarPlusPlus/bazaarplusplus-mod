@@ -58,12 +58,19 @@ internal static class CollectionSourceAttributionBadge
             -10f * BadgeRootHeightScale,
             -12f * BadgeRootHeightScale
         );
-        rect.sizeDelta = new Vector2(132f * BadgeRootHeightScale, 28f * BadgeRootHeightScale);
+        rect.sizeDelta = new Vector2(
+            132f * BadgeRootHeightScale,
+            Sizes.CollectionTagChipHeight * BadgeRootHeightScale
+        );
         rect.localScale = Vector3.one;
 
         var image = badge.GetComponent<Image>();
-        image.color = new Color(0.07f, 0.08f, 0.1f, 0.9f);
+        image.color = Colors.CollectionChipBackground;
         image.raycastTarget = false;
+        var outline = badge.AddComponent<Outline>();
+        outline.effectColor = Colors.CollectionChipBorder;
+        outline.effectDistance = Vector2.one * BadgeRootHeightScale;
+        outline.useGraphicAlpha = true;
 
         var labelObject = new GameObject(LabelName, typeof(RectTransform), typeof(CanvasRenderer));
         labelObject.transform.SetParent(badge.transform, worldPositionStays: false);
@@ -83,7 +90,7 @@ internal static class CollectionSourceAttributionBadge
         label.fontSize = Mathf.RoundToInt(12f * BadgeRootHeightScale);
         label.fontStyle = FontStyles.Bold;
         label.alignment = TextAlignmentOptions.Center;
-        label.color = Colors.HistoryTitleText;
+        label.color = Colors.CollectionChipText;
         label.textWrappingMode = TextWrappingModes.NoWrap;
         label.overflowMode = TextOverflowModes.Overflow;
         label.raycastTarget = false;

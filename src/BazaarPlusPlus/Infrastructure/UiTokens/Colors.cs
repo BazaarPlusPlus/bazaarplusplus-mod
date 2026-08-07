@@ -48,6 +48,22 @@ internal static class Colors
     public static Color HistoryFooterBackground => Rgba(0.10f, 0.12f, 0.16f, 0.98f);
     public static Color HistoryFooterSecondaryText => Rgba(0.72f, 0.77f, 0.84f, 0.94f);
 
+    // Collection Panel filter chrome follows the compact, near-black tag treatment used by the
+    // native catalog reference: a solid #101113 canvas, restrained fills, and a one-pixel edge.
+    public static Color CollectionPanelBackground => FromRgb(16, 17, 19, 1f);
+    public static Color CollectionChipBackground => FromRgb(28, 30, 34, 1f);
+    public static Color CollectionChipBorder => FromRgb(63, 68, 73, 1f);
+    public static Color CollectionChipText => FromRgb(252, 252, 252, 1f);
+    public static Color CollectionChipHoverBackground => FromRgb(33, 37, 41, 1f);
+    public static Color CollectionChipPressedBackground => FromRgb(25, 27, 31, 1f);
+    public static Color CollectionChipHoverBorder => FromRgb(75, 80, 86, 1f);
+    public static Color CollectionChipSelectedBackground => FromRgb(36, 56, 77, 1f);
+    public static Color CollectionChipSelectedBorder => FromRgb(74, 101, 125, 1f);
+    public static Color CollectionChipSelectedText => FromRgb(252, 252, 252, 1f);
+    public static Color CollectionChipSelectedHoverBackground => FromRgb(42, 66, 91, 1f);
+    public static Color CollectionChipSelectedPressedBackground => FromRgb(31, 46, 63, 1f);
+    public static Color CollectionChipSelectedHoverBorder => FromRgb(87, 115, 140, 1f);
+
     public static Color StatusCompletedBackground => Rgba(0.16f, 0.30f, 0.24f, 0.74f);
     public static Color StatusAbandonedBackground => Rgba(0.31f, 0.22f, 0.15f, 0.72f);
     public static Color StatusDefaultBackground => Rgba(0.18f, 0.24f, 0.33f, 0.72f);
@@ -107,8 +123,8 @@ internal static class Colors
     public static Color ReplayText => Rgba(0.88f, 0.95f, 1f, 1f);
     public static Color RecordReplayBackground => Rgba(0.45f, 0.19f, 0.24f, 0.98f);
     public static Color RecordReplayText => Rgba(1f, 0.90f, 0.92f, 1f);
-    public static Color CloseBackground => Rgba(0.29f, 0.20f, 0.20f, 0.98f);
-    public static Color CloseText => Rgba(0.98f, 0.92f, 0.90f, 1f);
+    public static Color CloseBackground => CollectionChipBackground;
+    public static Color CloseText => CollectionChipText;
 
     public static Color RankLegendaryBackground => FromRgb(241, 54, 41);
     public static Color RankBronzeBackground => Rgba(0.39f, 0.24f, 0.17f, 0.98f);

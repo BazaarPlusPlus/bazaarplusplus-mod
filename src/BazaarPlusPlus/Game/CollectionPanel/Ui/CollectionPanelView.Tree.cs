@@ -15,7 +15,7 @@ internal sealed partial class CollectionPanelView
     {
         var panel = new VisualElement();
         panel.style.flexGrow = 1f;
-        panel.style.backgroundColor = Colors.HistoryPanelBackground;
+        panel.style.backgroundColor = Colors.CollectionPanelBackground;
         panel.style.paddingLeft = UiSpacing.PanelPadding;
         panel.style.paddingRight = UiSpacing.PanelPadding;
         panel.style.paddingTop = UiSpacing.PanelPadding;
@@ -55,17 +55,25 @@ internal sealed partial class CollectionPanelView
         _title.style.overflow = Overflow.Hidden;
         titleRow.Add(_title);
 
+        _tabModeControl = CreateFacetChoiceControl(
+            CollectionPanelText.ItemsTab(),
+            CollectionPanelText.SkillsTab(),
+            () => _commands.SetActiveTab(CollectionTabKind.Items),
+            () => _commands.SetActiveTab(CollectionTabKind.Skills),
+            Sizes.CollectionTabToggleWidth,
+            Sizes.CollectionTabToggleHeight,
+            Sizes.FontBody,
+            slanted: false
+        );
+        _tabModeControl.style.marginLeft = UiSpacing.Md;
+        _tabModeControl.style.marginRight = UiSpacing.Md;
+        titleRow.Add(_tabModeControl);
+
         _countLabel = CreateCountLabel();
         _countLabel.style.marginRight = UiSpacing.Sm;
         titleRow.Add(_countLabel);
 
-        _closeButton = CreateButton(
-            CollectionPanelText.Close(),
-            _commands.Close,
-            Sizes.CloseButtonWidth,
-            Sizes.ButtonStandardHeight
-        );
-        StyleButton(_closeButton, Colors.CloseBackground, Colors.CloseText);
+        _closeButton = CreateCloseButton(_commands.Close);
         titleRow.Add(_closeButton);
 
         _subtitle = BPPSupporterAttributionRow.Create();
@@ -88,68 +96,23 @@ internal sealed partial class CollectionPanelView
         var primaryControlsRow = CreateOperationRow(UiSpacing.Md);
         rail.Add(primaryControlsRow);
 
-        _searchToggleButton = CreateSearchToggleButton();
-        primaryControlsRow.Add(_searchToggleButton);
+        // The search field is deliberately persistent. Sorting is attached to its right edge so
+        // the entire operation row reads as one compact search-and-sort control.
+        _searchInputContainer = CreateSearchField();
+        primaryControlsRow.Add(_searchInputContainer);
+        _searchInputContainer.Add(CreateSortButtonGroup());
 
         _standardOperationControls = new VisualElement();
         _standardOperationControls.style.flexDirection = FlexDirection.Row;
         _standardOperationControls.style.alignItems = Align.Center;
         _standardOperationControls.style.flexWrap = Wrap.NoWrap;
-        _standardOperationControls.style.flexGrow = 1f;
-        _standardOperationControls.style.flexShrink = 1f;
-        _standardOperationControls.style.minWidth = 0f;
-        _standardOperationControls.style.marginLeft = UiSpacing.Md;
+        _standardOperationControls.style.flexShrink = 0f;
+        _standardOperationControls.style.marginLeft = UiSpacing.Sm;
         primaryControlsRow.Add(_standardOperationControls);
-
-        _itemTabButton = CreateButton(
-            CollectionPanelText.ItemsTab(),
-            () => _commands.SetActiveTab(CollectionTabKind.Items),
-            Sizes.RunsTabWidth,
-            Sizes.ButtonStandardHeight
-        );
-        _skillTabButton = CreateButton(
-            CollectionPanelText.SkillsTab(),
-            () => _commands.SetActiveTab(CollectionTabKind.Skills),
-            Sizes.RunsTabWidth,
-            Sizes.ButtonStandardHeight
-        );
-        _standardOperationControls.Add(_itemTabButton);
-        _skillTabButton.style.marginLeft = UiSpacing.Md;
-        _standardOperationControls.Add(_skillTabButton);
-
-        _standardOperationControls.Add(CreateOperationSpacer());
-
-        var sortGroup = new VisualElement();
-        sortGroup.style.flexDirection = FlexDirection.Row;
-        sortGroup.style.alignItems = Align.Center;
-        sortGroup.style.flexShrink = 0f;
-        _standardOperationControls.Add(sortGroup);
-
-        _sortLabel = CreateLabel(Sizes.FontSmall, FontStyle.Bold, Colors.HistorySubtitleText);
-        _sortLabel.text = CollectionPanelText.SortHeader();
-        _sortLabel.style.marginRight = UiSpacing.Xs;
-        sortGroup.Add(_sortLabel);
-
-        _sortQualityButton = CreateInlineSortButton(
-            CollectionPanelText.SortQuality(),
-            () => _commands.SetSortPriority(CollectionSortPriority.Quality)
-        );
-        _sortSizeButton = CreateInlineSortButton(
-            CollectionPanelText.SortSize(),
-            () => _commands.SetSortPriority(CollectionSortPriority.Size)
-        );
-        sortGroup.Add(_sortQualityButton);
-        _sortSizeButton.style.marginLeft = UiSpacing.Xs;
-        sortGroup.Add(_sortSizeButton);
 
         // Compact day-number icon toggle.
         _dayToggleButton = CreateDayToggleButton();
-        _dayToggleButton.style.marginLeft = UiSpacing.Sm;
         _standardOperationControls.Add(_dayToggleButton);
-
-        _searchInputContainer = CreateSearchField();
-        _searchInputContainer.style.marginLeft = UiSpacing.Md;
-        primaryControlsRow.Add(_searchInputContainer);
 
         // Hero context stays visible while the remaining filters scroll.
         _heroFilterSection = CreateFilterSection(
@@ -176,7 +139,8 @@ internal sealed partial class CollectionPanelView
         _controlsDragScroller = new ScrollViewDragScroller(controlsScroll);
         rail.Add(controlsScroll);
 
-        // Size + tier filter. On Skills, Refresh hides Size and lets Quality fill the row.
+        // Size + quality filter. Both chip sets use content widths and flow together without a
+        // divider.
         _tierFilterSection = CreateFilterSection(
             controlsScroll,
             CollectionPanelText.TierSizeHeader(),
@@ -184,14 +148,13 @@ internal sealed partial class CollectionPanelView
             out var tierSizeChipRow,
             out _tierFilterLabel
         );
-        tierSizeChipRow.style.flexWrap = Wrap.NoWrap;
+        tierSizeChipRow.style.flexWrap = Wrap.Wrap;
         tierSizeChipRow.style.justifyContent = Justify.FlexStart;
-        _sizeChipRow = CreateCombinedFilterChipSegment(3f);
-        _tierChipRow = CreateCombinedFilterChipSegment(5f);
-        _tierSizeDivider = CreateCombinedFilterDivider();
+        _sizeChipRow = CreateCombinedFilterChipSegment();
+        _tierChipRow = CreateCombinedFilterChipSegment();
         tierSizeChipRow.Add(_sizeChipRow);
-        tierSizeChipRow.Add(_tierSizeDivider);
         tierSizeChipRow.Add(_tierChipRow);
+        _tierChipRow.style.marginLeft = UiSpacing.Sm;
         _tierChipRow.style.flexWrap = Wrap.NoWrap;
         _tierChipRow.style.justifyContent = Justify.FlexStart;
 
@@ -205,23 +168,15 @@ internal sealed partial class CollectionPanelView
             out _keywordFilterLabel,
             out var keywordHeaderRow
         );
-        _keywordMatchModeButton = CreateFacetMatchModeButton(_commands.ToggleKeywordMatchMode);
+        _keywordMatchModeButton = CreateFacetMatchModeControl(mode =>
+            _commands.SetKeywordMatchMode(mode)
+        );
         keywordHeaderRow.Add(_keywordMatchModeButton);
         _keywordChipRow.style.flexWrap = Wrap.Wrap;
         _keywordChipRow.style.justifyContent = Justify.FlexStart;
 
-        // Tag filter (player-facing item categories). Items show this below gameplay
-        // keywords; Skills hide it and source filters move up naturally.
-        _tagFilterSection = CreateFilterSection(
-            controlsScroll,
-            CollectionPanelText.TagHeader(),
-            UiSpacing.Lg,
-            out _tagChipRow,
-            out _tagFilterLabel,
-            out var tagHeaderRow
-        );
-        _tagMatchModeButton = CreateFacetMatchModeButton(_commands.ToggleTagMatchMode);
-        tagHeaderRow.Add(_tagMatchModeButton);
+        // Player-facing type chips continue directly below gameplay tags without a second title.
+        _tagFilterSection = CreateFilterChipSection(controlsScroll, UiSpacing.Sm, out _tagChipRow);
         _tagChipRow.style.flexWrap = Wrap.Wrap;
         _tagChipRow.style.justifyContent = Justify.FlexStart;
 
@@ -285,6 +240,54 @@ internal sealed partial class CollectionPanelView
         return spacer;
     }
 
+    private static Button CreateCloseButton(Action onClick)
+    {
+        var button = CreateButton(
+            string.Empty,
+            onClick,
+            Sizes.ButtonStandardHeight,
+            Sizes.ButtonStandardHeight
+        );
+        button.tooltip = CollectionPanelText.Close();
+        StyleButton(button, Colors.CloseBackground, Colors.CloseText);
+        UiStyle.Radius(button.style, Sizes.ButtonStandardHeight / 2f);
+        UiStyle.Border(button.style, Borders.Thin, Colors.CollectionChipBorder);
+
+        var icon = new VisualElement { pickingMode = PickingMode.Ignore };
+        UiStyle.FixedSize(
+            icon.style,
+            Sizes.CollectionSearchIconSize,
+            Sizes.CollectionSearchIconSize
+        );
+        icon.style.color = Colors.CloseText;
+        icon.generateVisualContent += context => DrawCloseIcon(context, icon);
+        button.Add(icon);
+        return button;
+    }
+
+    private static void DrawCloseIcon(MeshGenerationContext context, VisualElement icon)
+    {
+        var rect = icon.contentRect;
+        if (rect.width <= 0f || rect.height <= 0f)
+            return;
+
+        var inset = Mathf.Min(rect.width, rect.height) * 0.22f;
+        var painter = context.painter2D;
+        painter.lineWidth = Mathf.Max(1.5f, rect.width * 0.14f);
+        painter.lineCap = LineCap.Round;
+        painter.strokeColor = icon.resolvedStyle.color;
+
+        painter.BeginPath();
+        painter.MoveTo(new Vector2(rect.xMin + inset, rect.yMin + inset));
+        painter.LineTo(new Vector2(rect.xMax - inset, rect.yMax - inset));
+        painter.Stroke();
+
+        painter.BeginPath();
+        painter.MoveTo(new Vector2(rect.xMax - inset, rect.yMin + inset));
+        painter.LineTo(new Vector2(rect.xMin + inset, rect.yMax - inset));
+        painter.Stroke();
+    }
+
     private VisualElement CreateSearchField()
     {
         var container = new VisualElement();
@@ -292,9 +295,8 @@ internal sealed partial class CollectionPanelView
         container.style.flexGrow = 1f;
         container.style.flexShrink = 1f;
         container.style.minWidth = 0f;
-        container.style.display = DisplayStyle.None;
-        container.pickingMode = PickingMode.Ignore;
-        container.SetEnabled(false);
+        container.style.height = Sizes.CollectionTagChipHeight;
+        container.pickingMode = PickingMode.Position;
 
         var frame = new VisualElement();
         frame.style.flexDirection = FlexDirection.Row;
@@ -302,10 +304,10 @@ internal sealed partial class CollectionPanelView
         frame.style.flexGrow = 1f;
         frame.style.flexShrink = 1f;
         frame.style.minWidth = 0f;
-        frame.style.height = Sizes.ButtonStandardHeight;
-        frame.style.backgroundColor = Colors.HistoryStatusBackground;
-        UiStyle.Border(frame.style, Borders.Thin, Colors.HistoryListFrameBorder);
-        UiStyle.Radius(frame.style, Radii.Md);
+        frame.style.height = Sizes.CollectionTagChipHeight;
+        frame.style.backgroundColor = Colors.CollectionChipBackground;
+        UiStyle.Border(frame.style, Borders.Thin, Colors.CollectionChipBorder);
+        UiStyle.Radius(frame.style, Radii.CollectionChip);
         UiStyle.HorizontalPadding(frame.style, UiSpacing.Md);
         container.Add(frame);
 
@@ -319,9 +321,9 @@ internal sealed partial class CollectionPanelView
         field.style.minWidth = 0f;
         field.style.height = Length.Percent(100f);
         field.style.backgroundColor = Color.clear;
-        field.style.color = Colors.HistoryChipText;
+        field.style.color = Colors.CollectionChipText;
         _typography!.Apply(field);
-        field.style.fontSize = Sizes.FontSmall;
+        field.style.fontSize = Sizes.CollectionTagFontSize;
         field.style.borderLeftWidth = 0f;
         field.style.borderRightWidth = 0f;
         field.style.borderTopWidth = 0f;
@@ -330,9 +332,9 @@ internal sealed partial class CollectionPanelView
         frame.Add(field);
 
         _searchPlaceholderLabel = CreateLabel(
-            Sizes.FontSmall,
+            Sizes.CollectionTagFontSize,
             FontStyle.Normal,
-            Colors.WithAlpha(Colors.HistoryChipText, 0.58f)
+            Colors.WithAlpha(Colors.CollectionChipText, 0.58f)
         );
         _searchPlaceholderLabel.pickingMode = PickingMode.Ignore;
         _searchPlaceholderLabel.style.position = Position.Absolute;
@@ -354,17 +356,17 @@ internal sealed partial class CollectionPanelView
         var focused = false;
         void RefreshFrame()
         {
-            var background = Colors.HistoryStatusBackground;
-            var border = Colors.HistoryListFrameBorder;
+            var background = Colors.CollectionChipBackground;
+            var border = Colors.CollectionChipBorder;
             if (focused)
             {
-                background = Colors.ButtonHoverBackgroundFor(Colors.HistoryStatusBackground);
-                border = Colors.ButtonHoverBorderFor(Colors.HistoryStatusBackground);
+                background = Colors.CollectionChipSelectedBackground;
+                border = Colors.CollectionChipSelectedBorder;
             }
             else if (hovered)
             {
-                background = Colors.RowHoverBackgroundFor(Colors.HistoryStatusBackground);
-                border = Colors.RowHoverBorderFor(Colors.HistoryStatusBorder);
+                background = Colors.CollectionChipHoverBackground;
+                border = Colors.CollectionChipHoverBorder;
             }
 
             frame.style.backgroundColor = background;
@@ -397,179 +399,31 @@ internal sealed partial class CollectionPanelView
         return container;
     }
 
-    private Button CreateSearchToggleButton()
+    private VisualElement CreateSortButtonGroup()
     {
-        _searchIconData = CollectionSearchSvgIconData.LoadEmbedded(
-            "BazaarPlusPlus.Resources.Collection.search.svg"
+        var group = new VisualElement();
+        group.style.flexDirection = FlexDirection.Row;
+        group.style.alignItems = Align.Stretch;
+        group.style.flexShrink = 0f;
+        group.style.height = Sizes.CollectionTagChipHeight;
+        group.style.overflow = Overflow.Hidden;
+        UiStyle.FixedWidth(group.style, Sizes.CollectionSortButtonWidth * 2f);
+        UiStyle.Radius(group.style, Radii.CollectionChip);
+        UiStyle.Border(group.style, Borders.Thin, Colors.CollectionChipBorder);
+        group.style.marginLeft = UiSpacing.Sm;
+
+        _sortQualityButton = CreateInlineSortButton(
+            CollectionPanelText.SortQuality(),
+            () => _commands.SetSortPriority(CollectionSortPriority.Quality)
         );
-        _closeSearchIconData = CollectionSearchSvgIconData.LoadEmbedded(
-            "BazaarPlusPlus.Resources.Collection.close.svg"
+        _sortSizeButton = CreateInlineSortButton(
+            CollectionPanelText.SortSize(),
+            () => _commands.SetSortPriority(CollectionSortPriority.Size)
         );
-
-        var button = CreateButton(
-            string.Empty,
-            _commands.ToggleSearch,
-            Sizes.CollectionSearchButtonSize,
-            Sizes.CollectionSearchButtonSize
-        );
-        StyleButton(button, Colors.HistoryChipBackground, Colors.HistoryChipText);
-
-        _searchToggleIcon = new VisualElement();
-        _searchToggleIcon.pickingMode = PickingMode.Ignore;
-        _searchToggleIcon.style.width = Sizes.CollectionSearchIconSize;
-        _searchToggleIcon.style.height = Sizes.CollectionSearchIconSize;
-        _searchToggleIcon.style.flexGrow = 0f;
-        _searchToggleIcon.style.flexShrink = 0f;
-        _searchToggleIcon.style.color = Colors.HistoryChipText;
-        _searchTogglePrimaryStroke = CreateSearchToggleStroke(0);
-        _searchToggleSecondaryStroke = CreateSearchToggleStroke(1);
-        _searchToggleIcon.Add(_searchTogglePrimaryStroke);
-        _searchToggleIcon.Add(_searchToggleSecondaryStroke);
-        button.Add(_searchToggleIcon);
-
-        button.RegisterCallback<MouseEnterEvent>(_ =>
-        {
-            _searchToggleHovered = true;
-            RefreshSearchToggleIconColor();
-        });
-        button.RegisterCallback<MouseLeaveEvent>(_ =>
-        {
-            _searchToggleHovered = false;
-            _searchTogglePressed = false;
-            RefreshSearchToggleIconColor();
-        });
-        button.RegisterCallback<MouseDownEvent>(_ =>
-        {
-            _searchTogglePressed = true;
-            RefreshSearchToggleIconColor();
-        });
-        button.RegisterCallback<MouseUpEvent>(_ =>
-        {
-            _searchTogglePressed = false;
-            RefreshSearchToggleIconColor();
-        });
-        button.RegisterCallback<FocusInEvent>(_ =>
-        {
-            _searchToggleFocused = true;
-            RefreshSearchToggleIconColor();
-        });
-        button.RegisterCallback<FocusOutEvent>(_ =>
-        {
-            _searchToggleFocused = false;
-            RefreshSearchToggleIconColor();
-        });
-        return button;
-    }
-
-    private void RefreshSearchToggleIconColor()
-    {
-        if (_searchToggleIcon == null)
-            return;
-
-        if (_searchToggleButton != null)
-        {
-            StyleButton(_searchToggleButton, Colors.HistoryChipBackground, Colors.HistoryChipText);
-            if (_searchToggleButton.enabledInHierarchy && _searchToggleFocused)
-            {
-                _searchToggleButton.style.backgroundColor = Colors.ButtonHoverBackgroundFor(
-                    Colors.HistoryChipBackground
-                );
-                UiStyle.BorderColor(
-                    _searchToggleButton.style,
-                    Colors.ButtonHoverBorderFor(Colors.HistoryChipBackground)
-                );
-            }
-        }
-
-        var color = Colors.HistoryChipText;
-        if (_searchToggleButton?.enabledInHierarchy != true)
-            color = Colors.WithAlpha(color, 0.42f);
-        else if (_searchTogglePressed)
-            color = Colors.HistoryTitleText;
-        else if (_searchToggleHovered || _searchToggleFocused)
-            color = Colors.White;
-
-        _searchToggleIcon.style.color = color;
-        _searchTogglePrimaryStroke?.MarkDirtyRepaint();
-        _searchToggleSecondaryStroke?.MarkDirtyRepaint();
-    }
-
-    private VisualElement CreateSearchToggleStroke(int primitiveIndex)
-    {
-        var stroke = new VisualElement();
-        stroke.pickingMode = PickingMode.Ignore;
-        stroke.style.position = Position.Absolute;
-        stroke.style.left = 0f;
-        stroke.style.top = 0f;
-        stroke.style.width = Sizes.CollectionSearchIconSize;
-        stroke.style.height = Sizes.CollectionSearchIconSize;
-        stroke.generateVisualContent += context =>
-            DrawSearchToggleIconPrimitive(context, stroke, primitiveIndex);
-        return stroke;
-    }
-
-    private void DrawSearchToggleIconPrimitive(
-        MeshGenerationContext context,
-        VisualElement strokeElement,
-        int primitiveIndex
-    )
-    {
-        if (_searchToggleIcon == null)
-            return;
-
-        var icon = _searchExpanded ? _closeSearchIconData : _searchIconData;
-        if (icon == null)
-            return;
-        var content = strokeElement.contentRect;
-        if (content.width <= 0f || content.height <= 0f)
-            return;
-
-        var scale = Mathf.Min(content.width / icon.Width, content.height / icon.Height);
-        var offset = new Vector2(
-            content.x + (content.width - icon.Width * scale) * 0.5f - icon.MinX * scale,
-            content.y + (content.height - icon.Height * scale) * 0.5f - icon.MinY * scale
-        );
-        Vector2 Point(float x, float y) => offset + new Vector2(x * scale, y * scale);
-
-        var painter = context.painter2D;
-        painter.lineWidth = icon.StrokeWidth * scale;
-        painter.lineCap = LineCap.Round;
-        painter.lineJoin = LineJoin.Round;
-        painter.strokeColor = _searchToggleIcon.resolvedStyle.color;
-        if (!_searchExpanded && primitiveIndex == 0 && icon.Circles.Count > 0)
-        {
-            var circle = icon.Circles[0];
-            var center = Point(circle.CenterX, circle.CenterY);
-            var radius = circle.Radius * scale;
-            painter.BeginPath();
-            painter.MoveTo(center + new Vector2(radius, 0f));
-            painter.Arc(
-                center,
-                radius,
-                Angle.Degrees(0f),
-                Angle.Degrees(180f),
-                ArcDirection.Clockwise
-            );
-            painter.Arc(
-                center,
-                radius,
-                Angle.Degrees(180f),
-                Angle.Degrees(360f),
-                ArcDirection.Clockwise
-            );
-            painter.Stroke();
-            return;
-        }
-
-        var segmentIndex = _searchExpanded ? primitiveIndex : primitiveIndex - 1;
-        if (segmentIndex < 0 || segmentIndex >= icon.Segments.Count)
-            return;
-
-        var segment = icon.Segments[segmentIndex];
-        painter.BeginPath();
-        painter.MoveTo(Point(segment.StartX, segment.StartY));
-        painter.LineTo(Point(segment.EndX, segment.EndY));
-        painter.Stroke();
+        group.Add(_sortQualityButton);
+        group.Add(_sortSizeButton);
+        group.Add(CreateFacetChoiceDivider(Sizes.CollectionSortButtonWidth));
+        return group;
     }
 
     private void StyleSearchField(TextField field)
@@ -587,9 +441,9 @@ internal sealed partial class CollectionPanelView
             input.style.height = Length.Percent(100f);
             input.style.alignSelf = Align.Stretch;
             input.style.backgroundColor = Color.clear;
-            input.style.color = Colors.HistoryChipText;
+            input.style.color = Colors.CollectionChipText;
             _typography!.Apply(input);
-            input.style.fontSize = Sizes.FontSmall;
+            input.style.fontSize = Sizes.CollectionTagFontSize;
             input.style.unityTextAlign = TextAnchor.MiddleLeft;
             input.style.borderLeftWidth = 0f;
             input.style.borderRightWidth = 0f;
@@ -608,9 +462,9 @@ internal sealed partial class CollectionPanelView
             text.style.flexGrow = 1f;
             text.style.height = Length.Percent(100f);
             text.style.alignSelf = Align.Stretch;
-            text.style.color = Colors.HistoryChipText;
+            text.style.color = Colors.CollectionChipText;
             _typography!.Apply(text);
-            text.style.fontSize = Sizes.FontSmall;
+            text.style.fontSize = Sizes.CollectionTagFontSize;
             text.style.unityTextAlign = TextAnchor.MiddleLeft;
         }
     }
@@ -638,10 +492,14 @@ internal sealed partial class CollectionPanelView
             text,
             onClick,
             Sizes.CollectionSortButtonWidth,
-            Sizes.ButtonStandardHeight
+            Sizes.CollectionTagChipHeight
         );
         button.style.flexShrink = 0f;
-        StyleButton(button, Colors.HistoryChipBackground, Colors.HistoryChipText);
+        StyleCollectionGroupChip(
+            button,
+            Colors.CollectionChipBackground,
+            Colors.CollectionChipText
+        );
         return button;
     }
 
@@ -701,43 +559,172 @@ internal sealed partial class CollectionPanelView
         return section;
     }
 
-    private static Button CreateFacetMatchModeButton(Action onClick)
-    {
-        var button = CreateButton(
-            string.Empty,
-            onClick,
+    private static VisualElement CreateFacetMatchModeControl(
+        Action<CollectionFacetMatchMode> onSelect
+    ) =>
+        CreateFacetChoiceControl(
+            CollectionPanelText.FacetMatchMode(CollectionFacetMatchMode.Any),
+            CollectionPanelText.FacetMatchMode(CollectionFacetMatchMode.All),
+            () => onSelect(CollectionFacetMatchMode.Any),
+            () => onSelect(CollectionFacetMatchMode.All),
             Sizes.FacetModeToggleWidth,
-            Sizes.InfoChipHeight
+            Sizes.FacetModeToggleHeight,
+            Sizes.FacetModeFontSize,
+            slanted: true
         );
-        button.style.marginLeft = UiSpacing.Sm;
-        button.style.fontSize = Sizes.FontSmall;
-        StyleButton(button, Colors.HistoryChipBackground, Colors.HistoryChipText);
+
+    private static VisualElement CreateFacetChoiceControl(
+        string firstText,
+        string secondText,
+        Action onFirst,
+        Action onSecond,
+        float segmentWidth,
+        float height,
+        int fontSize,
+        bool slanted
+    )
+    {
+        var control = new VisualElement();
+        control.style.flexDirection = FlexDirection.Row;
+        control.style.flexShrink = 0f;
+        control.style.height = height;
+        UiStyle.FixedWidth(control.style, segmentWidth * 2f);
+        control.style.marginLeft = UiSpacing.Sm;
+        control.style.overflow = Overflow.Hidden;
+        UiStyle.Radius(control.style, Radii.CollectionChip);
+        if (!slanted)
+            UiStyle.Border(control.style, Borders.Thin, Colors.CollectionChipBorder);
+
+        var any = CreateFacetMatchModeSegment(
+            FacetMatchAnyName,
+            firstText,
+            onFirst,
+            left: true,
+            segmentWidth,
+            height,
+            fontSize,
+            slanted
+        );
+        var all = CreateFacetMatchModeSegment(
+            FacetMatchAllName,
+            secondText,
+            onSecond,
+            left: false,
+            segmentWidth,
+            height,
+            fontSize,
+            slanted
+        );
+        control.Add(any);
+        control.Add(all);
+        if (!slanted)
+            control.Add(CreateFacetChoiceDivider(segmentWidth));
+        return control;
+    }
+
+    private static Button CreateFacetMatchModeSegment(
+        string name,
+        string text,
+        Action onClick,
+        bool left,
+        float width,
+        float height,
+        int fontSize,
+        bool slanted
+    )
+    {
+        var button = CreateButton(string.Empty, onClick, width, height);
+        button.name = name;
+        button.style.flexShrink = 0f;
+        if (!slanted)
+            UiStyle.Padding(button.style, UiSpacing.Xs, UiSpacing.Sm);
+
+        var label = new Label(text)
+        {
+            name = FacetMatchLabelName,
+            pickingMode = PickingMode.Ignore,
+        };
+        label.style.fontSize = fontSize;
+        label.style.unityTextAlign = TextAnchor.MiddleCenter;
+        label.style.flexGrow = 1f;
+        label.style.flexShrink = 1f;
+        label.style.minWidth = 0f;
+        label.style.whiteSpace = WhiteSpace.NoWrap;
+        label.style.overflow = Overflow.Hidden;
+        button.Add(label);
+
+        StyleFacetMatchModeSegment(
+            button,
+            selected: false,
+            left: left,
+            fontSize: fontSize,
+            slanted: slanted
+        );
         return button;
     }
 
-    private static VisualElement CreateCombinedFilterChipSegment(float flexGrow)
+    private static VisualElement CreateFacetChoiceDivider(float left)
+    {
+        var divider = new VisualElement { pickingMode = PickingMode.Ignore };
+        divider.style.position = Position.Absolute;
+        divider.style.left = left;
+        divider.style.top = 0f;
+        divider.style.bottom = 0f;
+        divider.style.width = Borders.Thin;
+        divider.style.backgroundColor = Colors.CollectionChipBorder;
+        return divider;
+    }
+
+    private static VisualElement CreateCombinedFilterChipSegment()
     {
         var segment = new VisualElement();
         segment.style.flexDirection = FlexDirection.Row;
         segment.style.flexWrap = Wrap.NoWrap;
         segment.style.alignItems = Align.Center;
-        segment.style.flexGrow = flexGrow;
-        segment.style.flexShrink = 1f;
+        segment.style.flexGrow = 0f;
+        segment.style.flexShrink = 0f;
         segment.style.minWidth = 0f;
+        segment.style.overflow = Overflow.Hidden;
+        UiStyle.Radius(segment.style, Radii.CollectionChip);
+        UiStyle.Border(segment.style, Borders.Thin, Colors.CollectionChipBorder);
         return segment;
     }
 
-    private static VisualElement CreateCombinedFilterDivider()
+    private static VisualElement CreateChipGroupDivider()
     {
         var divider = new VisualElement { pickingMode = PickingMode.Ignore };
         divider.style.width = Borders.Thin;
-        divider.style.height = Sizes.InfoChipHeight;
-        divider.style.marginLeft = UiSpacing.Sm;
-        divider.style.marginRight = UiSpacing.Sm;
+        divider.style.height = Sizes.CollectionTagChipHeight;
         divider.style.flexShrink = 0f;
-        divider.style.backgroundColor = Colors.HistoryButtonBorder;
-        divider.style.opacity = 0.72f;
+        divider.style.backgroundColor = Colors.CollectionChipBorder;
         return divider;
+    }
+
+    private static VisualElement CreateFilterChipSection(
+        VisualElement parent,
+        float marginTop,
+        out VisualElement chipRow
+    )
+    {
+        var section = new VisualElement();
+        section.style.flexDirection = FlexDirection.Column;
+        section.style.flexShrink = 0f;
+        section.style.marginTop = marginTop;
+        parent.Add(section);
+
+        chipRow = CreateFilterChipRow();
+        section.Add(chipRow);
+        return section;
+    }
+
+    private static VisualElement CreateFilterChipRow()
+    {
+        var row = new VisualElement();
+        row.style.flexDirection = FlexDirection.Row;
+        row.style.flexWrap = Wrap.Wrap;
+        row.style.alignItems = Align.Center;
+        row.style.alignSelf = Align.Stretch;
+        return row;
     }
 
     // Compact day-number "icon": shows the current run day (or an unavailable dash) and toggles
@@ -748,10 +735,10 @@ internal sealed partial class CollectionPanelView
             string.Empty,
             _commands.ToggleRunDayFilter,
             Sizes.DayIconWidth,
-            Sizes.ButtonStandardHeight
+            Sizes.CollectionTagChipHeight
         );
         button.tooltip = CollectionPanelText.DayHeader();
-        StyleButton(button, Colors.HistoryChipBackground, Colors.HistoryChipText);
+        StyleCollectionChip(button, Colors.CollectionChipBackground, Colors.CollectionChipText);
         return button;
     }
 

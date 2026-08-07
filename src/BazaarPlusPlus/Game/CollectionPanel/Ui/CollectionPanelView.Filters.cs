@@ -15,6 +15,9 @@ namespace BazaarPlusPlus.Game.CollectionPanel.Ui;
 internal sealed partial class CollectionPanelView
 {
     private const string HeroChipBadgeName = "bpp-collection-hero-chip-badge";
+    private const string HeroChipGradientName = "bpp-collection-hero-chip-gradient";
+    private const string HeroChipPortraitName = "bpp-collection-hero-chip-portrait";
+    private const string SourceChipPortraitName = "bpp-collection-source-chip-portrait";
 
     private static readonly CollectionPortraitFailureGate<
         EHero,
@@ -53,12 +56,15 @@ internal sealed partial class CollectionPanelView
         var index = 0;
         foreach (var tier in tiers)
         {
+            if (index > 0)
+                _tierChipRow.Add(CreateChipGroupDivider());
+
             var chip = CreateChipButton(
                 CollectionPanelText.Tier(tier),
                 () => _commands.ToggleTier(tier),
-                true
+                contentWidth: true
             );
-            chip.style.marginLeft = index > 0 ? UiSpacing.Sm : 0f;
+            StyleCollectionGroupChip(chip, Colors.CollectionChipBackground, TierTextColor(tier));
             _tierChips[tier] = chip;
             _tierChipRow.Add(chip);
             index++;
@@ -99,12 +105,19 @@ internal sealed partial class CollectionPanelView
         var index = 0;
         foreach (var size in sizes)
         {
+            if (index > 0)
+                _sizeChipRow.Add(CreateChipGroupDivider());
+
             var chip = CreateChipButton(
                 CollectionPanelText.Size(size),
                 () => _commands.ToggleSize(size),
-                true
+                contentWidth: true
             );
-            chip.style.marginLeft = index > 0 ? UiSpacing.Sm : 0f;
+            StyleCollectionGroupChip(
+                chip,
+                Colors.CollectionChipBackground,
+                Colors.CollectionChipText
+            );
             _sizeChips[size] = chip;
             _sizeChipRow.Add(chip);
             index++;
@@ -163,14 +176,14 @@ internal sealed partial class CollectionPanelView
         if (!KeywordChipsMatch(options))
         {
             ClearKeywordFacetRow();
-            var hasRelatedSection = false;
+            var addedOption = false;
+            var addedRelatedGroup = false;
             foreach (var option in options)
             {
-                if (!hasRelatedSection && option.IsRelated)
+                if (option.IsRelated && addedOption && !addedRelatedGroup)
                 {
-                    _keywordRelatedSectionLabel = CreateKeywordRelatedSectionLabel();
-                    _keywordChipRow.Add(_keywordRelatedSectionLabel);
-                    hasRelatedSection = true;
+                    _keywordChipRow.Add(CreateFacetGroupSpacer());
+                    addedRelatedGroup = true;
                 }
 
                 var captured = option;
@@ -179,6 +192,7 @@ internal sealed partial class CollectionPanelView
                 _keywordChips[captured] = chip;
                 _keywordChipOrder.Add(captured);
                 _keywordChipRow.Add(chip);
+                addedOption = true;
             }
         }
     }
@@ -224,22 +238,17 @@ internal sealed partial class CollectionPanelView
         }
         _keywordChips.Clear();
         _keywordChipOrder.Clear();
-        _keywordRelatedSectionLabel = null;
         _keywordChipRow?.Clear();
     }
 
-    private static Label CreateKeywordRelatedSectionLabel()
+    private static VisualElement CreateFacetGroupSpacer()
     {
-        var label = CreateLabel(Sizes.FontTiny, FontStyle.Bold, Colors.HistoryStatusText);
-        label.text = CollectionPanelText.KeywordRelatedSection();
-        label.style.width = Length.Percent(100f);
-        label.style.flexBasis = Length.Percent(100f);
-        label.style.marginTop = UiSpacing.Xs;
-        label.style.marginBottom = UiSpacing.Xs;
-        label.style.whiteSpace = WhiteSpace.NoWrap;
-        label.style.overflow = Overflow.Hidden;
-        label.style.opacity = 0.72f;
-        return label;
+        var spacer = new VisualElement { pickingMode = PickingMode.Ignore };
+        spacer.style.width = Length.Percent(100f);
+        spacer.style.flexBasis = Length.Percent(100f);
+        spacer.style.height = UiSpacing.Sm;
+        spacer.style.flexShrink = 0f;
+        return spacer;
     }
 
     private void EnsureSourceChips(IReadOnlyList<CollectionSourceOptionViewModel> sources)
@@ -331,11 +340,10 @@ internal sealed partial class CollectionPanelView
             return;
 
         _appliedHeroChipBox = box;
-        var icon = Mathf.Round(box * Sizes.SourceChipIconRatio);
         foreach (var pair in _heroChips)
         {
             if (_heroChipIcons.TryGetValue(pair.Key, out var iconElement))
-                ResizeHeroChip(pair.Value, iconElement, pair.Key, box, icon);
+                ResizeHeroChip(pair.Value, iconElement, pair.Key, box);
         }
     }
 
@@ -351,11 +359,10 @@ internal sealed partial class CollectionPanelView
             return;
 
         _appliedSourceChipBox = box;
-        var icon = Mathf.Round(box * Sizes.SourceChipIconRatio);
         foreach (var pair in _sourceChips)
         {
             if (_sourceChipIcons.TryGetValue(pair.Key, out var iconElement))
-                ResizeSourceChip(pair.Value, iconElement, box, icon);
+                ResizeSourceChip(pair.Value, iconElement, box);
         }
     }
 
@@ -382,14 +389,19 @@ internal sealed partial class CollectionPanelView
             row.Clear();
     }
 
-    private Button CreateChipButton(string text, Action onClick, bool fillRow = false)
+    private Button CreateChipButton(
+        string text,
+        Action onClick,
+        bool fillRow = false,
+        bool contentWidth = false
+    )
     {
         var chip = CreateButton(
             text,
             onClick,
-            fillRow ? 0f : Sizes.ChipMinWidth + 12f,
-            Sizes.ChipHeight,
-            fixedWidth: !fillRow
+            fillRow || contentWidth ? 0f : Sizes.ChipMinWidth + 12f,
+            Sizes.CollectionTagChipHeight,
+            fixedWidth: !fillRow && !contentWidth
         );
         if (fillRow)
         {
@@ -397,20 +409,36 @@ internal sealed partial class CollectionPanelView
             chip.style.flexGrow = 1f;
             chip.style.flexShrink = 1f;
         }
-        chip.style.marginRight = fillRow ? 0f : UiSpacing.Sm;
+        else if (contentWidth)
+        {
+            chip.style.minWidth = 0f;
+            chip.style.flexGrow = 0f;
+            chip.style.flexShrink = 0f;
+            UiStyle.HorizontalPadding(chip.style, UiSpacing.Md);
+        }
+        chip.style.marginRight = fillRow || contentWidth ? 0f : UiSpacing.Sm;
         chip.style.marginBottom = UiSpacing.Xs;
-        StyleButton(chip, Colors.HistoryChipBackground, Colors.HistoryChipText);
+        var textElement = chip.Q<TextElement>();
+        if (textElement != null)
+            textElement.style.fontSize = Sizes.CollectionTagFontSize;
+        StyleCollectionChip(chip, Colors.CollectionChipBackground, Colors.CollectionChipText);
         return chip;
     }
 
     private static Button CreateTagFacetChipButton(Action onClick)
     {
-        var chip = CreateButton(string.Empty, onClick, 0f, Sizes.InfoChipHeight, fixedWidth: false);
-        chip.style.minWidth = Sizes.InfoChipMinWidth;
+        var chip = CreateButton(
+            string.Empty,
+            onClick,
+            0f,
+            Sizes.CollectionTagChipHeight,
+            fixedWidth: false
+        );
+        chip.style.minWidth = 0f;
         chip.style.flexDirection = FlexDirection.Row;
         chip.style.alignItems = Align.Center;
         chip.style.justifyContent = Justify.Center;
-        UiStyle.HorizontalPadding(chip.style, UiSpacing.Md);
+        UiStyle.HorizontalPadding(chip.style, UiSpacing.Sm);
         chip.style.marginRight = UiSpacing.Sm;
         chip.style.marginBottom = UiSpacing.Xs;
 
@@ -424,7 +452,7 @@ internal sealed partial class CollectionPanelView
         chip.Add(icon);
 
         var label = new Label { name = TagChipLabelName, pickingMode = PickingMode.Ignore };
-        label.style.fontSize = Sizes.FontSmall;
+        label.style.fontSize = Sizes.CollectionTagFontSize;
         label.style.unityFontStyleAndWeight = FontStyle.Normal;
         label.style.unityTextAlign = TextAnchor.MiddleCenter;
         label.style.flexShrink = 1f;
@@ -434,7 +462,7 @@ internal sealed partial class CollectionPanelView
         label.style.overflow = Overflow.Hidden;
         chip.Add(label);
 
-        StyleButton(chip, Colors.HistoryChipBackground, Colors.HistoryChipText);
+        StyleCollectionChip(chip, Colors.CollectionChipBackground, Colors.CollectionChipText);
         return chip;
     }
 
@@ -547,17 +575,12 @@ internal sealed partial class CollectionPanelView
         chip.style.justifyContent = Justify.Center;
         chip.style.alignItems = Align.Center;
         chip.style.marginBottom = UiSpacing.Xs;
-        StyleButton(chip, Colors.HistoryChipBackground, Colors.HistoryChipText);
+        StyleHeroChip(chip);
 
         var icon = CreateHeroChipIcon(hero);
         chip.Add(icon);
-        ResizeHeroChip(
-            chip,
-            icon,
-            hero,
-            CurrentHeroChipBox(),
-            Mathf.Round(CurrentHeroChipBox() * Sizes.SourceChipIconRatio)
-        );
+        BindHeroChipInteraction(chip, icon);
+        ResizeHeroChip(chip, icon, hero, CurrentHeroChipBox());
 
         _heroChipIcons[hero] = icon;
         if (HeroPortraitSpriteProvider.IsRenderableHero(hero))
@@ -582,12 +605,13 @@ internal sealed partial class CollectionPanelView
         chip.style.alignItems = Align.Center;
         chip.style.marginRight = UiSpacing.Sm;
         chip.style.marginBottom = UiSpacing.Xs;
-        StyleButton(chip, Colors.HistoryChipBackground, Colors.HistoryChipText);
+        StyleCollectionChip(chip, Colors.CollectionChipBackground, Colors.CollectionChipText);
+        UiStyle.Radius(chip.style, Radii.CollectionPortraitChip);
 
         var icon = CreateSourceChipIcon(source.DisplayName);
         chip.Add(icon);
         var box = CurrentSourceChipBox();
-        ResizeSourceChip(chip, icon, box, Mathf.Round(box * Sizes.SourceChipIconRatio));
+        ResizeSourceChip(chip, icon, box);
 
         _sourceChipIcons[source.SourceKey] = icon;
         LoadSourceChipIcon(source.SourceKey, source.RepresentativeTemplateId, icon);
@@ -597,17 +621,20 @@ internal sealed partial class CollectionPanelView
     private static VisualElement CreateHeroChipIcon(EHero hero)
     {
         var icon = new VisualElement { pickingMode = PickingMode.Ignore };
-        icon.style.position = Position.Relative;
-        icon.style.backgroundColor = Colors.HistoryStatusBackground;
-        icon.style.backgroundSize = new BackgroundSize(BackgroundSizeType.Cover);
-        icon.style.backgroundRepeat = new BackgroundRepeat(Repeat.NoRepeat, Repeat.NoRepeat);
-        UiStyle.Border(icon.style, Borders.Thin, Colors.HistoryButtonBorder);
-        ResizeHeroIcon(icon, Sizes.HeroChipIconSize);
+        StretchPortraitToParent(icon);
+        var portrait = CreatePortraitLayer(HeroChipPortraitName);
 
         if (HeroPortraitSpriteProvider.IsRenderableHero(hero))
+        {
+            icon.Add(CreateHeroGradient(hero));
+            icon.Add(portrait);
             AddHeroBadgeFallback(icon, hero, Sizes.HeroChipIconSize);
+        }
         else
+        {
+            icon.Add(portrait);
             AddCommonHeroGlyph(icon, Sizes.HeroChipIconSize);
+        }
 
         return icon;
     }
@@ -615,12 +642,8 @@ internal sealed partial class CollectionPanelView
     private static VisualElement CreateSourceChipIcon(string displayName)
     {
         var icon = new VisualElement { pickingMode = PickingMode.Ignore };
-        icon.style.position = Position.Relative;
-        icon.style.backgroundColor = Colors.HistoryStatusBackground;
-        icon.style.backgroundSize = new BackgroundSize(BackgroundSizeType.Cover);
-        icon.style.backgroundRepeat = new BackgroundRepeat(Repeat.NoRepeat, Repeat.NoRepeat);
-        UiStyle.Border(icon.style, Borders.Thin, Colors.HistoryButtonBorder);
-        ResizeSourceIcon(icon, Mathf.Round(Sizes.SourceChipMinSize * Sizes.SourceChipIconRatio));
+        StretchPortraitToParent(icon);
+        icon.Add(CreatePortraitLayer(SourceChipPortraitName));
 
         var initials = CreateLabel(Sizes.FontSmall, FontStyle.Bold, Colors.HistoryChipText);
         initials.name = SourceChipInitialsName;
@@ -642,13 +665,7 @@ internal sealed partial class CollectionPanelView
     private float CurrentHeroChipBox() =>
         _appliedHeroChipBox > 0f ? _appliedHeroChipBox : Sizes.HeroChipButtonSize;
 
-    private static void ResizeHeroChip(
-        Button chip,
-        VisualElement icon,
-        EHero hero,
-        float box,
-        float iconSize
-    )
+    private static void ResizeHeroChip(Button chip, VisualElement icon, EHero hero, float box)
     {
         chip.style.width = box;
         chip.style.minWidth = box;
@@ -656,14 +673,14 @@ internal sealed partial class CollectionPanelView
         chip.style.height = box;
         chip.style.minHeight = box;
         chip.style.maxHeight = box;
-        ResizeHeroIcon(icon, iconSize);
+        ResizeHeroIcon(icon);
         if (HeroPortraitSpriteProvider.IsRenderableHero(hero))
-            ResizeHeroBadge(icon, iconSize);
+            ResizeHeroBadge(icon, box);
         else
-            AddCommonHeroGlyph(icon, iconSize);
+            AddCommonHeroGlyph(icon, box);
     }
 
-    private static void ResizeSourceChip(Button chip, VisualElement icon, float box, float iconSize)
+    private static void ResizeSourceChip(Button chip, VisualElement icon, float box)
     {
         chip.style.width = box;
         chip.style.minWidth = box;
@@ -671,29 +688,55 @@ internal sealed partial class CollectionPanelView
         chip.style.height = box;
         chip.style.minHeight = box;
         chip.style.maxHeight = box;
-        ResizeSourceIcon(icon, iconSize);
+        ResizeSourceIcon(icon);
     }
 
-    private static void ResizeHeroIcon(VisualElement icon, float iconSize)
+    private static void ResizeHeroIcon(VisualElement icon)
     {
-        icon.style.width = iconSize;
-        icon.style.minWidth = iconSize;
-        icon.style.maxWidth = iconSize;
-        icon.style.height = iconSize;
-        icon.style.minHeight = iconSize;
-        icon.style.maxHeight = iconSize;
-        UiStyle.Radius(icon.style, iconSize / 2f);
+        StretchPortraitToParent(icon);
+        StretchPortraitToParentIfPresent(icon, HeroChipPortraitName);
+        StretchPortraitToParentIfPresent(icon, HeroChipGradientName);
     }
 
-    private static void ResizeSourceIcon(VisualElement icon, float iconSize)
+    private static void ResizeSourceIcon(VisualElement icon)
     {
-        icon.style.width = iconSize;
-        icon.style.minWidth = iconSize;
-        icon.style.maxWidth = iconSize;
-        icon.style.height = iconSize;
-        icon.style.minHeight = iconSize;
-        icon.style.maxHeight = iconSize;
-        UiStyle.Radius(icon.style, iconSize / 2f);
+        StretchPortraitToParent(icon);
+        StretchPortraitToParentIfPresent(icon, SourceChipPortraitName);
+    }
+
+    private static VisualElement CreatePortraitLayer(string name)
+    {
+        var portrait = new VisualElement { name = name, pickingMode = PickingMode.Ignore };
+        StretchPortraitToParent(portrait);
+        UiStyle.Padding(portrait.style, UiSpacing.None);
+        portrait.style.marginBottom = 0f;
+        portrait.style.backgroundSize = new BackgroundSize(BackgroundSizeType.Contain);
+        portrait.style.backgroundRepeat = new BackgroundRepeat(Repeat.NoRepeat, Repeat.NoRepeat);
+        portrait.style.backgroundPositionX = new BackgroundPosition(
+            BackgroundPositionKeyword.Center
+        );
+        portrait.style.backgroundPositionY = new BackgroundPosition(
+            BackgroundPositionKeyword.Bottom
+        );
+        return portrait;
+    }
+
+    private static void StretchPortraitToParentIfPresent(VisualElement parent, string name)
+    {
+        var portrait = parent.Q<VisualElement>(name);
+        if (portrait != null)
+            StretchPortraitToParent(portrait);
+    }
+
+    private static void StretchPortraitToParent(VisualElement portrait)
+    {
+        portrait.style.position = Position.Absolute;
+        portrait.style.left = 0f;
+        portrait.style.right = 0f;
+        portrait.style.top = 0f;
+        portrait.style.bottom = 0f;
+        portrait.style.width = StyleKeyword.Auto;
+        portrait.style.height = StyleKeyword.Auto;
     }
 
     private static void AddCommonHeroGlyph(VisualElement icon, float iconSize)
@@ -729,9 +772,7 @@ internal sealed partial class CollectionPanelView
 
     private static void AddHeroBadgeFallback(VisualElement icon, EHero hero, float iconSize)
     {
-        icon.Clear();
         var style = HeroVisual.Resolve(hero.ToString());
-        icon.style.backgroundColor = style.Background;
 
         var badge = CreateLabel(HeroBadgeFontSize(iconSize), FontStyle.Bold, style.Text);
         badge.name = HeroChipBadgeName;
@@ -744,6 +785,171 @@ internal sealed partial class CollectionPanelView
         badge.style.bottom = 0f;
         badge.style.unityTextAlign = TextAnchor.MiddleCenter;
         icon.Add(badge);
+    }
+
+    private static VisualElement CreateHeroGradient(EHero hero)
+    {
+        var gradient = new VisualElement
+        {
+            name = HeroChipGradientName,
+            pickingMode = PickingMode.Ignore,
+        };
+        StretchPortraitToParent(gradient);
+        var themeColor = DarkenHeroThemeColor(HeroVisual.Resolve(hero.ToString()).Background);
+        var state = new HeroGradientVisualState(gradient, themeColor);
+        gradient.userData = state;
+        gradient.generateVisualContent += context => DrawHeroGradient(context, gradient, state);
+        return gradient;
+    }
+
+    private static void DrawHeroGradient(
+        MeshGenerationContext context,
+        VisualElement gradient,
+        HeroGradientVisualState state
+    )
+    {
+        var rect = gradient.contentRect;
+        if (rect.width <= 0f || rect.height <= 0f)
+            return;
+
+        var themeColor = state.CurrentColor;
+        var topColor = new Color(themeColor.r, themeColor.g, themeColor.b, 0f);
+        var bottomColor = new Color(themeColor.r, themeColor.g, themeColor.b, state.BottomAlpha);
+        var mesh = context.Allocate(4, 6);
+        mesh.SetNextVertex(
+            new Vertex
+            {
+                position = new Vector3(rect.xMin, rect.yMin, Vertex.nearZ),
+                tint = topColor,
+            }
+        );
+        mesh.SetNextVertex(
+            new Vertex
+            {
+                position = new Vector3(rect.xMax, rect.yMin, Vertex.nearZ),
+                tint = topColor,
+            }
+        );
+        mesh.SetNextVertex(
+            new Vertex
+            {
+                position = new Vector3(rect.xMax, rect.yMax, Vertex.nearZ),
+                tint = bottomColor,
+            }
+        );
+        mesh.SetNextVertex(
+            new Vertex
+            {
+                position = new Vector3(rect.xMin, rect.yMax, Vertex.nearZ),
+                tint = bottomColor,
+            }
+        );
+        mesh.SetNextIndex(0);
+        mesh.SetNextIndex(1);
+        mesh.SetNextIndex(2);
+        mesh.SetNextIndex(0);
+        mesh.SetNextIndex(2);
+        mesh.SetNextIndex(3);
+    }
+
+    private static Color DarkenHeroThemeColor(Color color) =>
+        new(color.r * 0.42f, color.g * 0.42f, color.b * 0.42f, 1f);
+
+    private static void BindHeroChipInteraction(Button chip, VisualElement icon)
+    {
+        var gradient = icon.Q<VisualElement>(HeroChipGradientName);
+        if (gradient == null)
+            return;
+
+        if (gradient.userData is not HeroGradientVisualState gradientState)
+            return;
+
+        var state = new HeroChipInteractionState(gradientState);
+        chip.userData = state;
+        chip.RegisterCallback<MouseEnterEvent>(_ =>
+        {
+            state.Hovered = true;
+            state.Refresh();
+        });
+        chip.RegisterCallback<MouseLeaveEvent>(_ =>
+        {
+            state.Hovered = false;
+            state.Pressed = false;
+            state.Refresh();
+        });
+        chip.RegisterCallback<MouseDownEvent>(_ =>
+        {
+            state.Pressed = true;
+            state.Refresh();
+        });
+        chip.RegisterCallback<MouseUpEvent>(_ =>
+        {
+            state.Pressed = false;
+            state.Refresh();
+        });
+        state.Refresh();
+    }
+
+    private static void RefreshHeroChipInteraction(Button chip, bool selected)
+    {
+        if (chip.userData is HeroChipInteractionState state)
+        {
+            state.Selected = selected;
+            state.Refresh();
+        }
+    }
+
+    private sealed class HeroChipInteractionState
+    {
+        private readonly HeroGradientVisualState _gradient;
+
+        internal HeroChipInteractionState(HeroGradientVisualState gradient) => _gradient = gradient;
+
+        internal bool Hovered { get; set; }
+        internal bool Pressed { get; set; }
+        internal bool Selected { get; set; }
+
+        internal void Refresh()
+        {
+            if (Pressed)
+                _gradient.SetAppearance(1.14f, 0.94f);
+            else if (Selected)
+                _gradient.SetAppearance(1.32f, 1f);
+            else if (Hovered)
+                _gradient.SetAppearance(1.08f, 0.90f);
+            else
+                _gradient.SetAppearance(1f, 0.84f);
+        }
+    }
+
+    private sealed class HeroGradientVisualState
+    {
+        private readonly VisualElement _gradient;
+        private readonly Color _themeColor;
+        private float _colorScale = 1f;
+
+        internal HeroGradientVisualState(VisualElement gradient, Color themeColor)
+        {
+            _gradient = gradient;
+            _themeColor = themeColor;
+        }
+
+        internal float BottomAlpha { get; private set; } = 0.84f;
+
+        internal Color CurrentColor =>
+            new(
+                Mathf.Clamp01(_themeColor.r * _colorScale),
+                Mathf.Clamp01(_themeColor.g * _colorScale),
+                Mathf.Clamp01(_themeColor.b * _colorScale),
+                1f
+            );
+
+        internal void SetAppearance(float colorScale, float bottomAlpha)
+        {
+            _colorScale = colorScale;
+            BottomAlpha = bottomAlpha;
+            _gradient.MarkDirtyRepaint();
+        }
     }
 
     private static void ResizeHeroBadge(VisualElement icon, float iconSize)
@@ -911,35 +1117,41 @@ internal sealed partial class CollectionPanelView
     private static void ApplyHeroChipIcon(VisualElement icon, Sprite? sprite)
     {
         var badge = icon.Q<Label>(HeroChipBadgeName);
+        var portrait = icon.Q<VisualElement>(HeroChipPortraitName);
         if (sprite == null)
         {
-            icon.style.backgroundImage = new StyleBackground(StyleKeyword.Null);
+            if (portrait != null)
+                portrait.style.backgroundImage = new StyleBackground(StyleKeyword.Null);
             if (badge != null)
                 badge.style.display = DisplayStyle.Flex;
             return;
         }
 
-        icon.style.backgroundImage = new StyleBackground(sprite);
+        if (portrait != null)
+            portrait.style.backgroundImage = new StyleBackground(sprite);
         if (badge != null)
             badge.style.display = DisplayStyle.None;
-        icon.MarkDirtyRepaint();
+        portrait?.MarkDirtyRepaint();
     }
 
     private static void ApplySourceChipIcon(VisualElement icon, Sprite? sprite)
     {
         var initials = icon.Q<Label>(SourceChipInitialsName);
+        var portrait = icon.Q<VisualElement>(SourceChipPortraitName);
         if (sprite == null)
         {
-            icon.style.backgroundImage = new StyleBackground(StyleKeyword.Null);
+            if (portrait != null)
+                portrait.style.backgroundImage = new StyleBackground(StyleKeyword.Null);
             if (initials != null)
                 initials.style.display = DisplayStyle.Flex;
             return;
         }
 
-        icon.style.backgroundImage = new StyleBackground(sprite);
+        if (portrait != null)
+            portrait.style.backgroundImage = new StyleBackground(sprite);
         if (initials != null)
             initials.style.display = DisplayStyle.None;
-        icon.MarkDirtyRepaint();
+        portrait?.MarkDirtyRepaint();
     }
 
     private static string GetInitials(string displayName)
@@ -966,24 +1178,58 @@ internal sealed partial class CollectionPanelView
     }
 
     // unselectedTextColor carries the game's official keyword color for tag chips; the selected
-    // state keeps the gold highlight regardless so selection always reads the same way.
+    // state keeps the blue highlight regardless so selection always reads the same way.
     private static void RefreshChip(Button chip, bool selected, Color? unselectedTextColor = null)
     {
-        StyleButton(
+        StyleCollectionChip(
             chip,
-            selected ? Colors.ButtonSelectedBackground : Colors.HistoryChipBackground,
-            selected ? Colors.ButtonSelectedText : unselectedTextColor ?? Colors.HistoryChipText
+            selected ? Colors.CollectionChipSelectedBackground : Colors.CollectionChipBackground,
+            selected
+                ? Colors.CollectionChipSelectedText
+                : unselectedTextColor ?? Colors.CollectionChipText,
+            selected
         );
     }
 
     private static void RefreshTierChip(ETier tier, Button chip, bool selected)
     {
         var textColor = TierTextColor(tier);
-        StyleButton(
+        StyleCollectionGroupChip(
             chip,
-            selected ? Colors.ButtonSelectedBackground : Colors.HistoryChipBackground,
-            textColor
+            selected ? Colors.CollectionChipSelectedBackground : Colors.CollectionChipBackground,
+            textColor,
+            selected
         );
+    }
+
+    private static void RefreshSizeChip(Button chip, bool selected) =>
+        StyleCollectionGroupChip(
+            chip,
+            selected ? Colors.CollectionChipSelectedBackground : Colors.CollectionChipBackground,
+            selected ? Colors.CollectionChipSelectedText : Colors.CollectionChipText,
+            selected
+        );
+
+    private static void RefreshSortChip(Button chip, bool selected) =>
+        StyleCollectionGroupChip(
+            chip,
+            selected ? Colors.CollectionChipSelectedBackground : Colors.CollectionChipBackground,
+            selected ? Colors.CollectionChipSelectedText : Colors.CollectionChipText,
+            selected
+        );
+
+    private static void StyleCollectionGroupChip(
+        Button chip,
+        Color background,
+        Color textColor,
+        bool selected = false
+    )
+    {
+        StyleCollectionChip(chip, background, textColor, selected);
+        UiStyle.BorderWidth(chip.style, Borders.None);
+        UiStyle.Radius(chip.style, 0f);
+        chip.style.marginRight = 0f;
+        chip.style.marginBottom = 0f;
     }
 
     private static Color TierTextColor(ETier tier) =>
@@ -998,21 +1244,86 @@ internal sealed partial class CollectionPanelView
         };
 
     private static void RefreshMatchModeButton(
-        Button? button,
+        VisualElement? control,
         CollectionFacetMatchMode mode,
         string tooltip
     )
     {
-        if (button == null)
+        if (control == null)
             return;
 
-        button.text = CollectionPanelText.FacetMatchMode(mode);
-        button.tooltip = tooltip;
-        RefreshChip(button, mode == CollectionFacetMatchMode.All);
+        var any = control.Q<Button>(FacetMatchAnyName);
+        var all = control.Q<Button>(FacetMatchAllName);
+        if (any == null || all == null)
+            return;
+
+        SetFacetChoiceText(any, CollectionPanelText.FacetMatchMode(CollectionFacetMatchMode.Any));
+        SetFacetChoiceText(all, CollectionPanelText.FacetMatchMode(CollectionFacetMatchMode.All));
+        control.tooltip = tooltip;
+        any.tooltip = tooltip;
+        all.tooltip = tooltip;
+        StyleFacetMatchModeSegment(
+            any,
+            mode == CollectionFacetMatchMode.Any,
+            left: true,
+            fontSize: Sizes.FacetModeFontSize,
+            slanted: true
+        );
+        StyleFacetMatchModeSegment(
+            all,
+            mode == CollectionFacetMatchMode.All,
+            left: false,
+            fontSize: Sizes.FacetModeFontSize,
+            slanted: true
+        );
+    }
+
+    private static void RefreshFacetChoiceControl(
+        VisualElement? control,
+        bool firstSelected,
+        string firstText,
+        string secondText,
+        int fontSize,
+        bool slanted
+    )
+    {
+        if (control == null)
+            return;
+
+        var first = control.Q<Button>(FacetMatchAnyName);
+        var second = control.Q<Button>(FacetMatchAllName);
+        if (first == null || second == null)
+            return;
+
+        SetFacetChoiceText(first, firstText);
+        SetFacetChoiceText(second, secondText);
+        StyleFacetMatchModeSegment(
+            first,
+            firstSelected,
+            left: true,
+            fontSize: fontSize,
+            slanted: slanted
+        );
+        StyleFacetMatchModeSegment(
+            second,
+            !firstSelected,
+            left: false,
+            fontSize: fontSize,
+            slanted: slanted
+        );
+    }
+
+    private static void SetFacetChoiceText(Button button, string text)
+    {
+        var label = button.Q<Label>(FacetMatchLabelName);
+        if (label != null)
+            label.text = text;
+        else
+            button.text = text;
     }
 
     // Always visible; the face shows the effective day number and highlights when the day
-    // participates in filtering (gold = on, chip background = off).
+    // participates in filtering (blue = on, chip background = off).
     private void RefreshDayToggle(int? day, bool active)
     {
         if (_dayToggleButton == null)
@@ -1020,24 +1331,32 @@ internal sealed partial class CollectionPanelView
 
         _dayToggleButton.text =
             day?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "—";
-        StyleButton(
+        StyleCollectionChip(
             _dayToggleButton,
-            active ? Colors.ButtonSelectedBackground : Colors.HistoryChipBackground,
-            active ? Colors.ButtonSelectedText : Colors.HistoryChipText
+            active ? Colors.CollectionChipSelectedBackground : Colors.CollectionChipBackground,
+            active ? Colors.CollectionChipSelectedText : Colors.CollectionChipText,
+            active
         );
     }
 
     private void RefreshHeroChip(EHero hero, Button chip, bool selected)
     {
-        RefreshChip(chip, selected);
+        StyleHeroChip(chip);
+        RefreshHeroChipInteraction(chip, selected);
     }
 
-    private static void RefreshTabButton(Button button, bool selected)
+    private static void StyleHeroChip(Button chip)
     {
-        if (selected)
-            StyleButton(button, Colors.ButtonSelectedBackground, Colors.ButtonSelectedText);
-        else
-            StyleButton(button, Colors.RunsTabBackground, Colors.White);
+        UiHover.ApplyButtonPalette(
+            chip,
+            Colors.CollectionChipBackground,
+            Colors.CollectionChipText,
+            Colors.CollectionChipBorder,
+            Colors.CollectionChipBorder,
+            Colors.CollectionChipBackground,
+            Colors.CollectionChipBackground
+        );
+        UiStyle.Radius(chip.style, Radii.CollectionPortraitChip);
     }
 
     private static Label CreateLabel(int fontSize, FontStyle fontStyle, Color color)
@@ -1093,5 +1412,194 @@ internal sealed partial class CollectionPanelView
     private static void StyleButton(Button button, Color background, Color textColor)
     {
         UiHover.ApplyButtonPalette(button, background, textColor);
+    }
+
+    private static void StyleCollectionChip(
+        Button button,
+        Color background,
+        Color textColor,
+        bool selected = false
+    )
+    {
+        button.style.fontSize = Sizes.CollectionTagFontSize;
+        UiHover.ApplyButtonPalette(
+            button,
+            background,
+            textColor,
+            selected ? Colors.CollectionChipSelectedBorder : Colors.CollectionChipBorder,
+            selected ? Colors.CollectionChipSelectedHoverBorder : Colors.CollectionChipHoverBorder,
+            selected
+                ? Colors.CollectionChipSelectedHoverBackground
+                : Colors.CollectionChipHoverBackground,
+            selected
+                ? Colors.CollectionChipSelectedPressedBackground
+                : Colors.CollectionChipPressedBackground
+        );
+        UiStyle.Radius(button.style, Radii.CollectionChip);
+    }
+
+    private static void StyleFacetMatchModeSegment(
+        Button button,
+        bool selected,
+        bool left,
+        int fontSize,
+        bool slanted
+    )
+    {
+        button.style.fontSize = fontSize;
+        button.style.backgroundColor = slanted ? Color.clear : Colors.CollectionChipBackground;
+        UiStyle.BorderWidth(button.style, Borders.None);
+        UiStyle.Radius(button.style, 0f);
+
+        if (button.userData is not FacetMatchModeSegmentState state)
+        {
+            state = new FacetMatchModeSegmentState(button, left, fontSize, slanted);
+            button.userData = state;
+            if (slanted)
+                button.generateVisualContent += context =>
+                    DrawFacetMatchModeSegment(context, state);
+            button.RegisterCallback<MouseEnterEvent>(_ =>
+            {
+                state.Hovered = true;
+                state.Refresh();
+            });
+            button.RegisterCallback<MouseLeaveEvent>(_ =>
+            {
+                state.Hovered = false;
+                state.Pressed = false;
+                state.Refresh();
+            });
+            button.RegisterCallback<MouseDownEvent>(_ =>
+            {
+                state.Pressed = true;
+                state.Refresh();
+            });
+            button.RegisterCallback<MouseUpEvent>(_ =>
+            {
+                state.Pressed = false;
+                state.Refresh();
+            });
+        }
+
+        state.Selected = selected;
+        state.Refresh();
+    }
+
+    private static void DrawFacetMatchModeSegment(
+        MeshGenerationContext context,
+        FacetMatchModeSegmentState state
+    )
+    {
+        var rect = state.Button.contentRect;
+        if (rect.width <= 0f || rect.height <= 0f)
+            return;
+
+        var background = state.BackgroundColor;
+        var cut = Mathf.Min(4f, rect.width * 0.08f);
+        var topLeft = state.Left ? rect.xMin : rect.xMin + cut;
+        var bottomRight = state.Left ? rect.xMax - cut : rect.xMax;
+        var mesh = context.Allocate(4, 6);
+        mesh.SetNextVertex(
+            new Vertex
+            {
+                position = new Vector3(topLeft, rect.yMin, Vertex.nearZ),
+                tint = background,
+            }
+        );
+        mesh.SetNextVertex(
+            new Vertex
+            {
+                position = new Vector3(rect.xMax, rect.yMin, Vertex.nearZ),
+                tint = background,
+            }
+        );
+        mesh.SetNextVertex(
+            new Vertex
+            {
+                position = new Vector3(bottomRight, rect.yMax, Vertex.nearZ),
+                tint = background,
+            }
+        );
+        mesh.SetNextVertex(
+            new Vertex
+            {
+                position = new Vector3(rect.xMin, rect.yMax, Vertex.nearZ),
+                tint = background,
+            }
+        );
+        mesh.SetNextIndex(0);
+        mesh.SetNextIndex(1);
+        mesh.SetNextIndex(2);
+        mesh.SetNextIndex(0);
+        mesh.SetNextIndex(2);
+        mesh.SetNextIndex(3);
+    }
+
+    private sealed class FacetMatchModeSegmentState
+    {
+        internal FacetMatchModeSegmentState(Button button, bool left, int fontSize, bool slanted)
+        {
+            Button = button;
+            Left = left;
+            TextLabel = button.Q<Label>(FacetMatchLabelName);
+            FontSize = fontSize;
+            Slanted = slanted;
+        }
+
+        internal Button Button { get; }
+
+        internal bool Left { get; }
+
+        internal Label? TextLabel { get; }
+
+        internal int FontSize { get; }
+
+        internal bool Slanted { get; }
+
+        internal bool Selected { get; set; }
+
+        internal bool Hovered { get; set; }
+
+        internal bool Pressed { get; set; }
+
+        internal Color BackgroundColor
+        {
+            get
+            {
+                if (Pressed)
+                {
+                    return Selected
+                        ? Colors.CollectionChipSelectedPressedBackground
+                        : Colors.CollectionChipPressedBackground;
+                }
+
+                if (Hovered)
+                {
+                    return Selected
+                        ? Colors.CollectionChipSelectedHoverBackground
+                        : Colors.CollectionChipHoverBackground;
+                }
+
+                return Selected
+                    ? Colors.CollectionChipSelectedBackground
+                    : Colors.CollectionChipBackground;
+            }
+        }
+
+        internal void Refresh()
+        {
+            Button.style.backgroundColor = Slanted ? Color.clear : BackgroundColor;
+            Button.style.color = Selected
+                ? Colors.CollectionChipSelectedText
+                : Colors.CollectionChipText;
+            if (TextLabel != null)
+            {
+                TextLabel.style.fontSize = FontSize;
+                TextLabel.style.color = Selected
+                    ? Colors.CollectionChipSelectedText
+                    : Colors.CollectionChipText;
+            }
+            Button.MarkDirtyRepaint();
+        }
     }
 }

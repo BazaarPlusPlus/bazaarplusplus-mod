@@ -19,8 +19,7 @@ internal interface ICollectionPanelCommands
     void ToggleSize(ECardSize size);
     void ToggleTag(ECardTag tag);
     void ToggleKeyword(CollectionKeywordFacetOption option);
-    void ToggleTagMatchMode();
-    void ToggleKeywordMatchMode();
+    void SetKeywordMatchMode(CollectionFacetMatchMode mode);
     void ToggleSource(string sourceKey);
     void SetSortPriority(CollectionSortPriority priority);
     void SetSearchQuery(string query);

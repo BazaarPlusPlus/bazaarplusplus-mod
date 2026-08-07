@@ -17,6 +17,7 @@ internal static class Sizes
     public const float SectionTitleHeight = 32f;
     public const float ChipMinWidth = 86f;
     public const float ChipHeight = 32f;
+    public const float CollectionTagChipHeight = 24f;
     public const float DayIconWidth = 40f;
     public const float SupporterAttributionHeight = 24f;
     public const float SupporterAttributionReservedHeight = 48f;
@@ -27,7 +28,8 @@ internal static class Sizes
     public const float HeroChipIconSize = 48f;
     public const float HeroChipButtonSize = 56f;
     public const int HeroChipsPerRow = 8;
-    public const float TagChipIconSize = 14f;
+    public const float TagChipIconSize = 16f;
+    public const int CollectionTagFontSize = 14;
     public const int SourceChipsPerRow = 8;
     public const float SourceChipIconRatio = 48f / 56f;
     public const float SourceChipMinSize = 40f;
@@ -58,7 +60,11 @@ internal static class Sizes
     public const float LiveBuildRecommendationStatusMaxHeight = 90f;
     public const float LiveBuildRowEmptyMaxHeight = 58f;
     public const float TagFacetChipMaxWidth = 156f;
-    public const float FacetModeToggleWidth = 58f;
+    public const float FacetModeToggleWidth = 52f;
+    public const float FacetModeToggleHeight = 20f;
+    public const int FacetModeFontSize = 13;
+    public const float CollectionTabToggleWidth = 72f;
+    public const float CollectionTabToggleHeight = 28f;
     public const float RowAccentWidth = 6f;
     public const float RowSideHostWidth = 62f;
     public const float RunRowHeight = 98f;

@@ -113,8 +113,13 @@ internal sealed class CollectionViewState
 
     public CollectionRenderOutcome? ToggleTier(ETier tier)
     {
-        if (!_filter.Tiers.Remove(tier))
+        if (_filter.Tiers.Count == 1 && _filter.Tiers.Contains(tier))
+            _filter.Tiers.Clear();
+        else
+        {
+            _filter.Tiers.Clear();
             _filter.Tiers.Add(tier);
+        }
         return QueryAndRender(resetControlsScroll: true);
     }
 
@@ -126,8 +131,13 @@ internal sealed class CollectionViewState
 
     public CollectionRenderOutcome? ToggleSize(ECardSize size)
     {
-        if (!_filter.Sizes.Remove(size))
+        if (_filter.Sizes.Count == 1 && _filter.Sizes.Contains(size))
+            _filter.Sizes.Clear();
+        else
+        {
+            _filter.Sizes.Clear();
             _filter.Sizes.Add(size);
+        }
         return QueryAndRender(resetControlsScroll: false);
     }
 
@@ -154,15 +164,10 @@ internal sealed class CollectionViewState
         return QueryAndRender(resetControlsScroll: false);
     }
 
-    public CollectionRenderOutcome? ToggleTagMatchMode()
+    public CollectionRenderOutcome? SetKeywordMatchMode(CollectionFacetMatchMode mode)
     {
-        _filter.TagMatchMode = ToggleMatchMode(_filter.TagMatchMode);
-        return QueryAndRender(resetControlsScroll: false);
-    }
-
-    public CollectionRenderOutcome? ToggleKeywordMatchMode()
-    {
-        _filter.KeywordMatchMode = ToggleMatchMode(_filter.KeywordMatchMode);
+        _filter.KeywordMatchMode = mode;
+        _filter.TagMatchMode = mode;
         return QueryAndRender(resetControlsScroll: false);
     }
 
@@ -183,9 +188,6 @@ internal sealed class CollectionViewState
 
     public void SetSearchQuery(string query)
     {
-        if (!_searchMode.IsExpanded)
-            return;
-
         query ??= string.Empty;
         if (string.Equals(_filter.SearchQuery, query, StringComparison.Ordinal))
             return;
@@ -533,9 +535,4 @@ internal sealed class CollectionViewState
         _statusMessage = null;
         _statusVisible = false;
     }
-
-    private static CollectionFacetMatchMode ToggleMatchMode(CollectionFacetMatchMode mode) =>
-        mode == CollectionFacetMatchMode.All
-            ? CollectionFacetMatchMode.Any
-            : CollectionFacetMatchMode.All;
 }

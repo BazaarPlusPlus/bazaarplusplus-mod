@@ -12,11 +12,7 @@ namespace BazaarPlusPlus.Game.CollectionPanel;
 // current PlayerPreferences language code, fall through to English when nothing else fits.
 internal static class CollectionPanelText
 {
-    private static readonly LocalizedTextSet TitleText = new(
-        "Card Collection",
-        "卡牌图鉴",
-        "卡牌圖鑑"
-    );
+    private static readonly LocalizedTextSet TitleText = new("Card Collection", "图鉴", "圖鑑");
 
     private static readonly LocalizedTextSet SubtitleText = new(
         "Supported by the BazaarPlusPlus community.",
@@ -61,34 +57,18 @@ internal static class CollectionPanelText
         "尺寸 / 品質"
     );
     private static readonly LocalizedTextSet TierHeaderText = new("Quality", "品质", "品質");
-    private static readonly LocalizedTextSet TagHeaderText = new("Types", "类型", "類型");
     private static readonly LocalizedTextSet KeywordHeaderText = new("Tags", "标签", "標籤");
-    private static readonly LocalizedTextSet KeywordRelatedSectionText = new(
-        "Related",
-        "相关",
-        "相關"
-    );
     private static readonly LocalizedTextSet FacetMatchAnyText = new("Any", "任一", "任一");
     private static readonly LocalizedTextSet FacetMatchAllText = new("All", "全部", "全部");
-    private static readonly LocalizedTextSet TagMatchAnyTooltipText = new(
-        "Types: match cards with any selected type. Click to require all.",
-        "类型：匹配任一已选类型的卡。点击切换为必须全部匹配。",
-        "類型：匹配任一已選類型的卡。點擊切換為必須全部匹配。"
-    );
-    private static readonly LocalizedTextSet TagMatchAllTooltipText = new(
-        "Types: require every selected type. Click to match any.",
-        "类型：必须匹配所有已选类型。点击切换为任一匹配。",
-        "類型：必須匹配所有已選類型。點擊切換為任一匹配。"
-    );
     private static readonly LocalizedTextSet KeywordMatchAnyTooltipText = new(
-        "Tags: match cards with any selected tag. Click to require all.",
-        "标签：匹配任一已选标签的卡。点击切换为必须全部匹配。",
-        "標籤：匹配任一已選標籤的卡。點擊切換為必須全部匹配。"
+        "Tags and types: match cards with any selected value. Click to require all.",
+        "标签和类型：匹配任一已选内容的卡。点击切换为必须全部匹配。",
+        "標籤和類型：匹配任一已選內容的卡。點擊切換為必須全部匹配。"
     );
     private static readonly LocalizedTextSet KeywordMatchAllTooltipText = new(
-        "Tags: require every selected tag. Click to match any.",
-        "标签：必须匹配所有已选标签。点击切换为任一匹配。",
-        "標籤：必須匹配所有已選標籤。點擊切換為任一匹配。"
+        "Tags and types: require every selected value. Click to match any.",
+        "标签和类型：必须匹配所有已选内容。点击切换为任一匹配。",
+        "標籤和類型：必須匹配所有已選內容。點擊切換為任一匹配。"
     );
     private static readonly LocalizedTextSet SortHeaderText = new("Sort", "排序", "排序");
     private static readonly LocalizedTextSet SortQualityText = new("Quality", "品质", "品質");
@@ -145,21 +125,12 @@ internal static class CollectionPanelText
 
     internal static string TierHeader() => Resolve(TierHeaderText);
 
-    internal static string TagHeader() => Resolve(TagHeaderText);
-
     internal static string KeywordHeader() => Resolve(KeywordHeaderText);
-
-    internal static string KeywordRelatedSection() => Resolve(KeywordRelatedSectionText);
 
     internal static string FacetMatchMode(CollectionFacetMatchMode mode) =>
         mode == CollectionFacetMatchMode.All
             ? Resolve(FacetMatchAllText)
             : Resolve(FacetMatchAnyText);
-
-    internal static string TagMatchModeTooltip(CollectionFacetMatchMode mode) =>
-        mode == CollectionFacetMatchMode.All
-            ? Resolve(TagMatchAllTooltipText)
-            : Resolve(TagMatchAnyTooltipText);
 
     internal static string KeywordMatchModeTooltip(CollectionFacetMatchMode mode) =>
         mode == CollectionFacetMatchMode.All
