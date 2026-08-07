@@ -65,6 +65,7 @@ internal sealed partial class CollectionPanelView
                 () => _commands.ToggleTier(tier),
                 contentWidth: true
             );
+            UiStyle.HorizontalPadding(chip.style, UiSpacing.Lg);
             StyleCollectionGroupChip(chip, Colors.CollectionChipBackground, TierTextColor(tier));
             _tierChips[tier] = chip;
             _tierChipRow.Add(chip);

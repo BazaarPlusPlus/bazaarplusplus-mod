@@ -24,7 +24,6 @@ internal static class Sizes
     public const int SupporterAttributionNameFont = 12;
     public const float SupporterAttributionNameMaxWidth = 96f;
     public const float SupporterActionMinWidth = 74f;
-    public const float CollectionMatchCountWidth = 96f;
     public const float HeroChipIconSize = 48f;
     public const float HeroChipButtonSize = 56f;
     public const int HeroChipsPerRow = 8;
@@ -70,6 +69,8 @@ internal static class Sizes
     public const int FacetModeFontSize = 13;
     public const float CollectionTabToggleWidth = 96f;
     public const float CollectionTabToggleHeight = 28f;
+    public const float CollectionTabActiveWidth = 120f;
+    public const float CollectionTabInactiveWidth = 72f;
     public const float RowAccentWidth = 6f;
     public const float RowSideHostWidth = 62f;
     public const float RunRowHeight = 98f;

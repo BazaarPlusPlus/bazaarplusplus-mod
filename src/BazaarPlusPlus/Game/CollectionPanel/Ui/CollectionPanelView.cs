@@ -22,6 +22,7 @@ internal sealed partial class CollectionPanelView : IDisposable
     private const string FacetMatchAnyName = "bpp-facet-match-any";
     private const string FacetMatchAllName = "bpp-facet-match-all";
     private const string FacetMatchLabelName = "bpp-facet-match-label";
+    private const string FacetChoiceDividerName = "bpp-facet-choice-divider";
 
     private readonly Transform _parent;
     private readonly ICollectionPanelCommands _commands;
@@ -323,14 +324,7 @@ internal sealed partial class CollectionPanelView : IDisposable
         }
 
         RefreshChromeTexts(model.ActiveType);
-        RefreshFacetChoiceControl(
-            _tabModeControl,
-            model.ActiveTab == CollectionTabKind.Items,
-            TabLabel(CollectionTabKind.Items, model.ActiveTab, model.VisibleCount),
-            TabLabel(CollectionTabKind.Skills, model.ActiveTab, model.VisibleCount),
-            fontSize: Sizes.FontBody,
-            slanted: false
-        );
+        RefreshTabChoiceControl(model);
 
         KeywordIconSpriteProvider.BeginResolvePass();
         EnsureHeroChips(model.AvailableHeroes);
@@ -469,6 +463,45 @@ internal sealed partial class CollectionPanelView : IDisposable
             ? CollectionPanelText.ItemsTab()
             : CollectionPanelText.SkillsTab();
         return tab == activeTab ? $"{label}({visibleCount})" : label;
+    }
+
+    private void RefreshTabChoiceControl(CollectionPanelViewModel model)
+    {
+        var itemsSelected = model.ActiveTab == CollectionTabKind.Items;
+        RefreshFacetChoiceControl(
+            _tabModeControl,
+            itemsSelected,
+            TabLabel(CollectionTabKind.Items, model.ActiveTab, model.VisibleCount),
+            TabLabel(CollectionTabKind.Skills, model.ActiveTab, model.VisibleCount),
+            fontSize: Sizes.FontBody,
+            slanted: false
+        );
+        if (_tabModeControl == null)
+            return;
+
+        var items = _tabModeControl.Q<Button>(FacetMatchAnyName);
+        var skills = _tabModeControl.Q<Button>(FacetMatchAllName);
+        var divider = _tabModeControl.Q<VisualElement>(FacetChoiceDividerName);
+        if (items == null || skills == null || divider == null)
+            return;
+
+        var itemsWidth = itemsSelected
+            ? Sizes.CollectionTabActiveWidth
+            : Sizes.CollectionTabInactiveWidth;
+        var skillsWidth = itemsSelected
+            ? Sizes.CollectionTabInactiveWidth
+            : Sizes.CollectionTabActiveWidth;
+        UiStyle.FixedWidth(items.style, itemsWidth);
+        UiStyle.FixedWidth(skills.style, skillsWidth);
+        UiStyle.HorizontalPadding(
+            items.style,
+            itemsSelected ? UiSpacing.Md : UiSpacing.Xs
+        );
+        UiStyle.HorizontalPadding(
+            skills.style,
+            itemsSelected ? UiSpacing.Xs : UiSpacing.Md
+        );
+        divider.style.left = itemsWidth;
     }
 
     // P4 fix: these chrome strings used to be set only at construction, so a locale change

@@ -690,7 +690,11 @@ internal sealed partial class CollectionPanelView
 
     private static VisualElement CreateFacetChoiceDivider(float left)
     {
-        var divider = new VisualElement { pickingMode = PickingMode.Ignore };
+        var divider = new VisualElement
+        {
+            name = FacetChoiceDividerName,
+            pickingMode = PickingMode.Ignore,
+        };
         divider.style.position = Position.Absolute;
         divider.style.left = left;
         divider.style.top = 0f;
@@ -711,7 +715,7 @@ internal sealed partial class CollectionPanelView
         segment.style.minWidth = 0f;
         segment.style.overflow = Overflow.Hidden;
         UiStyle.Radius(segment.style, Radii.CollectionChip);
-        UiStyle.Border(segment.style, Borders.Thin, Color.black);
+        UiStyle.Border(segment.style, Borders.Thin, Colors.CollectionChipBorder);
         return segment;
     }
 
@@ -754,7 +758,6 @@ internal sealed partial class CollectionPanelView
             Colors.CollectionFilterTitleText
         );
         label.text = title;
-        label.style.marginLeft = UiSpacing.Xl;
         label.style.whiteSpace = WhiteSpace.NoWrap;
         header.Add(label);
 
