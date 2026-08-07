@@ -145,7 +145,7 @@ internal static class BazaarAgentReplayRecorderWiring
                 CombatReplayRecordingBlocker.FfmpegUnavailable =>
                     "Video recording is unavailable (FFmpeg could not be resolved).",
                 CombatReplayRecordingBlocker.NativeRecorderUnavailable =>
-                    "Video recording is unavailable (the native macOS recorder could not be loaded).",
+                    "Video recording is unavailable (the platform-native recorder could not be loaded).",
                 _ => "Video recording is unavailable (video directory is not configured).",
             };
             return false;
