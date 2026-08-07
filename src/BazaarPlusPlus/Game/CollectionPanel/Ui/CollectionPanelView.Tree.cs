@@ -785,9 +785,6 @@ internal sealed partial class CollectionPanelView
             Sizes.CollectionSearchRowHeight
         );
         button.tooltip = CollectionPanelText.DayHeader();
-        var defaultText = button.Q<TextElement>();
-        if (defaultText != null)
-            defaultText.style.display = DisplayStyle.None;
         var content = new VisualElement { pickingMode = PickingMode.Ignore };
         content.style.flexDirection = FlexDirection.Column;
         content.style.alignItems = Align.Center;

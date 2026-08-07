@@ -6,34 +6,33 @@ The Collection panel renders Size and Quality as two adjacent segmented controls
 changed from native `Button.text` content to a custom icon + label layout so the aspect-ratio icon
 would not overlap the built-in text element.
 
-Two attempted fixes did not restore the Size group in game:
+Three attempted fixes did not restore the Size group in game:
 
 1. Hide the native text element and add custom icon/label children.
 2. Give each custom Size button an explicit width.
+3. Give the outer Size segment an explicit width and flex basis.
 
-The runtime screenshot still shows only a thin leading edge before the Quality group, which means
-the outer Size segment exists but its effective width remains approximately zero.
+The latest runtime screenshot shows a correctly widened but completely empty Size segment. This
+disproves the outer-width hypothesis and confirms that the child buttons themselves are hidden.
 
 ## Current problem
 
-`CreateCombinedFilterChipSegment` is an overflow-hidden flex container with no explicit width. The
-Size buttons are UI Toolkit `Button` controls whose native text measure node is deliberately hidden.
-Although the child buttons now carry explicit widths, the parent segment's auto/intrinsic width is
-still collapsing in the runtime Yoga layout. Because the parent has `Overflow.Hidden`, all custom
-content is clipped; only the segment's border remains visible.
+Unity UI Toolkit `Button` inherits from `TextElement`. `chip.Q<TextElement>()` therefore returns the
+Button itself when there is no separate descendant text node. The custom Size-chip path treated that
+result as a built-in child label and assigned `display: none`, hiding the entire Button. The existing
+generic `CreateButton` code already guards this exact trap with `!ReferenceEquals(textElement,
+button)`; the Size-chip customization omitted that guard.
 
-The Quality segment does not collapse because its buttons still use native `Button.text`, so the
-native measure path supplies an intrinsic width to the parent.
+The outer-width change made the failure clearer: the empty segment now has the intended width while
+all three hidden children remain absent.
 
 ## Candidate approaches
 
-1. **Explicitly size the outer Size segment (chosen).** Make the segment width deterministic from
-   the number of Size buttons, button width, and divider widths. This removes dependence on native
-   Button text measurement and preserves the existing custom icon/label implementation.
-2. Re-enable native text for measurement but make it transparent. Rejected because it risks a
-   second overlapping text layer and couples layout to invisible presentation.
-3. Replace the segmented control with a hand-measured custom container. Rejected as unnecessary
-   while a deterministic outer width is sufficient.
+1. **Do not hide the queried `TextElement` (chosen).** The Button text is already empty; custom icon
+   and label children can be added without changing the Button's own display state.
+2. Guard with `!ReferenceEquals(defaultText, chip)`. Safe but unnecessary while the native Button
+   text is empty; removing the faulty block is simpler.
+3. Keep the explicit outer segment width as deterministic layout protection for the custom content.
 
 ## Verification method
 

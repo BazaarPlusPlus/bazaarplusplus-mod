@@ -17,6 +17,7 @@ internal sealed partial class CollectionPanelView
     private const string HeroChipBadgeName = "bpp-collection-hero-chip-badge";
     private const string HeroChipGradientName = "bpp-collection-hero-chip-gradient";
     private const string HeroChipPortraitName = "bpp-collection-hero-chip-portrait";
+    private const string HeroChipSelectionRingName = "bpp-collection-hero-chip-selection-ring";
     private const string SourceChipPortraitName = "bpp-collection-source-chip-portrait";
 
     private static readonly CollectionPortraitFailureGate<
@@ -133,14 +134,9 @@ internal sealed partial class CollectionPanelView
             onClick,
             contentWidth: true
         );
-        var defaultText = chip.Q<TextElement>();
-        if (defaultText != null)
-            defaultText.style.display = DisplayStyle.None;
-
         chip.style.paddingLeft = UiSpacing.Md;
         chip.style.paddingRight = UiSpacing.Md;
-        // The native Button text element used to provide intrinsic width. Once it is hidden in
-        // favor of the custom icon/label pair, reserve the chip width explicitly.
+        // Custom content uses a deterministic width rather than Button.text measurement.
         UiStyle.FixedWidth(chip.style, Sizes.CollectionSizeChipWidth);
         chip.style.flexDirection = FlexDirection.Row;
         chip.style.alignItems = Align.Center;
@@ -633,10 +629,11 @@ internal sealed partial class CollectionPanelView
         chip.style.justifyContent = Justify.Center;
         chip.style.alignItems = Align.Center;
         chip.style.marginBottom = UiSpacing.Xs;
-        StyleHeroChip(chip, hero);
+        StyleHeroChip(chip);
 
         var icon = CreateHeroChipIcon(hero);
         chip.Add(icon);
+        chip.Add(CreateHeroSelectionRing());
         BindHeroChipInteraction(chip, icon);
         ResizeHeroChip(chip, icon, hero, CurrentHeroChipBox());
 
@@ -695,6 +692,20 @@ internal sealed partial class CollectionPanelView
         }
 
         return icon;
+    }
+
+    private static VisualElement CreateHeroSelectionRing()
+    {
+        var ring = new VisualElement
+        {
+            name = HeroChipSelectionRingName,
+            pickingMode = PickingMode.Ignore,
+        };
+        StretchPortraitToParent(ring);
+        UiStyle.Border(ring.style, Borders.Accent, Colors.CollectionChipBorder);
+        UiStyle.Radius(ring.style, Radii.CollectionPortraitChip);
+        ring.style.display = DisplayStyle.None;
+        return ring;
     }
 
     private static VisualElement CreateSourceChipIcon(string displayName)
@@ -1402,25 +1413,28 @@ internal sealed partial class CollectionPanelView
 
     private void RefreshHeroChip(EHero hero, Button chip, bool selected)
     {
-        StyleHeroChip(chip, hero, selected);
+        StyleHeroChip(chip);
+        var ring = chip.Q<VisualElement>(HeroChipSelectionRingName);
+        if (ring != null)
+        {
+            ring.style.display = selected ? DisplayStyle.Flex : DisplayStyle.None;
+            UiStyle.BorderColor(ring.style, HeroVisual.Resolve(hero.ToString()).Background);
+        }
         RefreshHeroChipInteraction(chip, selected);
     }
 
-    private static void StyleHeroChip(Button chip, EHero hero, bool selected = false)
+    private static void StyleHeroChip(Button chip)
     {
-        var border = selected
-            ? HeroVisual.Resolve(hero.ToString()).Background
-            : Colors.CollectionChipBorder;
         UiHover.ApplyButtonPalette(
             chip,
             Colors.CollectionChipBackground,
             Colors.CollectionChipText,
-            border,
-            border,
+            Colors.CollectionChipBorder,
+            Colors.CollectionChipBorder,
             Colors.CollectionChipBackground,
             Colors.CollectionChipBackground
         );
-        UiStyle.BorderWidth(chip.style, selected ? Borders.Accent : Borders.Thin);
+        UiStyle.BorderWidth(chip.style, Borders.Thin);
         UiStyle.Radius(chip.style, Radii.CollectionPortraitChip);
     }
 
