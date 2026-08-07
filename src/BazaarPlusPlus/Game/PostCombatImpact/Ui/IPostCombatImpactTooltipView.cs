@@ -35,7 +35,6 @@ internal interface IPostCombatImpactTooltipView : IDisposable
         bool isSkill,
         CombatImpactSource? source,
         CombatImpactReceived? received,
-        IReadOnlyList<PeriodicAttributionGap> periodicResiduals,
         CombatImpactPerspective perspective
     );
 

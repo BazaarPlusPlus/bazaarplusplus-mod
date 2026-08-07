@@ -37,7 +37,6 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
     private const float HeaderHintFontScale = 0.6f;
     private const float SummaryFontScale = 0.75f;
     private const float TriggerSummaryFontScale = 0.64f;
-    private const float DisclosureFontScale = 0.62f;
     private const float GroupLabelFontScale = 1f;
     private const float GroupMetricFontScale = 1f;
     private const float GroupSecondaryMetricFontScale = 0.62f;
@@ -123,7 +122,6 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         bool isSkill,
         CombatImpactSource? source,
         CombatImpactReceived? received,
-        IReadOnlyList<PeriodicAttributionGap> periodicResiduals,
         CombatImpactPerspective perspective
     )
     {
@@ -173,7 +171,6 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
             causedRoot,
             isSkill,
             source,
-            periodicResiduals,
             _receivedPerspectiveAvailable,
             generation
         );
@@ -503,7 +500,6 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         RectTransform root,
         bool isSkill,
         CombatImpactSource? source,
-        IReadOnlyList<PeriodicAttributionGap> periodicResiduals,
         bool canSwitchPerspective,
         int generation
     )
@@ -543,19 +539,6 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
                 _causedBlocks.Add(block);
             }
         }
-        BuildDisclosures(
-            bodyTemplate,
-            root,
-            CombatImpactMetricFormatter
-                .CausedDisclosures(source, IsChinese())
-                .Concat(
-                    CombatImpactMetricFormatter.PeriodicResidualDisclosures(
-                        periodicResiduals,
-                        IsChinese()
-                    )
-                )
-                .ToArray()
-        );
         _causedMoreText = BuildMoreRow(bodyTemplate, root);
     }
 
@@ -602,11 +585,6 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
                 _receivedBlocks.Add(block);
             }
         }
-        BuildDisclosures(
-            bodyTemplate,
-            root,
-            CombatImpactMetricFormatter.ReceivedDisclosures(received, IsChinese())
-        );
         _receivedMoreText = BuildMoreRow(bodyTemplate, root);
     }
 
@@ -698,7 +676,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         int generation
     )
     {
-        var triggerSources = CombatImpactMetricFormatter.TriggerSourceValues(group, IsChinese());
+        var triggerSources = CombatImpactMetricFormatter.TriggerSourceValues(group);
         var hasTriggerSummary = !string.IsNullOrWhiteSpace(triggerSources);
         var groupRoot = CreateVertical("ImpactCausedGroup", parent, hasTriggerSummary ? 6f : 4f);
         AddLayout(groupRoot.gameObject, preferredHeight: -1f, flexibleWidth: 1f);
@@ -978,35 +956,6 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         image.raycastTarget = false;
         AddLayout(divider, preferredHeight: 1f, flexibleWidth: 1f);
         return divider;
-    }
-
-    private static void BuildDisclosures(
-        TMP_Text textTemplate,
-        RectTransform parent,
-        IReadOnlyList<string> disclosures
-    )
-    {
-        if (disclosures.Count == 0)
-            return;
-
-        AddDivider(parent);
-        var root = CreateVertical("ImpactDisclosures", parent, 2f);
-        AddLayout(root.gameObject, preferredHeight: -1f, flexibleWidth: 1f);
-        foreach (var disclosure in disclosures)
-        {
-            var text = CloneText(
-                textTemplate,
-                root,
-                disclosure,
-                DisclosureFontScale,
-                flexibleWidth: 1f
-            );
-            text.alignment = TextAlignmentOptions.Left;
-            text.color = DisclosureColor;
-            text.alpha = 0.76f;
-            text.textWrappingMode = TextWrappingModes.Normal;
-            text.overflowMode = TextOverflowModes.Overflow;
-        }
     }
 
     private static TMP_Text BuildMoreRow(TMP_Text textTemplate, RectTransform parent)
