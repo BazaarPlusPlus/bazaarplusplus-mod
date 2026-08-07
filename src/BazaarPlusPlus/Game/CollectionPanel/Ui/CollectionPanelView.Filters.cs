@@ -123,18 +123,30 @@ internal sealed partial class CollectionPanelView
     private Button CreateSizeChipButton(ECardSize size, Action onClick)
     {
         var chip = CreateChipButton(
-            CollectionPanelText.Size(size),
+            string.Empty,
             onClick,
             contentWidth: true
         );
-        var icon = new VisualElement { pickingMode = PickingMode.Ignore };
-        UiStyle.FixedSize(icon.style, 22f, 16f);
-        icon.style.marginRight = UiSpacing.Xs;
+        var defaultText = chip.Q<TextElement>();
+        if (defaultText != null)
+            defaultText.style.display = DisplayStyle.None;
+
+        chip.style.paddingLeft = UiSpacing.Md;
+        chip.style.paddingRight = UiSpacing.Md;
         chip.style.flexDirection = FlexDirection.Row;
         chip.style.alignItems = Align.Center;
         chip.style.justifyContent = Justify.Center;
+        var icon = new VisualElement { pickingMode = PickingMode.Ignore };
+        UiStyle.FixedSize(icon.style, 18f, 14f);
+        icon.style.marginRight = UiSpacing.Xs;
         icon.generateVisualContent += context => DrawSizeIcon(context, icon, size);
-        chip.Insert(0, icon);
+        var label = new Label(CollectionPanelText.Size(size)) { pickingMode = PickingMode.Ignore };
+        label.style.fontSize = Sizes.CollectionTagFontSize;
+        label.style.whiteSpace = WhiteSpace.NoWrap;
+        label.style.flexShrink = 0f;
+        label.style.color = Colors.CollectionChipText;
+        chip.Add(icon);
+        chip.Add(label);
         return chip;
     }
 
@@ -147,14 +159,14 @@ internal sealed partial class CollectionPanelView
         var rect = icon.contentRect;
         var (width, height) = size switch
         {
-            ECardSize.Small => (8f, 14f),
-            ECardSize.Large => (21f, 14f),
-            _ => (14f, 14f),
+            ECardSize.Small => (6f, 10f),
+            ECardSize.Large => (15f, 10f),
+            _ => (10f, 10f),
         };
         var x = rect.center.x - width / 2f;
         var y = rect.center.y - height / 2f;
         var painter = context.painter2D;
-        painter.fillColor = Colors.CollectionChipText;
+        painter.fillColor = Colors.HistorySubtitleText;
         painter.BeginPath();
         painter.MoveTo(new Vector2(x, y));
         painter.LineTo(new Vector2(x + width, y));
