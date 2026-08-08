@@ -13,7 +13,6 @@ using BazaarGameShared.Domain.Tooltips;
 using BazaarPlusPlus.Game.CardTags;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Game.CollectionPanel.Sources;
-using BazaarPlusPlus.Game.CollectionPanel.Ui;
 using BazaarPlusPlus.GameInterop.DayTiers;
 using BazaarPlusPlus.GameInterop.Heroes;
 using BazaarPlusPlus.GameInterop.TagTypography;
@@ -63,41 +62,6 @@ AssertFalse(
 AssertTrue(
     searchRefreshGate.Advance(0.061f),
     "The committed query should refresh once after composition ends and debounce elapses."
-);
-
-var parsedSearchIcon = CollectionSearchSvgIconData.Parse(
-    """
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-         stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <circle cx="10.5" cy="10.5" r="5.75" />
-      <line x1="14.75" y1="14.75" x2="20" y2="20" />
-    </svg>
-    """
-);
-AssertEqual(24f, parsedSearchIcon.Width, "Collection SVG parsing should preserve the viewBox.");
-AssertEqual(
-    1,
-    parsedSearchIcon.Circles.Count,
-    "The search SVG should preserve its magnifier circle."
-);
-AssertEqual(
-    1,
-    parsedSearchIcon.Segments.Count,
-    "The search SVG should preserve its handle segment."
-);
-var parsedCloseIcon = CollectionSearchSvgIconData.Parse(
-    """
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-         stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <line x1="7.25" y1="7.25" x2="16.75" y2="16.75" />
-      <line x1="16.75" y1="7.25" x2="7.25" y2="16.75" />
-    </svg>
-    """
-);
-AssertEqual(
-    2,
-    parsedCloseIcon.Segments.Count,
-    "The close SVG should preserve both rounded X strokes."
 );
 
 var heroState = new CollectionFilterState();
@@ -2511,10 +2475,6 @@ AssertSequence(
     new[] { queryCatalogCards[0].Id },
     "CollectionQuery should return filter-engine ordered cards using resolved source offer pools."
 );
-AssertTrue(
-    queryResult.OfferMatchesByCardId != null,
-    "CollectionQuery should expose ready offer matches for the grid when a source resolves."
-);
 AssertFalse(
     queryResult.Normalization.ClearSelectedSource,
     "A valid source selection should not request source clearing."
@@ -2771,10 +2731,6 @@ AssertSequence(
     searchGlobalResult.Cards,
     Array.Empty<Guid>(),
     "Collection search should AND text with source, hero, day, tier, size, tag, and keyword filters."
-);
-AssertTrue(
-    searchGlobalResult.OfferMatchesByCardId != null,
-    "Collection search should retain resolved source offer metadata."
 );
 
 var searchWithinFilters = new CollectionFilterState

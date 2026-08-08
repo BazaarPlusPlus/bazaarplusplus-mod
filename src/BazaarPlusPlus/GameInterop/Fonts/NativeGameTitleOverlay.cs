@@ -186,8 +186,8 @@ internal sealed class NativeGameTitleOverlay : IDisposable
             && typography != null
         )
         {
-            typography.Apply(_title);
-            _role = desiredRole;
+            if (typography.Apply(_title) == NativeGameTypography.Outcome.Applied)
+                _role = desiredRole;
         }
         if (!string.IsNullOrEmpty(_title.text))
         {

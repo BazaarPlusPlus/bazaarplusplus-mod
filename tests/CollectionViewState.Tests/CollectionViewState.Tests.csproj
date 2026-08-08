@@ -56,10 +56,6 @@
       Link="CollectionSearchModeState.cs"
     />
     <Compile
-      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Ui\CollectionSearchSvgIconData.cs"
-      Link="CollectionSearchSvgIconData.cs"
-    />
-    <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionQuery.cs"
       Link="CollectionQuery.cs"
     />
