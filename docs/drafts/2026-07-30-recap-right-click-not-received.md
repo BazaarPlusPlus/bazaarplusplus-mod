@@ -489,34 +489,3 @@ The event records booleans only—no tooltip copy—and uses `(category, phase)`
 per-visible-episode latch also prevents the frame audit from logging every Update. The pure anomaly
 rules are covered separately from Unity state capture so hidden frames, paired custom content and
 either renderable text node remain non-anomalous.
-
-### 2026-08-07 (seventh round): empty Auxiliary frame flashes on cold Equipment Van hover
-
-The first attempted fix moved Recap hover registration from a postfix to a prefix, assuming the
-large primary card tooltip rendered before its gate was installed. Runtime acceptance still
-reproduced the flash, so that change is reverted.
-
-The deployed DLL hash matched the attempted build. Its runtime log captured the actual invariant
-violation at reproduction time:
-
-`category=visible_without_text phase=frame_audit header_active=false body_active=false paired_content_active=false recovered=false`
-
-This proves the visible artifact is the native Auxiliary frame after Combat Impact teardown, not
-the primary Equipment Van tooltip. `ForceSettle` and the other teardown paths concealed only the
-native controller CanvasGroup, then called `Release(false)`. `Release` immediately restored and
-removed the BPP-owned `auxParent` gate. The in-flight native tween could raise its own CanvasGroup
-again, exposing the frame while both native text nodes and paired content were inactive.
-
-The fix introduces one teardown release path: it closes both the native CanvasGroup and the
-`auxParent` gate, releases custom content and the primary gate, but deliberately retains the closed
-`auxParent` gate until a confirmed native Show hands the pooled controller back. Session transfer
-and final disposal keep their existing full-restore behavior. Every same-session failure/hide path
-uses this concealed release; the incorrect Recap prefix change and its order-only test are removed.
-
-Verification:
-
-- Architecture coverage must prove concealed release passes `restoreAuxiliaryGate: false`, the
-  release core restores that gate only conditionally, and `ForceSettle` uses the concealed path.
-- Focused Architecture and PostCombatImpact tests plus Debug build must pass.
-- Runtime: from empty space, enter Equipment Van repeatedly. Acceptance requires no flash and no
-  new `visible_without_text / frame_audit` event after the updated DLL starts.
