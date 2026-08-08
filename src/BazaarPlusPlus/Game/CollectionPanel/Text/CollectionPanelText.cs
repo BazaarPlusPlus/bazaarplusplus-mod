@@ -23,6 +23,11 @@ internal static class CollectionPanelText
     private static readonly LocalizedTextSet ItemsTabText = new("Items", "物品", "物品");
     private static readonly LocalizedTextSet SkillsTabText = new("Skills", "技能", "技能");
     private static readonly LocalizedTextSet CloseText = new("Close", "关闭", "關閉");
+    private static readonly LocalizedTextSet ResetFiltersText = new(
+        "Reset filters",
+        "重置筛选",
+        "重設篩選"
+    );
     private static readonly LocalizedTextSet SearchTooltipText = new(
         "Search names, descriptions, internal ids, tags, and related effects.",
         "搜索名称、描述、内部 ID、标签和相关效果。",
@@ -111,6 +116,8 @@ internal static class CollectionPanelText
     internal static string SkillsTab() => Resolve(SkillsTabText);
 
     internal static string Close() => Resolve(CloseText);
+
+    internal static string ResetFilters() => Resolve(ResetFiltersText);
 
     internal static string SearchTooltip() => Resolve(SearchTooltipText);
 

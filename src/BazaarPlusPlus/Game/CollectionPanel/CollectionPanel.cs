@@ -664,6 +664,8 @@ internal sealed class CollectionPanel : MonoBehaviour
         public void SetActiveTab(CollectionTabKind tab) =>
             panel.ApplyOutcome(panel._viewState.SetActiveTab(tab));
 
+        public void ResetFilters() => panel.ApplyOutcome(panel._viewState.ResetFilters());
+
         public void ToggleHero(EHero hero) => panel.ApplyOutcome(panel._viewState.ToggleHero(hero));
 
         public void ToggleTier(ETier tier) => panel.ApplyOutcome(panel._viewState.ToggleTier(tier));

@@ -65,6 +65,57 @@ AssertTrue(
     "The committed query should refresh once after composition ends and debounce elapses."
 );
 
+var resetFacetState = new CollectionFilterState
+{
+    SearchQuery = "stale query",
+    SelectedSourceKey = "merchant:aila",
+    TagMatchMode = CollectionFacetMatchMode.All,
+    KeywordMatchMode = CollectionFacetMatchMode.All,
+    UseRunDayFilter = false,
+    SortPriority = CollectionSortPriority.Size,
+};
+resetFacetState.SelectTab(CollectionTabKind.Skills);
+resetFacetState.ToggleHero(EHero.Vanessa);
+resetFacetState.Tiers.Add(ETier.Gold);
+resetFacetState.Sizes.Add(ECardSize.Medium);
+resetFacetState.Tags.Add(ECardTag.Weapon);
+resetFacetState.Keywords.Add(EHiddenTag.Damage);
+resetFacetState.Mechanics.Add(CollectionMechanic.Multicast);
+resetFacetState.ResetFacets();
+AssertEqual(
+    CollectionTabKind.Skills,
+    resetFacetState.ActiveTab,
+    "Resetting facets should retain the active catalog tab."
+);
+AssertEqual(EHero.Common, resetFacetState.EffectiveHero, "Resetting facets should clear hero selection.");
+AssertEqual(0, resetFacetState.Tiers.Count, "Resetting facets should clear quality selection.");
+AssertEqual(0, resetFacetState.Sizes.Count, "Resetting facets should clear size selection.");
+AssertEqual(0, resetFacetState.Tags.Count, "Resetting facets should clear type selection.");
+AssertEqual(0, resetFacetState.Keywords.Count, "Resetting facets should clear tag selection.");
+AssertEqual(
+    0,
+    resetFacetState.Mechanics.Count,
+    "Resetting facets should clear mechanic selection."
+);
+AssertEqual(null, resetFacetState.SelectedSourceKey, "Resetting facets should clear merchant selection.");
+AssertEqual(string.Empty, resetFacetState.SearchQuery, "Resetting facets should clear search.");
+AssertEqual(
+    CollectionFacetMatchMode.Any,
+    resetFacetState.TagMatchMode,
+    "Resetting facets should restore type matching to Any."
+);
+AssertEqual(
+    CollectionFacetMatchMode.Any,
+    resetFacetState.KeywordMatchMode,
+    "Resetting facets should restore tag matching to Any."
+);
+AssertTrue(resetFacetState.UseRunDayFilter, "Resetting facets should restore the Day filter.");
+AssertEqual(
+    CollectionSortPriority.Quality,
+    resetFacetState.SortPriority,
+    "Resetting facets should restore quality-first sorting."
+);
+
 var parsedSearchIcon = CollectionSearchSvgIconData.Parse(
     """
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"

@@ -67,6 +67,10 @@ internal sealed partial class CollectionPanelView
         _title.style.overflow = Overflow.Hidden;
         titleRow.Add(_title);
 
+        var resetButton = CreateResetButton(_commands.ResetFilters);
+        resetButton.style.marginLeft = UiSpacing.Sm;
+        titleRow.Add(resetButton);
+
         _tabModeControl = CreateFacetChoiceControl(
             CollectionPanelText.ItemsTab(),
             CollectionPanelText.SkillsTab(),
@@ -77,7 +81,7 @@ internal sealed partial class CollectionPanelView
             Sizes.FontBody,
             slanted: false
         );
-        _tabModeControl.style.marginLeft = UiSpacing.Md;
+        _tabModeControl.style.marginLeft = UiSpacing.Sm;
         _tabModeControl.style.marginRight = UiSpacing.Md;
         titleRow.Add(_tabModeControl);
 
@@ -291,6 +295,27 @@ internal sealed partial class CollectionPanelView
         return button;
     }
 
+    private static Button CreateResetButton(Action onClick)
+    {
+        var button = CreateButton(
+            string.Empty,
+            onClick,
+            Sizes.CollectionTabToggleHeight,
+            Sizes.CollectionTabToggleHeight
+        );
+        button.tooltip = CollectionPanelText.ResetFilters();
+        StyleButton(button, Colors.CollectionChipBackground, Colors.CollectionChipText);
+        UiStyle.Radius(button.style, Radii.CollectionChip);
+        UiStyle.Border(button.style, Borders.Thin, Colors.CollectionChipBorder);
+
+        var icon = new VisualElement { pickingMode = PickingMode.Ignore };
+        UiStyle.FixedSize(icon.style, Sizes.CollectionSearchIconSize, Sizes.CollectionSearchIconSize);
+        icon.style.color = Colors.CollectionChipText;
+        icon.generateVisualContent += context => DrawResetIcon(context, icon);
+        button.Add(icon);
+        return button;
+    }
+
     private static void DrawCloseIcon(MeshGenerationContext context, VisualElement icon)
     {
         var rect = icon.contentRect;
@@ -311,6 +336,36 @@ internal sealed partial class CollectionPanelView
         painter.BeginPath();
         painter.MoveTo(new Vector2(rect.xMax - inset, rect.yMin + inset));
         painter.LineTo(new Vector2(rect.xMin + inset, rect.yMax - inset));
+        painter.Stroke();
+    }
+
+    private static void DrawResetIcon(MeshGenerationContext context, VisualElement icon)
+    {
+        var rect = icon.contentRect;
+        if (rect.width <= 0f || rect.height <= 0f)
+            return;
+
+        var center = rect.center;
+        var radius = Mathf.Min(rect.width, rect.height) * 0.34f;
+        var painter = context.painter2D;
+        painter.lineWidth = Mathf.Max(1.5f, rect.width * 0.12f);
+        painter.lineCap = LineCap.Round;
+        painter.lineJoin = LineJoin.Round;
+        painter.strokeColor = icon.resolvedStyle.color;
+        painter.BeginPath();
+        painter.MoveTo(new Vector2(center.x + radius, center.y - radius * 0.35f));
+        painter.LineTo(new Vector2(center.x + radius * 0.48f, center.y - radius * 0.84f));
+        painter.LineTo(new Vector2(center.x - radius * 0.32f, center.y - radius * 0.94f));
+        painter.LineTo(new Vector2(center.x - radius * 0.87f, center.y - radius * 0.42f));
+        painter.LineTo(new Vector2(center.x - radius * 0.92f, center.y + radius * 0.36f));
+        painter.LineTo(new Vector2(center.x - radius * 0.34f, center.y + radius * 0.90f));
+        painter.LineTo(new Vector2(center.x + radius * 0.42f, center.y + radius * 0.74f));
+        painter.Stroke();
+
+        painter.BeginPath();
+        painter.MoveTo(new Vector2(center.x + radius * 0.34f, center.y - radius * 0.98f));
+        painter.LineTo(new Vector2(center.x + radius, center.y - radius * 0.35f));
+        painter.LineTo(new Vector2(center.x + radius * 0.12f, center.y - radius * 0.28f));
         painter.Stroke();
     }
 

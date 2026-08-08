@@ -13,6 +13,7 @@ internal interface ICollectionPanelCommands
     void Close();
     void ToggleSearch();
     void SetActiveTab(CollectionTabKind tab);
+    void ResetFilters();
     void ToggleHero(EHero hero);
     void ToggleTier(ETier tier);
     void ToggleRunDayFilter();

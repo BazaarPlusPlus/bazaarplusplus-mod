@@ -119,6 +119,22 @@ internal sealed class CollectionFilterState
             : sourceKey;
     }
 
+    public void ResetFacets()
+    {
+        SelectedHero = null;
+        Tiers.Clear();
+        Tags.Clear();
+        Keywords.Clear();
+        Mechanics.Clear();
+        Sizes.Clear();
+        SelectedSourceKey = null;
+        SearchQuery = string.Empty;
+        TagMatchMode = CollectionFacetMatchMode.Any;
+        KeywordMatchMode = CollectionFacetMatchMode.Any;
+        UseRunDayFilter = true;
+        SortPriority = CollectionSortPriority.Quality;
+    }
+
     public bool ClearSelectedSource()
     {
         if (string.IsNullOrWhiteSpace(SelectedSourceKey))

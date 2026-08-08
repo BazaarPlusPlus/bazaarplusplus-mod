@@ -176,6 +176,14 @@ internal sealed class CollectionViewState
         return QueryAndRender(resetControlsScroll: false);
     }
 
+    public CollectionRenderOutcome ResetFilters()
+    {
+        _filter.ResetFacets();
+        _searchRefreshGate.Cancel();
+        _heroPreferenceStore.Save(_filter.EffectiveHero);
+        return QueryAndRender(resetControlsScroll: true);
+    }
+
     public CollectionRenderOutcome? ToggleSource(string sourceKey)
     {
         _filter.ToggleSource(_filter.ActiveTab, sourceKey);
