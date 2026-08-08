@@ -924,7 +924,7 @@ internal sealed partial class CollectionPanelView
         };
         StretchPortraitToParent(gradient);
         gradient.style.display = DisplayStyle.None;
-        var themeColor = DarkenPortraitThemeColor(Colors.HistoryGoldAccent);
+        var themeColor = DarkenPortraitThemeColor(Colors.CollectionChipSelectedBorder);
         var state = new HeroGradientVisualState(gradient, themeColor);
         gradient.userData = state;
         gradient.generateVisualContent += context => DrawHeroGradient(context, gradient, state);
@@ -1356,7 +1356,7 @@ internal sealed partial class CollectionPanelView
         UiStyle.Border(
             chip.style,
             selected ? Borders.Accent : Borders.Thin,
-            selected ? Colors.HistoryGoldAccent : Colors.CollectionChipBorder
+            selected ? Colors.CollectionChipSelectedBorder : Colors.CollectionChipBorder
         );
     }
 

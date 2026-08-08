@@ -395,14 +395,16 @@ internal sealed partial class CollectionPanelView : IDisposable
         }
         foreach (var pair in _sourceChips)
         {
-            RefreshSourceChip(
-                pair.Value,
-                string.Equals(pair.Key, model.SelectedSourceKey, StringComparison.Ordinal)
+            var selected = string.Equals(
+                pair.Key,
+                model.SelectedSourceKey,
+                StringComparison.Ordinal
             );
+            RefreshSourceChip(pair.Value, selected);
             if (_sourceChipIcons.TryGetValue(pair.Key, out var sourceIcon))
                 RefreshSourceEncounterHighlight(
                     sourceIcon,
-                    model.EncounteredMerchantSourceKeys.Contains(pair.Key)
+                    model.EncounteredMerchantSourceKeys.Contains(pair.Key) && !selected
                 );
             pair.Value.SetEnabled(model.SourceSelectorEnabled);
             pair.Value.style.opacity = model.SourceSelectorEnabled ? 1f : 0.58f;
