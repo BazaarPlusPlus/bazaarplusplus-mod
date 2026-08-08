@@ -1982,6 +1982,37 @@ public class CoreLayeringTests
     }
 
     [Fact]
+    public void Collection_day_toggle_caption_is_localized()
+    {
+        var mainSource = MainSourceRoot(RepoRoot());
+        var textSource = File.ReadAllText(
+            Path.Combine(mainSource, "Game", "CollectionPanel", "Text", "CollectionPanelText.cs")
+        );
+        var treeSource = File.ReadAllText(
+            Path.Combine(mainSource, "Game", "CollectionPanel", "Ui", "CollectionPanelView.Tree.cs")
+        );
+        var filtersSource = File.ReadAllText(
+            Path.Combine(
+                mainSource,
+                "Game",
+                "CollectionPanel",
+                "Ui",
+                "CollectionPanelView.Filters.cs"
+            )
+        );
+
+        Assert.Contains("DayCaptionText = new(\"DAY\", \"天\", \"天\")", textSource);
+        Assert.Contains("DayCaption() => Resolve(DayCaptionText)", textSource);
+        Assert.DoesNotContain("new Label(\"DAY\")", treeSource);
+        Assert.Contains("new Label(CollectionPanelText.DayCaption())", treeSource);
+        Assert.DoesNotContain("_dayToggleCaption.text = \"DAY\"", filtersSource);
+        Assert.Contains(
+            "_dayToggleCaption.text = CollectionPanelText.DayCaption();",
+            filtersSource
+        );
+    }
+
+    [Fact]
     public void Collection_title_uses_native_game_heading_typography()
     {
         var mainSource = MainSourceRoot(RepoRoot());

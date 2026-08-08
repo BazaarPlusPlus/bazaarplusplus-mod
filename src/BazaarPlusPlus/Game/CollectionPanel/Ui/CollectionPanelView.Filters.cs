@@ -1535,7 +1535,7 @@ internal sealed partial class CollectionPanelView
             return;
 
         if (_dayToggleCaption != null)
-            _dayToggleCaption.text = "DAY";
+            _dayToggleCaption.text = CollectionPanelText.DayCaption();
         if (_dayToggleValue != null)
             _dayToggleValue.text =
                 day?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "—";

@@ -977,7 +977,10 @@ internal sealed partial class CollectionPanelView
         content.style.alignItems = Align.Center;
         content.style.justifyContent = Justify.Center;
         content.style.flexGrow = 1f;
-        var caption = new Label("DAY") { pickingMode = PickingMode.Ignore };
+        var caption = new Label(CollectionPanelText.DayCaption())
+        {
+            pickingMode = PickingMode.Ignore,
+        };
         caption.style.fontSize = Sizes.FontTiny;
         caption.style.marginBottom = -2f;
         caption.style.unityTextAlign = TextAnchor.MiddleCenter;
