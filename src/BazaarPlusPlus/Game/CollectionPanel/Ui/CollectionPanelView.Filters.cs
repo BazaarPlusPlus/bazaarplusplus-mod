@@ -156,19 +156,25 @@ internal sealed partial class CollectionPanelView
             + Borders.Thin * 2f;
         UiStyle.FixedWidth(_sizeChipRow.style, segmentWidth);
         _sizeChipRow.style.flexBasis = segmentWidth;
+        var horizontalPadding = CurrentSizeChipHorizontalPadding();
         foreach (var chip in _sizeChips.Values)
+        {
             UiStyle.FixedWidth(chip.style, chipWidth);
+            UiStyle.HorizontalPadding(chip.style, horizontalPadding);
+        }
     }
 
     private static float CurrentSizeChipWidth() =>
         Sizes.CollectionSizeChipWidth
-        - (CollectionPanelText.IsChineseLanguage() ? 0f : UiSpacing.Xs);
+        - (CollectionPanelText.IsChineseLanguage() ? 0f : UiSpacing.Sm);
+
+    private static float CurrentSizeChipHorizontalPadding() =>
+        CollectionPanelText.IsChineseLanguage() ? UiSpacing.Md : UiSpacing.Xs;
 
     private Button CreateSizeChipButton(ECardSize size, Action onClick)
     {
         var chip = CreateChipButton(string.Empty, onClick, contentWidth: true);
-        chip.style.paddingLeft = UiSpacing.Md;
-        chip.style.paddingRight = UiSpacing.Md;
+        UiStyle.HorizontalPadding(chip.style, CurrentSizeChipHorizontalPadding());
         // Custom content uses a deterministic width rather than Button.text measurement.
         UiStyle.FixedWidth(chip.style, CurrentSizeChipWidth());
         chip.style.flexDirection = FlexDirection.Row;
