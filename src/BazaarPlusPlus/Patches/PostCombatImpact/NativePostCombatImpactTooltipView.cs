@@ -70,8 +70,12 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
     private GameObject? _contentRoot;
     private GameObject? _causedRoot;
     private GameObject? _receivedRoot;
+    private TMP_Text? _headingTemplate;
+    private TMP_Text? _bodyTemplate;
     private TMP_Text? _causedMoreText;
     private TMP_Text? _receivedMoreText;
+    private CombatImpactSource? _source;
+    private CombatImpactReceived? _received;
     private NativePreviewOwner? _previewOwner;
     private INativeCardPreviewScope? _previewScope;
     private CancellationTokenSource? _previewCancellation;
@@ -79,7 +83,11 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
     private bool _widthDegradedLogged;
     private bool _topAlignmentDegradedLogged;
     private bool _receivedPerspectiveAvailable;
+    private bool _causedPerspectiveBuilt;
+    private bool _receivedPerspectiveBuilt;
+    private bool _isSkill;
     private int _pendingPreviewCount;
+    private int _contentGeneration;
     private CombatImpactPerspective _activePerspective = CombatImpactPerspective.Caused;
 
     internal NativePostCombatImpactTooltipView(
@@ -162,27 +170,17 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         var receivedRoot = CreateVertical("ImpactReceivedPerspective", root, 8f);
         _causedRoot = causedRoot.gameObject;
         _receivedRoot = receivedRoot.gameObject;
+        _headingTemplate = auxiliary.headerText;
+        _bodyTemplate = auxiliary.bodyText;
+        _isSkill = isSkill;
+        _source = source;
+        _received = received;
+        _contentGeneration = generation;
         _previewCancellation = new CancellationTokenSource();
         _previewOwner = new NativePreviewOwner(auxiliary.gameObject.layer);
         _previewScope = _previewHost.OpenScope(_previewOwner);
-        BuildCaused(
-            auxiliary.headerText,
-            auxiliary.bodyText,
-            causedRoot,
-            isSkill,
-            source,
-            _receivedPerspectiveAvailable,
-            generation
-        );
-        BuildReceived(
-            auxiliary.headerText,
-            auxiliary.bodyText,
-            receivedRoot,
-            isSkill,
-            received,
-            _receivedPerspectiveAvailable,
-            generation
-        );
+        if (!EnsurePerspectiveBuilt(_activePerspective))
+            return false;
         ApplyPerspectiveVisibility(_activePerspective);
         return _session.AttachContent(_contentRoot, ApplyMetricColumnWidth);
     }
@@ -218,9 +216,10 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         // and rolling it back are Combat Impact decisions and stay here.
         using (_session.BeginMaskedLayout())
         {
+            if (!EnsurePerspectiveBuilt(perspective))
+                return false;
             _activePerspective = perspective;
             ApplyPerspectiveVisibility(perspective);
-            _session.RebuildLayout();
             var result = _session.Position(anchor, ResolveContentBudget());
             if (result.Positioned)
             {
@@ -230,7 +229,6 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
 
             _activePerspective = previousPerspective;
             ApplyPerspectiveVisibility(previousPerspective);
-            _session.RebuildLayout();
             // The rollback pass must reach the same reason-code logic as the forward pass:
             // LogPlacementDegradationOnce clears its latch whenever a dimension stops being
             // degraded, so discarding this result changes how many records later passes emit.
@@ -335,8 +333,12 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         _contentRoot = null;
         _causedRoot = null;
         _receivedRoot = null;
+        _headingTemplate = null;
+        _bodyTemplate = null;
         _causedMoreText = null;
         _receivedMoreText = null;
+        _source = null;
+        _received = null;
         _previewOwner = null;
         _metricColumns.Clear();
         _causedBlocks.Clear();
@@ -346,6 +348,10 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         _widthDegradedLogged = false;
         _topAlignmentDegradedLogged = false;
         _receivedPerspectiveAvailable = false;
+        _causedPerspectiveBuilt = false;
+        _receivedPerspectiveBuilt = false;
+        _isSkill = false;
+        _contentGeneration = 0;
         _activePerspective = CombatImpactPerspective.Caused;
     }
 
@@ -492,6 +498,49 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         canvasGroup.blocksRaycasts = false;
         var layout = root.GetComponent<LayoutElement>() ?? root.AddComponent<LayoutElement>();
         layout.ignoreLayout = !visible;
+    }
+
+    private bool EnsurePerspectiveBuilt(CombatImpactPerspective perspective)
+    {
+        if (_headingTemplate == null || _bodyTemplate == null)
+            return false;
+
+        if (perspective == CombatImpactPerspective.Caused)
+        {
+            if (_causedPerspectiveBuilt)
+                return true;
+            if (_causedRoot?.transform is not RectTransform causedRoot)
+                return false;
+
+            BuildCaused(
+                _headingTemplate,
+                _bodyTemplate,
+                causedRoot,
+                _isSkill,
+                _source,
+                _receivedPerspectiveAvailable,
+                _contentGeneration
+            );
+            _causedPerspectiveBuilt = true;
+            return true;
+        }
+
+        if (_receivedPerspectiveBuilt)
+            return true;
+        if (_receivedRoot?.transform is not RectTransform receivedRoot)
+            return false;
+
+        BuildReceived(
+            _headingTemplate,
+            _bodyTemplate,
+            receivedRoot,
+            _isSkill,
+            _received,
+            _receivedPerspectiveAvailable,
+            _contentGeneration
+        );
+        _receivedPerspectiveBuilt = true;
+        return true;
     }
 
     private void BuildCaused(
