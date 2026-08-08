@@ -227,7 +227,7 @@ internal sealed partial class CollectionPanelView
         var (width, height) = size switch
         {
             ECardSize.Small => (6f, 10f),
-            ECardSize.Large => (15f, 10f),
+            ECardSize.Large => (13f, 10f),
             _ => (10f, 10f),
         };
         var glyph = new VisualElement { pickingMode = PickingMode.Ignore };
