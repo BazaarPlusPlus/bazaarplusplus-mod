@@ -866,12 +866,7 @@ public class CoreLayeringTests
         );
         var grid = MethodSource(treeSource, "private void BuildGrid", "}\n}");
 
-        foreach (
-            var token in new[]
-            {
-                "Colors.CollectionFilterCardBackground",
-            }
-        )
+        foreach (var token in new[] { "Colors.CollectionFilterCardBackground" })
         {
             Assert.Contains(token, operationRail);
             Assert.Contains(token, grid);
