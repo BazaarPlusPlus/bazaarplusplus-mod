@@ -401,6 +401,7 @@ internal sealed partial class CollectionPanelView : IDisposable
                 StringComparison.Ordinal
             );
             RefreshSourceChip(pair.Value, selected);
+            RefreshSourceSelectionRing(pair.Value, selected);
             if (_sourceChipIcons.TryGetValue(pair.Key, out var sourceIcon))
                 RefreshSourceEncounterHighlight(
                     sourceIcon,

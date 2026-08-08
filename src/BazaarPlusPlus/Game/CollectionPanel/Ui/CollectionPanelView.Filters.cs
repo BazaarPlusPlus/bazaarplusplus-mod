@@ -22,6 +22,7 @@ internal sealed partial class CollectionPanelView
     private const string SourceChipEncounterGradientName =
         "bpp-collection-source-chip-encounter-gradient";
     private const string SourceChipPortraitName = "bpp-collection-source-chip-portrait";
+    private const string SourceChipSelectionRingName = "bpp-collection-source-chip-selection-ring";
 
     private static readonly CollectionPortraitFailureGate<
         EHero,
@@ -707,6 +708,7 @@ internal sealed partial class CollectionPanelView
 
         var icon = CreateSourceChipIcon(source.DisplayName);
         chip.Add(icon);
+        chip.Add(CreateSourceSelectionRing());
         var box = CurrentSourceChipBox();
         ResizeSourceChip(chip, icon, box);
 
@@ -769,6 +771,30 @@ internal sealed partial class CollectionPanelView
         initials.style.unityTextAlign = TextAnchor.MiddleCenter;
         icon.Add(initials);
         return icon;
+    }
+
+    private static VisualElement CreateSourceSelectionRing()
+    {
+        var ring = new VisualElement
+        {
+            name = SourceChipSelectionRingName,
+            pickingMode = PickingMode.Ignore,
+        };
+        StretchPortraitToParent(ring);
+        UiStyle.Border(ring.style, Borders.Accent, Colors.CollectionChipSelectedBorder);
+        UiStyle.Radius(ring.style, Radii.CollectionPortraitChip);
+        ring.style.display = DisplayStyle.None;
+        return ring;
+    }
+
+    private static void RefreshSourceSelectionRing(Button chip, bool selected)
+    {
+        var ring = chip.Q<VisualElement>(SourceChipSelectionRingName);
+        if (ring == null)
+            return;
+
+        ring.style.display = selected ? DisplayStyle.Flex : DisplayStyle.None;
+        UiStyle.BorderColor(ring.style, Colors.CollectionChipSelectedBorder);
     }
 
     private float CurrentSourceChipBox() =>
@@ -1355,7 +1381,7 @@ internal sealed partial class CollectionPanelView
         RefreshChip(chip, selected);
         UiStyle.Border(
             chip.style,
-            selected ? Borders.Accent : Borders.Thin,
+            Borders.Thin,
             selected ? Colors.CollectionChipSelectedBorder : Colors.CollectionChipBorder
         );
     }
