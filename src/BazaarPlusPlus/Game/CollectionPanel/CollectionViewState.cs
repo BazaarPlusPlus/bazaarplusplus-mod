@@ -111,6 +111,13 @@ internal sealed class CollectionViewState
         return QueryAndRender(resetControlsScroll: true);
     }
 
+    public CollectionRenderOutcome ToggleAllHeroes()
+    {
+        _filter.ToggleAllHeroes();
+        PruneInvisibleSourceSelections();
+        return QueryAndRender(resetControlsScroll: true);
+    }
+
     public CollectionRenderOutcome? ToggleTier(ETier tier)
     {
         if (_filter.Tiers.Count == 1 && _filter.Tiers.Contains(tier))
@@ -423,6 +430,7 @@ internal sealed class CollectionViewState
             HeroFilterVisible = heroFilterPresentation.IsVisible,
             HeroFilterEnabled = heroFilterPresentation.IsEnabled,
             SelectedHero = _filter.SelectedHero,
+            AllHeroesSelected = _filter.AllHeroesSelected,
             SelectedTiers = _filter.Tiers,
             SelectedSizes = _filter.Sizes,
             SelectedTags = _filter.Tags,

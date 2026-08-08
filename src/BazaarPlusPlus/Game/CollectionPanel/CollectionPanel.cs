@@ -669,6 +669,8 @@ internal sealed class CollectionPanel : MonoBehaviour
 
         public void ToggleHero(EHero hero) => panel.ApplyOutcome(panel._viewState.ToggleHero(hero));
 
+        public void ToggleAllHeroes() => panel.ApplyOutcome(panel._viewState.ToggleAllHeroes());
+
         public void ToggleTier(ETier tier) => panel.ApplyOutcome(panel._viewState.ToggleTier(tier));
 
         public void ToggleRunDayFilter() =>

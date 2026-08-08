@@ -165,8 +165,15 @@ internal sealed partial class CollectionPanelView
             CollectionPanelText.HeroHeader(),
             UiSpacing.Xl,
             out _heroChipRow,
-            out _heroFilterLabel
+            out _heroFilterLabel,
+            out var heroHeaderRow
         );
+        _allHeroesButton = CreateTextMatchModeButton(
+            "bpp-collection-all-heroes",
+            _commands.ToggleAllHeroes
+        );
+        _allHeroesButton.style.marginLeft = UiSpacing.Sm;
+        heroHeaderRow.Add(_allHeroesButton);
         _heroChipRow.style.flexWrap = Wrap.NoWrap;
         _heroChipRow.style.justifyContent = Justify.FlexStart;
         _heroChipRow.RegisterCallback<GeometryChangedEvent>(OnHeroChipRowGeometryChanged);
@@ -286,7 +293,10 @@ internal sealed partial class CollectionPanelView
         return shadow;
     }
 
-    private static void DrawControlsScrollShadow(MeshGenerationContext context, VisualElement shadow)
+    private static void DrawControlsScrollShadow(
+        MeshGenerationContext context,
+        VisualElement shadow
+    )
     {
         var rect = shadow.contentRect;
         if (rect.width <= 0f || rect.height <= 0f)
@@ -296,32 +306,16 @@ internal sealed partial class CollectionPanelView
         var bottom = Colors.Clear;
         var mesh = context.Allocate(4, 6);
         mesh.SetNextVertex(
-            new Vertex
-            {
-                position = new Vector3(rect.xMin, rect.yMin, Vertex.nearZ),
-                tint = top,
-            }
+            new Vertex { position = new Vector3(rect.xMin, rect.yMin, Vertex.nearZ), tint = top }
         );
         mesh.SetNextVertex(
-            new Vertex
-            {
-                position = new Vector3(rect.xMax, rect.yMin, Vertex.nearZ),
-                tint = top,
-            }
+            new Vertex { position = new Vector3(rect.xMax, rect.yMin, Vertex.nearZ), tint = top }
         );
         mesh.SetNextVertex(
-            new Vertex
-            {
-                position = new Vector3(rect.xMax, rect.yMax, Vertex.nearZ),
-                tint = bottom,
-            }
+            new Vertex { position = new Vector3(rect.xMax, rect.yMax, Vertex.nearZ), tint = bottom }
         );
         mesh.SetNextVertex(
-            new Vertex
-            {
-                position = new Vector3(rect.xMin, rect.yMax, Vertex.nearZ),
-                tint = bottom,
-            }
+            new Vertex { position = new Vector3(rect.xMin, rect.yMax, Vertex.nearZ), tint = bottom }
         );
         mesh.SetNextIndex(0);
         mesh.SetNextIndex(1);
@@ -379,8 +373,9 @@ internal sealed partial class CollectionPanelView
         UiStyle.Border(button.style, Borders.Thin, Colors.CollectionChipBorder);
 
         var icon = new VisualElement { pickingMode = PickingMode.Ignore };
-        UiStyle.FixedSize(icon.style, Sizes.CollectionSearchIconSize, Sizes.CollectionSearchIconSize);
-        icon.style.color = Colors.CollectionChipText;
+        UiStyle.FixedSize(icon.style, 16f, 16f);
+        icon.style.marginTop = -0.5f;
+        icon.style.color = Colors.WithAlpha(Colors.CollectionChipText, 0.84f);
         icon.generateVisualContent += context => DrawResetIcon(context, icon);
         button.Add(icon);
         return button;
@@ -416,26 +411,26 @@ internal sealed partial class CollectionPanelView
             return;
 
         var center = rect.center;
-        var radius = Mathf.Min(rect.width, rect.height) * 0.34f;
+        var radius = Mathf.Min(rect.width, rect.height) * 0.32f;
         var painter = context.painter2D;
-        painter.lineWidth = Mathf.Max(1.5f, rect.width * 0.12f);
+        painter.lineWidth = Mathf.Max(1.35f, rect.width * 0.115f);
         painter.lineCap = LineCap.Round;
         painter.lineJoin = LineJoin.Round;
         painter.strokeColor = icon.resolvedStyle.color;
         painter.BeginPath();
-        painter.MoveTo(new Vector2(center.x + radius, center.y - radius * 0.35f));
-        painter.LineTo(new Vector2(center.x + radius * 0.48f, center.y - radius * 0.84f));
-        painter.LineTo(new Vector2(center.x - radius * 0.32f, center.y - radius * 0.94f));
-        painter.LineTo(new Vector2(center.x - radius * 0.87f, center.y - radius * 0.42f));
-        painter.LineTo(new Vector2(center.x - radius * 0.92f, center.y + radius * 0.36f));
-        painter.LineTo(new Vector2(center.x - radius * 0.34f, center.y + radius * 0.90f));
-        painter.LineTo(new Vector2(center.x + radius * 0.42f, center.y + radius * 0.74f));
+        painter.MoveTo(new Vector2(center.x + radius * 0.82f, center.y - radius * 0.18f));
+        painter.LineTo(new Vector2(center.x + radius * 0.44f, center.y - radius * 0.76f));
+        painter.LineTo(new Vector2(center.x - radius * 0.26f, center.y - radius * 0.88f));
+        painter.LineTo(new Vector2(center.x - radius * 0.82f, center.y - radius * 0.40f));
+        painter.LineTo(new Vector2(center.x - radius * 0.82f, center.y + radius * 0.36f));
+        painter.LineTo(new Vector2(center.x - radius * 0.26f, center.y + radius * 0.84f));
+        painter.LineTo(new Vector2(center.x + radius * 0.46f, center.y + radius * 0.68f));
         painter.Stroke();
 
         painter.BeginPath();
-        painter.MoveTo(new Vector2(center.x + radius * 0.34f, center.y - radius * 0.98f));
-        painter.LineTo(new Vector2(center.x + radius, center.y - radius * 0.35f));
-        painter.LineTo(new Vector2(center.x + radius * 0.12f, center.y - radius * 0.28f));
+        painter.MoveTo(new Vector2(center.x + radius * 0.16f, center.y - radius * 0.92f));
+        painter.LineTo(new Vector2(center.x + radius * 0.86f, center.y - radius * 0.18f));
+        painter.LineTo(new Vector2(center.x + radius * 0.02f, center.y - radius * 0.10f));
         painter.Stroke();
     }
 
@@ -709,9 +704,7 @@ internal sealed partial class CollectionPanelView
         return section;
     }
 
-    private VisualElement CreateTextMatchModeControl(
-        Action<CollectionFacetMatchMode> onSelect
-    )
+    private VisualElement CreateTextMatchModeControl(Action<CollectionFacetMatchMode> onSelect)
     {
         var control = new VisualElement();
         control.style.flexDirection = FlexDirection.Row;

@@ -21,6 +21,7 @@ internal sealed class CollectionPanelViewModel
     public bool HeroFilterVisible { get; set; } = true;
     public bool HeroFilterEnabled { get; set; } = true;
     public EHero? SelectedHero { get; set; }
+    public bool AllHeroesSelected { get; set; }
     public HashSet<ETier> SelectedTiers { get; set; } = new();
     public HashSet<ECardSize> SelectedSizes { get; set; } = new();
     public HashSet<ECardTag> SelectedTags { get; set; } = new();

@@ -15,6 +15,7 @@ internal interface ICollectionPanelCommands
     void SetActiveTab(CollectionTabKind tab);
     void ResetFilters();
     void ToggleHero(EHero hero);
+    void ToggleAllHeroes();
     void ToggleTier(ETier tier);
     void ToggleRunDayFilter();
     void ToggleSize(ECardSize size);

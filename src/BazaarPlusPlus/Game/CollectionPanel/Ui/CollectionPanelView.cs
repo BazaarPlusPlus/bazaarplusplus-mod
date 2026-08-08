@@ -51,6 +51,7 @@ internal sealed partial class CollectionPanelView : IDisposable
     private Button? _sortQualityButton;
     private Button? _sortSizeButton;
     private Label? _heroFilterLabel;
+    private Button? _allHeroesButton;
     private Label? _tierFilterLabel;
     private Label? _keywordFilterLabel;
     private VisualElement? _keywordMatchModeButton;
@@ -305,9 +306,8 @@ internal sealed partial class CollectionPanelView : IDisposable
         if (_controlsScrollShadow == null || _controlsScrollView == null)
             return;
 
-        _controlsScrollShadow.style.display = _controlsScrollView.scrollOffset.y > 0.5f
-            ? DisplayStyle.Flex
-            : DisplayStyle.None;
+        _controlsScrollShadow.style.display =
+            _controlsScrollView.scrollOffset.y > 0.5f ? DisplayStyle.Flex : DisplayStyle.None;
     }
 
     public void Refresh(CollectionPanelViewModel model)
@@ -344,10 +344,7 @@ internal sealed partial class CollectionPanelView : IDisposable
         EnsureSizeChips(model.AvailableSizes);
         RefreshFacetChips(model);
         EnsureSourceChips(model.AvailableSources);
-        RefreshTextMatchModeControl(
-            _keywordMatchModeButton,
-            model.KeywordMatchMode
-        );
+        RefreshTextMatchModeControl(_keywordMatchModeButton, model.KeywordMatchMode);
         RefreshTextMatchModeControl(_tagMatchModeButton, model.TagMatchMode);
         // Chip text is reset unconditionally on every Refresh: the Ensure*Chips early-exit
         // compares only keys, so a locale change while the chips survive would otherwise leave
@@ -355,8 +352,13 @@ internal sealed partial class CollectionPanelView : IDisposable
         foreach (var pair in _heroChips)
         {
             pair.Value.tooltip = CollectionPanelText.Hero(pair.Key);
-            RefreshHeroChip(pair.Key, pair.Value, model.SelectedHero == pair.Key);
+            RefreshHeroChip(
+                pair.Key,
+                pair.Value,
+                model.AllHeroesSelected || model.SelectedHero == pair.Key
+            );
         }
+        RefreshAllHeroesButton(model.AllHeroesSelected);
         foreach (var pair in _tierChips)
         {
             pair.Value.text = CollectionPanelText.Tier(pair.Key);
@@ -471,9 +473,10 @@ internal sealed partial class CollectionPanelView : IDisposable
         int visibleCount
     )
     {
-        var label = tab == CollectionTabKind.Items
-            ? CollectionPanelText.ItemsTab()
-            : CollectionPanelText.SkillsTab();
+        var label =
+            tab == CollectionTabKind.Items
+                ? CollectionPanelText.ItemsTab()
+                : CollectionPanelText.SkillsTab();
         return tab == activeTab ? $"{label}({visibleCount})" : label;
     }
 
@@ -505,14 +508,8 @@ internal sealed partial class CollectionPanelView : IDisposable
             : Sizes.CollectionTabActiveWidth;
         UiStyle.FixedWidth(items.style, itemsWidth);
         UiStyle.FixedWidth(skills.style, skillsWidth);
-        UiStyle.HorizontalPadding(
-            items.style,
-            itemsSelected ? UiSpacing.Md : UiSpacing.Xs
-        );
-        UiStyle.HorizontalPadding(
-            skills.style,
-            itemsSelected ? UiSpacing.Xs : UiSpacing.Md
-        );
+        UiStyle.HorizontalPadding(items.style, itemsSelected ? UiSpacing.Md : UiSpacing.Xs);
+        UiStyle.HorizontalPadding(skills.style, itemsSelected ? UiSpacing.Xs : UiSpacing.Md);
         divider.style.left = itemsWidth;
     }
 
@@ -553,6 +550,13 @@ internal sealed partial class CollectionPanelView : IDisposable
             _dayToggleButton.tooltip = CollectionPanelText.DayHeader();
         if (_heroFilterLabel != null)
             _heroFilterLabel.text = CollectionPanelText.HeroHeader();
+        if (_allHeroesButton != null)
+        {
+            _allHeroesButton.text = CollectionPanelText.FacetMatchMode(
+                CollectionFacetMatchMode.All
+            );
+            _allHeroesButton.tooltip = CollectionPanelText.AllHeroesTooltip();
+        }
         if (_tierFilterLabel != null)
             _tierFilterLabel.text = CollectionPanelText.TierSizeHeader();
         if (_keywordFilterLabel != null)

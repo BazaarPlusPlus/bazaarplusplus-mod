@@ -55,6 +55,11 @@ internal static class CollectionPanelText
     );
 
     private static readonly LocalizedTextSet HeroHeaderText = new("Basic", "基础", "基礎");
+    private static readonly LocalizedTextSet AllHeroesTooltipText = new(
+        "Show cards for every hero",
+        "显示所有英雄的卡牌",
+        "顯示所有英雄的卡牌"
+    );
     private static readonly LocalizedTextSet DayHeaderText = new("Day", "天数", "天數");
     private static readonly LocalizedTextSet TierSizeHeaderText = new(
         "Size / Quality",
@@ -131,6 +136,8 @@ internal static class CollectionPanelText
             : Resolve(ItemSearchPlaceholderText);
 
     internal static string HeroHeader() => Resolve(HeroHeaderText);
+
+    internal static string AllHeroesTooltip() => Resolve(AllHeroesTooltipText);
 
     internal static string DayHeader() => Resolve(DayHeaderText);
 

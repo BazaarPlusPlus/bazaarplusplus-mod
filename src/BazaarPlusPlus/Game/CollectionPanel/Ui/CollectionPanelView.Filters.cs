@@ -130,11 +130,7 @@ internal sealed partial class CollectionPanelView
 
     private Button CreateSizeChipButton(ECardSize size, Action onClick)
     {
-        var chip = CreateChipButton(
-            string.Empty,
-            onClick,
-            contentWidth: true
-        );
+        var chip = CreateChipButton(string.Empty, onClick, contentWidth: true);
         chip.style.paddingLeft = UiSpacing.Md;
         chip.style.paddingRight = UiSpacing.Md;
         // Custom content uses a deterministic width rather than Button.text measurement.
@@ -1348,6 +1344,14 @@ internal sealed partial class CollectionPanelView
             : Colors.WithAlpha(Colors.CollectionFilterTitleText, 0.48f);
     }
 
+    private void RefreshAllHeroesButton(bool selected)
+    {
+        if (_allHeroesButton == null)
+            return;
+
+        StyleTextMatchModeButton(_allHeroesButton, selected);
+    }
+
     private static void RefreshFacetChoiceControl(
         VisualElement? control,
         bool firstSelected,
@@ -1402,7 +1406,8 @@ internal sealed partial class CollectionPanelView
         if (_dayToggleCaption != null)
             _dayToggleCaption.text = "DAY";
         if (_dayToggleValue != null)
-            _dayToggleValue.text = day?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "—";
+            _dayToggleValue.text =
+                day?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "—";
         StyleCollectionChip(
             _dayToggleButton,
             active ? Colors.CollectionChipSelectedBackground : Colors.CollectionChipBackground,
