@@ -54,6 +54,7 @@ internal sealed partial class CollectionPanelView : IDisposable
     private Label? _tierFilterLabel;
     private Label? _keywordFilterLabel;
     private VisualElement? _keywordMatchModeButton;
+    private VisualElement? _tagMatchModeButton;
     private VisualElement? _heroChipRow;
     private VisualElement? _tierChipRow;
     private VisualElement? _sizeChipRow;
@@ -332,11 +333,11 @@ internal sealed partial class CollectionPanelView : IDisposable
         EnsureSizeChips(model.AvailableSizes);
         RefreshFacetChips(model);
         EnsureSourceChips(model.AvailableSources);
-        RefreshMatchModeButton(
+        RefreshTextMatchModeControl(
             _keywordMatchModeButton,
-            model.KeywordMatchMode,
-            CollectionPanelText.KeywordMatchModeTooltip(model.KeywordMatchMode)
+            model.KeywordMatchMode
         );
+        RefreshTextMatchModeControl(_tagMatchModeButton, model.TagMatchMode);
         // Chip text is reset unconditionally on every Refresh: the Ensure*Chips early-exit
         // compares only keys, so a locale change while the chips survive would otherwise leave
         // their labels in the previous language (same P4 mechanism as RefreshChromeTexts).

@@ -87,7 +87,7 @@ internal sealed partial class CollectionPanelView
         _subtitle = BPPSupporterAttributionRow.Create();
         _subtitle.style.flexWrap = Wrap.NoWrap;
         _subtitle.style.overflow = Overflow.Hidden;
-        _subtitle.style.marginTop = UiSpacing.Md;
+        _subtitle.style.marginTop = UiSpacing.Lg;
         _subtitle.style.backgroundColor = Colors.CollectionPanelBackground;
         UiStyle.FixedHeight(_subtitle.style, Sizes.CollectionTabToggleHeight);
         UiStyle.HorizontalPadding(_subtitle.style, UiSpacing.Md);
@@ -186,12 +186,9 @@ internal sealed partial class CollectionPanelView
             out _keywordFilterLabel,
             out var keywordHeaderRow
         );
-        _keywordMatchModeButton = CreateFacetMatchModeControl(mode =>
+        _keywordMatchModeButton = CreateTextMatchModeControl(mode =>
             _commands.SetKeywordMatchMode(mode)
         );
-        // Keep the match-mode implementation available for a later UX pass while hiding the
-        // compact control during the grouped-filter redesign.
-        _keywordMatchModeButton.style.display = DisplayStyle.None;
         keywordHeaderRow.Add(_keywordMatchModeButton);
         _keywordChipRow.style.flexWrap = Wrap.Wrap;
         _keywordChipRow.style.justifyContent = Justify.FlexStart;
@@ -201,8 +198,11 @@ internal sealed partial class CollectionPanelView
             controlsScroll,
             CollectionPanelText.TagHeader(),
             UiSpacing.Lg,
-            out _tagChipRow
+            out _tagChipRow,
+            out var tagHeaderRow
         );
+        _tagMatchModeButton = CreateTextMatchModeControl(mode => _commands.SetTagMatchMode(mode));
+        tagHeaderRow.Add(_tagMatchModeButton);
         _tagChipRow.style.flexWrap = Wrap.Wrap;
         _tagChipRow.style.justifyContent = Justify.FlexStart;
 
@@ -584,19 +584,44 @@ internal sealed partial class CollectionPanelView
         return section;
     }
 
-    private static VisualElement CreateFacetMatchModeControl(
+    private VisualElement CreateTextMatchModeControl(
         Action<CollectionFacetMatchMode> onSelect
-    ) =>
-        CreateFacetChoiceControl(
-            CollectionPanelText.FacetMatchMode(CollectionFacetMatchMode.Any),
-            CollectionPanelText.FacetMatchMode(CollectionFacetMatchMode.All),
-            () => onSelect(CollectionFacetMatchMode.Any),
-            () => onSelect(CollectionFacetMatchMode.All),
-            Sizes.FacetModeToggleWidth,
-            Sizes.FacetModeToggleHeight,
-            Sizes.FacetModeFontSize,
-            slanted: true
+    )
+    {
+        var control = new VisualElement();
+        control.style.flexDirection = FlexDirection.Row;
+        control.style.flexShrink = 0f;
+        control.style.alignItems = Align.Center;
+        control.style.marginLeft = UiSpacing.Sm;
+        control.Add(
+            CreateTextMatchModeButton(
+                FacetMatchAnyName,
+                () => onSelect(CollectionFacetMatchMode.Any)
+            )
         );
+        control.Add(
+            CreateTextMatchModeButton(
+                FacetMatchAllName,
+                () => onSelect(CollectionFacetMatchMode.All)
+            )
+        );
+        return control;
+    }
+
+    private Button CreateTextMatchModeButton(string name, Action onClick)
+    {
+        var button = new Button(onClick) { name = name };
+        _typography!.Apply(button);
+        button.style.height = Sizes.FacetModeToggleHeight;
+        button.style.flexShrink = 0f;
+        button.style.fontSize = Sizes.FacetModeFontSize;
+        button.style.unityTextAlign = TextAnchor.MiddleCenter;
+        UiStyle.Padding(button.style, UiSpacing.Xs, UiSpacing.None);
+        button.style.backgroundColor = Color.clear;
+        UiStyle.BorderWidth(button.style, Borders.None);
+        UiStyle.Radius(button.style, 0f);
+        return button;
+    }
 
     private static VisualElement CreateFacetChoiceControl(
         string firstText,
@@ -733,7 +758,8 @@ internal sealed partial class CollectionPanelView
         VisualElement parent,
         string title,
         float marginTop,
-        out VisualElement chipRow
+        out VisualElement chipRow,
+        out VisualElement header
     )
     {
         var section = new VisualElement();
@@ -746,7 +772,7 @@ internal sealed partial class CollectionPanelView
         UiStyle.Padding(section.style, UiSpacing.Md);
         parent.Add(section);
 
-        var header = new VisualElement();
+        header = new VisualElement();
         header.style.flexDirection = FlexDirection.Row;
         header.style.alignItems = Align.Center;
         header.style.marginBottom = UiSpacing.Sm;
@@ -758,6 +784,9 @@ internal sealed partial class CollectionPanelView
             Colors.CollectionFilterTitleText
         );
         label.text = title;
+        label.style.flexGrow = 1f;
+        label.style.flexShrink = 1f;
+        label.style.minWidth = 0f;
         label.style.marginLeft = UiSpacing.Xs;
         label.style.whiteSpace = WhiteSpace.NoWrap;
         header.Add(label);
@@ -795,10 +824,11 @@ internal sealed partial class CollectionPanelView
         content.style.flexGrow = 1f;
         var caption = new Label("DAY") { pickingMode = PickingMode.Ignore };
         caption.style.fontSize = Sizes.FontTiny;
+        caption.style.marginBottom = -2f;
         caption.style.unityTextAlign = TextAnchor.MiddleCenter;
         caption.style.color = Colors.CollectionChipText;
         var value = new Label { pickingMode = PickingMode.Ignore };
-        value.style.fontSize = Sizes.FontBody;
+        value.style.fontSize = Sizes.FontButton;
         value.style.unityTextAlign = TextAnchor.MiddleCenter;
         value.style.color = Colors.CollectionChipText;
         _dayToggleCaption = caption;

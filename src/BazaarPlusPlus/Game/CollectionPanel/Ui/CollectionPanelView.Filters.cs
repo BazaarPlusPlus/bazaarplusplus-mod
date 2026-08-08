@@ -1320,10 +1320,9 @@ internal sealed partial class CollectionPanelView
             _ => Colors.HistoryChipText,
         };
 
-    private static void RefreshMatchModeButton(
+    private static void RefreshTextMatchModeControl(
         VisualElement? control,
-        CollectionFacetMatchMode mode,
-        string tooltip
+        CollectionFacetMatchMode mode
     )
     {
         if (control == null)
@@ -1334,25 +1333,19 @@ internal sealed partial class CollectionPanelView
         if (any == null || all == null)
             return;
 
-        SetFacetChoiceText(any, CollectionPanelText.FacetMatchMode(CollectionFacetMatchMode.Any));
-        SetFacetChoiceText(all, CollectionPanelText.FacetMatchMode(CollectionFacetMatchMode.All));
-        control.tooltip = tooltip;
-        any.tooltip = tooltip;
-        all.tooltip = tooltip;
-        StyleFacetMatchModeSegment(
-            any,
-            mode == CollectionFacetMatchMode.Any,
-            left: true,
-            fontSize: Sizes.FacetModeFontSize,
-            slanted: true
-        );
-        StyleFacetMatchModeSegment(
-            all,
-            mode == CollectionFacetMatchMode.All,
-            left: false,
-            fontSize: Sizes.FacetModeFontSize,
-            slanted: true
-        );
+        any.text = CollectionPanelText.FacetMatchMode(CollectionFacetMatchMode.Any);
+        all.text = CollectionPanelText.FacetMatchMode(CollectionFacetMatchMode.All);
+        StyleTextMatchModeButton(any, mode == CollectionFacetMatchMode.Any);
+        StyleTextMatchModeButton(all, mode == CollectionFacetMatchMode.All);
+    }
+
+    private static void StyleTextMatchModeButton(Button button, bool selected)
+    {
+        button.style.backgroundColor = Color.clear;
+        UiStyle.BorderWidth(button.style, Borders.None);
+        button.style.color = selected
+            ? Colors.CollectionFilterTitleText
+            : Colors.WithAlpha(Colors.CollectionFilterTitleText, 0.48f);
     }
 
     private static void RefreshFacetChoiceControl(

@@ -167,6 +167,11 @@ internal sealed class CollectionViewState
     public CollectionRenderOutcome? SetKeywordMatchMode(CollectionFacetMatchMode mode)
     {
         _filter.KeywordMatchMode = mode;
+        return QueryAndRender(resetControlsScroll: false);
+    }
+
+    public CollectionRenderOutcome? SetTagMatchMode(CollectionFacetMatchMode mode)
+    {
         _filter.TagMatchMode = mode;
         return QueryAndRender(resetControlsScroll: false);
     }

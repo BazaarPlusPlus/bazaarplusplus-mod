@@ -682,6 +682,9 @@ internal sealed class CollectionPanel : MonoBehaviour
         public void SetKeywordMatchMode(CollectionFacetMatchMode mode) =>
             panel.ApplyOutcome(panel._viewState.SetKeywordMatchMode(mode));
 
+        public void SetTagMatchMode(CollectionFacetMatchMode mode) =>
+            panel.ApplyOutcome(panel._viewState.SetTagMatchMode(mode));
+
         public void ToggleSource(string sourceKey) =>
             panel.ApplyOutcome(panel._viewState.ToggleSource(sourceKey));
 
