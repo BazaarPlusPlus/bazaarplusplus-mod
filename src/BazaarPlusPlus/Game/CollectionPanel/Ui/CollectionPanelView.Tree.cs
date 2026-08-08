@@ -52,7 +52,7 @@ internal sealed partial class CollectionPanelView
         UiStyle.Padding(controlDeck.style, UiSpacing.Lg);
         rail.Add(controlDeck);
 
-        // Title + tabs + Close (Close lives here in the operation area, not a top bar).
+        // Title + Close (Close lives here in the operation area, not a top bar).
         var titleRow = new VisualElement();
         titleRow.style.flexDirection = FlexDirection.Row;
         titleRow.style.alignItems = Align.Center;
@@ -67,36 +67,14 @@ internal sealed partial class CollectionPanelView
         _title.style.overflow = Overflow.Hidden;
         titleRow.Add(_title);
 
-        var resetButton = CreateResetButton(_commands.ResetFilters);
-        resetButton.style.marginLeft = UiSpacing.Sm;
-        titleRow.Add(resetButton);
-
-        _tabModeControl = CreateFacetChoiceControl(
-            CollectionPanelText.ItemsTab(),
-            CollectionPanelText.SkillsTab(),
-            () => _commands.SetActiveTab(CollectionTabKind.Items),
-            () => _commands.SetActiveTab(CollectionTabKind.Skills),
-            Sizes.CollectionTabToggleWidth,
-            Sizes.CollectionTabToggleHeight,
-            Sizes.FontBody,
-            slanted: false
-        );
-        _tabModeControl.style.marginLeft = UiSpacing.Sm;
-        _tabModeControl.style.marginRight = UiSpacing.Md;
-        titleRow.Add(_tabModeControl);
-
         _closeButton = CreateCloseButton(_commands.Close);
+        _closeButton.style.marginLeft = UiSpacing.Sm;
         titleRow.Add(_closeButton);
 
+        // Keep the attribution row's own reserved height and wrap behavior: clamping it to chip
+        // height with NoWrap hard-clips supporter names and the sponsor action.
         _subtitle = BPPSupporterAttributionRow.Create();
-        _subtitle.style.flexWrap = Wrap.NoWrap;
         _subtitle.style.overflow = Overflow.Hidden;
-        _subtitle.style.marginTop = UiSpacing.Xl;
-        _subtitle.style.backgroundColor = Colors.CollectionPanelBackground;
-        UiStyle.FixedHeight(_subtitle.style, Sizes.CollectionTabToggleHeight);
-        UiStyle.HorizontalPadding(_subtitle.style, UiSpacing.Md);
-        UiStyle.Border(_subtitle.style, Borders.Thin, Color.black);
-        UiStyle.Radius(_subtitle.style, Radii.CollectionChip);
         controlDeck.Add(_subtitle);
 
         if (_stagingItemIdCopyEnabled)
@@ -113,14 +91,37 @@ internal sealed partial class CollectionPanelView
             controlDeck.Add(_stagingIdCopyLabel);
         }
 
-        var primaryControlsRow = CreateOperationRow(UiSpacing.Md);
+        // The fixed-width toggles below (tab 192 + sort 120 + day/reset 88 plus margins) exceed
+        // the rail's minimum content width, so the row must be allowed to wrap: trailing
+        // controls flow to a second line instead of being clipped by the rail's hidden
+        // overflow. Children carry the row's top margin so wrapped lines stay separated.
+        var primaryControlsRow = CreateOperationRow(UiSpacing.None);
+        primaryControlsRow.style.flexWrap = Wrap.Wrap;
         controlDeck.Add(primaryControlsRow);
 
-        // The search field is deliberately persistent. Sorting is attached to its right edge so
-        // the entire operation row reads as one compact search-and-sort control.
+        // The search field is deliberately persistent. Zero flex-basis keeps the wrap decision
+        // independent of the typed query's width: the field only takes leftover space.
         _searchInputContainer = CreateSearchField();
+        _searchInputContainer.style.flexBasis = 0f;
+        _searchInputContainer.style.marginTop = UiSpacing.Md;
         primaryControlsRow.Add(_searchInputContainer);
-        _searchInputContainer.Add(CreateSortButtonGroup());
+
+        // Catalog choice sits between search and sort, matching the row height so the whole
+        // line reads as one control strip.
+        _tabModeControl = CreateFacetChoiceControl(
+            CollectionPanelText.ItemsTab(),
+            CollectionPanelText.SkillsTab(),
+            () => _commands.SetActiveTab(CollectionTabKind.Items),
+            () => _commands.SetActiveTab(CollectionTabKind.Skills),
+            Sizes.CollectionTabToggleWidth,
+            Sizes.CollectionSearchRowHeight,
+            Sizes.FontBody,
+            slanted: false
+        );
+        _tabModeControl.style.marginTop = UiSpacing.Md;
+        primaryControlsRow.Add(_tabModeControl);
+
+        primaryControlsRow.Add(CreateSortButtonGroup());
 
         _standardOperationControls = new VisualElement();
         _standardOperationControls.style.flexDirection = FlexDirection.Row;
@@ -128,11 +129,17 @@ internal sealed partial class CollectionPanelView
         _standardOperationControls.style.flexWrap = Wrap.NoWrap;
         _standardOperationControls.style.flexShrink = 0f;
         _standardOperationControls.style.marginLeft = UiSpacing.Sm;
+        _standardOperationControls.style.marginTop = UiSpacing.Md;
         primaryControlsRow.Add(_standardOperationControls);
 
         // Compact day-number icon toggle.
         _dayToggleButton = CreateDayToggleButton();
         _standardOperationControls.Add(_dayToggleButton);
+
+        // Reset closes the operation row at the far right, away from the frequent controls.
+        var resetButton = CreateResetButton(_commands.ResetFilters);
+        resetButton.style.marginLeft = UiSpacing.Sm;
+        _standardOperationControls.Add(resetButton);
 
         // The foundational hero/size/quality card is pinned between the control deck and the
         // scrolling filter stack: switching tabs or scrolling secondary filters must not move
@@ -342,19 +349,18 @@ internal sealed partial class CollectionPanelView
         var button = CreateButton(
             string.Empty,
             onClick,
-            Sizes.ButtonStandardHeight,
-            Sizes.ButtonStandardHeight
+            Sizes.CollectionCloseButtonSize,
+            Sizes.CollectionCloseButtonSize
         );
         button.tooltip = CollectionPanelText.Close();
-        StyleButton(button, Colors.HistoryButtonBackground, Colors.CollectionChipText);
-        UiStyle.Radius(button.style, Sizes.ButtonStandardHeight / 2f);
-        UiStyle.Border(button.style, Borders.Thin, Colors.CollectionChipBorder);
+        StyleCollectionChip(button, Colors.CollectionChipBackground, Colors.CollectionChipText);
+        UiStyle.Radius(button.style, Sizes.CollectionCloseButtonSize / 2f);
 
         var icon = new VisualElement { pickingMode = PickingMode.Ignore };
         UiStyle.FixedSize(
             icon.style,
-            Sizes.CollectionSearchIconSize,
-            Sizes.CollectionSearchIconSize
+            Sizes.CollectionCloseIconSize,
+            Sizes.CollectionCloseIconSize
         );
         icon.style.color = Colors.CollectionChipText;
         icon.generateVisualContent += context => DrawCloseIcon(context, icon);
@@ -367,8 +373,8 @@ internal sealed partial class CollectionPanelView
         var button = CreateButton(
             string.Empty,
             onClick,
-            Sizes.CollectionTabToggleHeight,
-            Sizes.CollectionTabToggleHeight
+            Sizes.CollectionSearchRowHeight,
+            Sizes.CollectionSearchRowHeight
         );
         button.tooltip = CollectionPanelText.ResetFilters();
         StyleButton(button, Colors.CollectionChipBackground, Colors.CollectionChipText);
@@ -376,7 +382,7 @@ internal sealed partial class CollectionPanelView
         UiStyle.Border(button.style, Borders.Thin, Colors.CollectionChipBorder);
 
         var icon = new VisualElement { pickingMode = PickingMode.Ignore };
-        UiStyle.FixedSize(icon.style, 16f, 16f);
+        UiStyle.FixedSize(icon.style, 18f, 18f);
         icon.style.marginTop = -0.5f;
         icon.style.color = Colors.WithAlpha(Colors.CollectionChipText, 0.84f);
         icon.generateVisualContent += context => DrawResetIcon(context, icon);
@@ -597,6 +603,7 @@ internal sealed partial class CollectionPanelView
         UiStyle.Radius(group.style, Radii.CollectionChip);
         UiStyle.Border(group.style, Borders.Thin, Colors.CollectionChipBorder);
         group.style.marginLeft = UiSpacing.Sm;
+        group.style.marginTop = UiSpacing.Md;
 
         _sortQualityButton = CreateInlineSortButton(
             CollectionPanelText.SortQuality(),
@@ -1043,8 +1050,13 @@ internal sealed partial class CollectionPanelView
             Colors.HistoryFooterSecondaryText
         );
         _emptyLabel.text = CollectionPanelText.NoMatches();
+        _emptyLabel.pickingMode = PickingMode.Ignore;
+        _emptyLabel.style.position = Position.Absolute;
+        _emptyLabel.style.left = 0f;
+        _emptyLabel.style.right = 0f;
+        _emptyLabel.style.top = 0f;
+        _emptyLabel.style.bottom = 0f;
         _emptyLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
-        _emptyLabel.style.height = 80f;
         _emptyLabel.style.whiteSpace = WhiteSpace.Normal;
         _emptyLabel.style.overflow = Overflow.Hidden;
         _emptyLabel.style.display = DisplayStyle.None;

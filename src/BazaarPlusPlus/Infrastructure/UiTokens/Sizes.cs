@@ -47,6 +47,8 @@ internal static class Sizes
     public const float CollectionSizeChipWidth = 72f;
     public const float CollectionSearchButtonSize = ButtonStandardHeight;
     public const float CollectionSearchIconSize = 18f;
+    public const float CollectionCloseButtonSize = 36f;
+    public const float CollectionCloseIconSize = 24f;
     public const float GhostAllButtonWidth = 70f;
     public const float GhostFilterButtonWidth = 78f;
     public const float ServerHealthButtonWidth = 108f;

@@ -49,8 +49,10 @@ internal static class Colors
     public static Color HistoryFooterSecondaryText => Rgba(0.72f, 0.77f, 0.84f, 0.94f);
 
     // Collection Panel filter chrome follows the compact, near-black tag treatment used by the
-    // native settings backdrop: #101113 with the same ~0.902 alpha as its outer Overlay_P.
-    public static Color CollectionPanelBackground => FromRgb(16, 17, 19, 0.902f);
+    // native settings backdrop (#101113), but fully opaque: the game scene showing through the
+    // full-screen catalog reads as clutter, and the grid occluders reuse this token to hide
+    // cards scrolled outside the viewport, so any alpha here leaks card edges.
+    public static Color CollectionPanelBackground => FromRgb(16, 17, 19, 1f);
     public static Color CollectionFilterCardBackground => FromRgb(22, 24, 28, 1f);
     public static Color CollectionFilterCardBorder => FromRgb(0, 0, 0, 1f);
     public static Color CollectionFilterTitleText => FromRgb(232, 236, 242, 1f);

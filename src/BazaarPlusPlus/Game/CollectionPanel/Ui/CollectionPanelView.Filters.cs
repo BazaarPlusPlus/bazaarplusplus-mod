@@ -377,6 +377,8 @@ internal sealed partial class CollectionPanelView
             if (i % Sizes.SourceChipsPerRow == 0)
             {
                 sourceLine = CreateSourceChipLine();
+                if (i > 0)
+                    sourceLine.style.marginTop = UiSpacing.Xs;
                 _sourceChipRow.Add(sourceLine);
             }
 
@@ -1439,7 +1441,7 @@ internal sealed partial class CollectionPanelView
     private static Color TierTextColor(ETier tier) =>
         tier switch
         {
-            ETier.Bronze => Colors.FromRgb(180, 98, 65, 1f),
+            ETier.Bronze => Colors.FromRgb(222, 150, 110, 1f),
             ETier.Silver => Colors.FromRgb(192, 192, 192, 1f),
             ETier.Gold => Colors.FromRgb(255, 215, 0, 1f),
             ETier.Diamond => Colors.FromRgb(0, 255, 255, 1f),
@@ -1545,7 +1547,6 @@ internal sealed partial class CollectionPanelView
             active ? Colors.CollectionChipSelectedText : Colors.CollectionChipText,
             active
         );
-        UiStyle.BorderColor(_dayToggleButton.style, Color.black);
     }
 
     private void RefreshHeroChip(EHero hero, Button chip, bool selected)
