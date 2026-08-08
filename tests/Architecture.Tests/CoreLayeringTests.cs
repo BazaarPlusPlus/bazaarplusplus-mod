@@ -833,17 +833,16 @@ public class CoreLayeringTests
     }
 
     [Fact]
-    public void Collection_grid_covers_native_card_vertical_overflow_without_blocking_input()
+    public void Collection_grid_uses_a_real_clip_without_foreground_card_occluders()
     {
         var mainSource = MainSourceRoot(RepoRoot());
         var overlaySource = File.ReadAllText(
             Path.Combine(mainSource, "Game", "CollectionPanel", "Grid", "CollectionGridOverlay.cs")
         );
 
-        Assert.Contains("CollectionPanelOverlayBottomOccluder", overlaySource);
-        Assert.Contains("CollectionPanelOverlayTopOccluder", overlaySource);
-        Assert.Contains("LayoutVerticalOccluders();", overlaySource);
-        Assert.Contains("image.raycastTarget = false", overlaySource);
+        Assert.Contains("typeof(RectMask2D)", overlaySource);
+        Assert.DoesNotContain("Occluder", overlaySource);
+        Assert.DoesNotContain("LayoutVerticalOccluders", overlaySource);
         Assert.DoesNotContain("CollectionPanelOverlayLeftOccluder", overlaySource);
         Assert.DoesNotContain("CollectionPanelOverlayRightOccluder", overlaySource);
     }
