@@ -49,7 +49,7 @@ internal static class CollectionPanelText
         "搜尋技能"
     );
 
-    private static readonly LocalizedTextSet HeroHeaderText = new("Hero", "英雄", "英雄");
+    private static readonly LocalizedTextSet HeroHeaderText = new("Basic", "基础", "基礎");
     private static readonly LocalizedTextSet DayHeaderText = new("Day", "天数", "天數");
     private static readonly LocalizedTextSet TierSizeHeaderText = new(
         "Size / Quality",
