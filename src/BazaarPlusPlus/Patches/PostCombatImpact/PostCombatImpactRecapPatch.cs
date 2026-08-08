@@ -183,3 +183,19 @@ internal static class PostCombatImpactTooltipDisablePatch
     private static void Prefix(CardTooltipController __instance) =>
         BppPatchHost.Features.PostCombatImpact.OnNativeTooltipChanging(__instance);
 }
+
+[HarmonyPatch(typeof(BaseTooltipController), "ToggleInteractabilityOnCanvas")]
+internal static class PostCombatImpactTooltipRaycastPassPatch
+{
+    [HarmonyPostfix]
+    private static void Postfix(BaseTooltipController __instance, CanvasGroup ___tooltipCanvasGroup)
+    {
+        if (___tooltipCanvasGroup == null)
+            return;
+
+        BppPatchHost.Features.PostCombatImpact.OnNativeTooltipInteractabilityChanged(
+            __instance,
+            ___tooltipCanvasGroup
+        );
+    }
+}

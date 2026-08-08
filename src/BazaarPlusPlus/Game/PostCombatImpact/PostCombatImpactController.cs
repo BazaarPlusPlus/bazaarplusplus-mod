@@ -362,6 +362,7 @@ internal sealed class PostCombatImpactController : MonoBehaviour
         // Native positioning clears the lock as it completes. Apply it only after HasShown so the
         // Recap proxy's board CardController cannot tear the primary Tooltip down on the next tick.
         primary.SetLockedFlag(true);
+        SuppressTooltipRaycasts(primary);
 
         if (!IsCurrentHover(request, revision))
         {
@@ -782,6 +783,31 @@ internal sealed class PostCombatImpactController : MonoBehaviour
         _selectedSourceId = null;
         _activePrimaryTooltip = null;
         _activeAuxiliaryTooltip = null;
+    }
+
+    internal void OnNativeTooltipInteractabilityChanged(
+        BaseTooltipController controller,
+        CanvasGroup canvasGroup
+    )
+    {
+        if (canvasGroup.blocksRaycasts && OwnsNativeTooltip(controller))
+            SuppressTooltipRaycasts(controller);
+    }
+
+    private bool OwnsNativeTooltip(BaseTooltipController controller) =>
+        ReferenceEquals(_pendingPrimaryTooltip, controller)
+        || ReferenceEquals(_activePrimaryTooltip, controller)
+        || ReferenceEquals(_pendingAuxiliaryController, controller)
+        || ReferenceEquals(_activeAuxiliaryTooltip, controller);
+
+    private static void SuppressTooltipRaycasts(BaseTooltipController controller)
+    {
+        var canvasGroup = controller.tooltipCanvasGroup;
+        if (canvasGroup == null)
+            return;
+
+        canvasGroup.blocksRaycasts = false;
+        canvasGroup.interactable = false;
     }
 
     internal void OnNativeTooltipPreparing(

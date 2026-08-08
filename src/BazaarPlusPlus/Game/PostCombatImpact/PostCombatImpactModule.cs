@@ -49,6 +49,11 @@ internal interface IPostCombatImpactModule
 
     void OnNativeTooltipChanging(CardTooltipController controller);
 
+    void OnNativeTooltipInteractabilityChanged(
+        BaseTooltipController controller,
+        CanvasGroup canvasGroup
+    );
+
     void OnNativeAuxiliaryTooltipShowing(
         AuxiliaryTooltipController controller,
         Transform anchor,
@@ -147,6 +152,11 @@ internal sealed class PostCombatImpactModule : IBppFeature, IPostCombatImpactMod
 
     public void OnNativeTooltipChanging(CardTooltipController controller) =>
         _runtime?.OnNativeTooltipChanging(controller);
+
+    public void OnNativeTooltipInteractabilityChanged(
+        BaseTooltipController controller,
+        CanvasGroup canvasGroup
+    ) => _runtime?.OnNativeTooltipInteractabilityChanged(controller, canvasGroup);
 
     public void OnNativeAuxiliaryTooltipShowing(
         AuxiliaryTooltipController controller,
