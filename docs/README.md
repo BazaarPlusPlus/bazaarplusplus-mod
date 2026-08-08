@@ -36,11 +36,11 @@ Each layer owns one thing, and links rather than restating: `CLAUDE.md` owns pro
 
 **Work goes to GitHub issues, not to this tree.** Task plans, feature requests, bugs, acceptance checklists, implementation orders, and "pending confirmation" notes are issues. A document here describes how the system is, not what someone intends to do next.
 
-**`drafts/` is the write buffer for knowledge documents only** — design records, root-cause analyses, decision analyses produced mid-session. A consolidation run promotes each draft's durable outcomes into MEMORY, an ADR, or ARCHITECTURE, moves any remaining work to issues, and then deletes the draft. The directory therefore exists only while unswept drafts are pending. `tests/docs/DocsHygieneTests.cs` fails when a draft goes stale.
+**`drafts/` is the write buffer for knowledge documents only** — design records, root-cause analyses, decision analyses produced mid-session. A consolidation run promotes each draft's durable outcomes into MEMORY, an ADR, or ARCHITECTURE, moves any remaining work to issues, and then deletes the draft. The directory therefore exists only while unswept drafts are pending. `tests/Architecture.Tests/DocsHygieneTests.cs` fails when a draft goes stale.
 
 **Edit policy.** `ARCHITECTURE.md`, `architecture/`, `contracts/`, and `adr/` may be corrected the moment the code drifts. `MEMORY.md` and this file are curated by consolidation runs, so new knowledge goes to `drafts/` first.
 
-**Budgets are in bytes, not lines.** `CLAUDE.md` and `MEMORY.md` carry dense one-line entries, so a line count says nothing about what they cost an agent. The enforced ceilings live in `tests/docs/DocsHygieneTests.cs`; keeping under them means merging entries, not appending. `MEMORY.md`'s Gotchas section is exempt — that section is the reason the file exists, and compressing it to hit a budget defeats the budget.
+**Budgets are in bytes, not lines.** `CLAUDE.md` and `MEMORY.md` carry dense one-line entries, so a line count says nothing about what they cost an agent. The enforced ceilings live in `tests/Architecture.Tests/DocsHygieneTests.cs`; keeping under them means merging entries, not appending. `MEMORY.md`'s Gotchas section is exempt — that section is the reason the file exists, and compressing it to hit a budget defeats the budget.
 
 ## Historical material
 
