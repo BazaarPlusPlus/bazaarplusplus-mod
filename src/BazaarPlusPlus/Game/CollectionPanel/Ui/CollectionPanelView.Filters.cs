@@ -105,14 +105,11 @@ internal sealed partial class CollectionPanelView
         if (_sizeChipRow == null)
             return;
         if (SizeChipsMatch(sizes))
+        {
+            ApplySizeChipLayout(sizes);
             return;
+        }
         ClearChipRow(_sizeChips, _sizeChipRow, keepFirst: false);
-        var segmentWidth =
-            sizes.Count * Sizes.CollectionSizeChipWidth
-            + Mathf.Max(0, sizes.Count - 1) * Borders.Thin
-            + Borders.Thin * 2f;
-        UiStyle.FixedWidth(_sizeChipRow.style, segmentWidth);
-        _sizeChipRow.style.flexBasis = segmentWidth;
         var index = 0;
         foreach (var size in sizes)
         {
@@ -129,7 +126,28 @@ internal sealed partial class CollectionPanelView
             _sizeChipRow.Add(chip);
             index++;
         }
+        ApplySizeChipLayout(sizes);
     }
+
+    private void ApplySizeChipLayout(IReadOnlyList<ECardSize> sizes)
+    {
+        if (_sizeChipRow == null)
+            return;
+
+        var chipWidth = CurrentSizeChipWidth();
+        var segmentWidth =
+            sizes.Count * chipWidth
+            + Mathf.Max(0, sizes.Count - 1) * Borders.Thin
+            + Borders.Thin * 2f;
+        UiStyle.FixedWidth(_sizeChipRow.style, segmentWidth);
+        _sizeChipRow.style.flexBasis = segmentWidth;
+        foreach (var chip in _sizeChips.Values)
+            UiStyle.FixedWidth(chip.style, chipWidth);
+    }
+
+    private static float CurrentSizeChipWidth() =>
+        Sizes.CollectionSizeChipWidth
+        + (CollectionPanelText.IsChineseLanguage() ? 0f : UiSpacing.Sm);
 
     private Button CreateSizeChipButton(ECardSize size, Action onClick)
     {
@@ -137,13 +155,13 @@ internal sealed partial class CollectionPanelView
         chip.style.paddingLeft = UiSpacing.Md;
         chip.style.paddingRight = UiSpacing.Md;
         // Custom content uses a deterministic width rather than Button.text measurement.
-        UiStyle.FixedWidth(chip.style, Sizes.CollectionSizeChipWidth);
+        UiStyle.FixedWidth(chip.style, CurrentSizeChipWidth());
         chip.style.flexDirection = FlexDirection.Row;
         chip.style.alignItems = Align.Center;
         chip.style.justifyContent = Justify.Center;
         var icon = new VisualElement { name = SizeChipIconName, pickingMode = PickingMode.Ignore };
         UiStyle.FixedSize(icon.style, 18f, 14f);
-        icon.style.marginRight = UiSpacing.Xs;
+        icon.style.marginRight = CollectionPanelText.IsChineseLanguage() ? UiSpacing.Xs : 0f;
         icon.style.display = CollectionPanelText.IsChineseLanguage()
             ? DisplayStyle.Flex
             : DisplayStyle.None;
@@ -1317,6 +1335,16 @@ internal sealed partial class CollectionPanelView
             selected ? Colors.CollectionChipSelectedText : Colors.CollectionChipText,
             selected
         );
+
+    private static void RefreshSourceChip(Button chip, bool selected)
+    {
+        RefreshChip(chip, selected);
+        UiStyle.Border(
+            chip.style,
+            selected ? Borders.Accent : Borders.Thin,
+            selected ? Colors.HistoryGoldAccent : Colors.CollectionChipBorder
+        );
+    }
 
     private static void RefreshSortChip(Button chip, bool selected) =>
         StyleCollectionGroupChip(

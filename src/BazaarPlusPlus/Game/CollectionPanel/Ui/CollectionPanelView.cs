@@ -395,7 +395,7 @@ internal sealed partial class CollectionPanelView : IDisposable
         }
         foreach (var pair in _sourceChips)
         {
-            RefreshChip(
+            RefreshSourceChip(
                 pair.Value,
                 string.Equals(pair.Key, model.SelectedSourceKey, StringComparison.Ordinal)
             );

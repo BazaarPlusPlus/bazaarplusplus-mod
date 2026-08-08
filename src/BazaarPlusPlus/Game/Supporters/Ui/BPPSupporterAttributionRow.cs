@@ -16,7 +16,7 @@ internal static class BPPSupporterAttributionRow
         row.style.flexDirection = FlexDirection.Row;
         row.style.flexWrap = Wrap.Wrap;
         row.style.alignItems = Align.Center;
-        row.style.marginTop = UiSpacing.Sm;
+        row.style.marginTop = UiSpacing.Md;
         UiStyle.FixedHeight(row.style, Sizes.SupporterAttributionReservedHeight);
         return row;
     }
