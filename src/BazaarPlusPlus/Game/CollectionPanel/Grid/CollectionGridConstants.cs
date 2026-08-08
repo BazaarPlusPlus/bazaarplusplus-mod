@@ -36,7 +36,7 @@ internal static class CollectionGridConstants
 
     // Fraction of a cell kept as breathing room on every side so the native card sits inside
     // its slot (the slot background then reads as a frame around it) instead of touching edges.
-    public const float CellContentInset = 0.06f;
+    public const float CellContentInset = 0.07f;
 
     public const int RowOverscan = 1;
 
