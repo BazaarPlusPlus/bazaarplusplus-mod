@@ -268,6 +268,89 @@ public class CoreLayeringTests
         }
     }
 
+    [Fact]
+    public void Collection_search_svg_icon_chain_stays_removed()
+    {
+        var repoRoot = RepoRoot();
+        var mainSource = MainSourceRoot(repoRoot);
+        var retiredTypeName = "CollectionSearchSvg" + "IconData";
+        var collectionResources = Path.Combine(mainSource, "Resources", "Collection");
+
+        Assert.False(
+            File.Exists(
+                Path.Combine(mainSource, "Game", "CollectionPanel", "Ui", retiredTypeName + ".cs")
+            ),
+            "The unused Collection search SVG parser must stay removed."
+        );
+        Assert.False(
+            File.Exists(Path.Combine(collectionResources, "search.svg")),
+            "The unused Collection search SVG resource must stay removed."
+        );
+        Assert.False(
+            File.Exists(Path.Combine(collectionResources, "close.svg")),
+            "The unused Collection close SVG resource must stay removed."
+        );
+
+        var typeViolations = new List<string>();
+        foreach (var root in new[] { mainSource, Path.Combine(repoRoot, "tests") })
+        {
+            foreach (
+                var file in Directory
+                    .EnumerateFiles(root, "*", SearchOption.AllDirectories)
+                    .Where(path =>
+                        path.EndsWith(".cs", StringComparison.Ordinal)
+                        || path.EndsWith(".csproj", StringComparison.Ordinal)
+                    )
+            )
+            {
+                if (File.ReadAllText(file).Contains(retiredTypeName, StringComparison.Ordinal))
+                    typeViolations.Add(Path.GetRelativePath(repoRoot, file).Replace('\\', '/'));
+            }
+        }
+
+        Assert.True(
+            typeViolations.Count == 0,
+            "No source or pinned test include may retain the retired Collection SVG parser:\n"
+                + string.Join("\n", typeViolations)
+        );
+
+        var resourceViolations = new List<string>();
+        var retiredResourcePaths = new[]
+        {
+            @"Resources\Collection\search.svg",
+            @"Resources\Collection\close.svg",
+        };
+        foreach (
+            var root in new[] { Path.Combine(repoRoot, "src"), Path.Combine(repoRoot, "tests") }
+        )
+        {
+            foreach (
+                var project in Directory.EnumerateFiles(
+                    root,
+                    "*.csproj",
+                    SearchOption.AllDirectories
+                )
+            )
+            {
+                var projectSource = File.ReadAllText(project).Replace('/', '\\');
+                if (
+                    retiredResourcePaths.Any(path =>
+                        projectSource.Contains(path, StringComparison.Ordinal)
+                    )
+                )
+                    resourceViolations.Add(
+                        Path.GetRelativePath(repoRoot, project).Replace('\\', '/')
+                    );
+            }
+        }
+
+        Assert.True(
+            resourceViolations.Count == 0,
+            "No project may retain the retired Collection SVG resources:\n"
+                + string.Join("\n", resourceViolations)
+        );
+    }
+
     // Feature-scoped ratchet, not a repo-wide layering rule: Game/ may legitimately reference
     // TheBazaar.* elsewhere (Game/Tooltips does). This locks in the decision that CollectionPanel
     // consumes native tooltip typography through the GameInterop.TagTypography seam instead of
@@ -2057,6 +2140,10 @@ public class CoreLayeringTests
         Assert.Contains("searchFallbacks: true", titleOverlaySource);
         Assert.Contains("tryAddCharacter: true", titleOverlaySource);
         Assert.Contains("_title.GetPreferredValues(_title.text)", titleOverlaySource);
+        Assert.Contains(
+            "typography.Apply(_title) == NativeGameTypography.Outcome.Applied",
+            titleOverlaySource
+        );
         Assert.Contains(
             "_title.ForceMeshUpdate(ignoreActiveState: true, forceTextReparsing: true)",
             titleOverlaySource

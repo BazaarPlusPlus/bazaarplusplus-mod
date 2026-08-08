@@ -49,21 +49,14 @@ internal sealed class CollectionQueryResult
 {
     public CollectionQueryResult(
         IReadOnlyList<CollectionCardVm> cards,
-        IReadOnlyDictionary<Guid, IReadOnlyList<CollectionSourceOfferMatch>>? offerMatchesByCardId,
         CollectionFilterNormalization normalization
     )
     {
         Cards = cards;
-        OfferMatchesByCardId = offerMatchesByCardId;
         Normalization = normalization;
     }
 
     public IReadOnlyList<CollectionCardVm> Cards { get; }
-
-    public IReadOnlyDictionary<
-        Guid,
-        IReadOnlyList<CollectionSourceOfferMatch>
-    >? OfferMatchesByCardId { get; }
 
     public CollectionFilterNormalization Normalization { get; }
 }
@@ -100,8 +93,6 @@ internal static class CollectionQuery
 
         var sourceResolution = ResolveSelectedSource(filter, sourceCatalog);
         IReadOnlyCollection<Guid>? offeredCardIds = null;
-        IReadOnlyDictionary<Guid, IReadOnlyList<CollectionSourceOfferMatch>>? offerMatchesByCardId =
-            null;
         if (sourceResolution.Source != null)
         {
             var offerPoolResult = offerPoolResolver.GetOrResolve(
@@ -112,7 +103,6 @@ internal static class CollectionQuery
             if (offerPoolResult.Status == CollectionSourceOfferPoolStatus.Ready)
             {
                 offeredCardIds = offerPoolResult.OfferedCardIds;
-                offerMatchesByCardId = offerPoolResult.OfferMatchesByCardId;
             }
         }
 
@@ -143,7 +133,7 @@ internal static class CollectionQuery
             retainedKeywords,
             retainedMechanics
         );
-        return new CollectionQueryResult(ordered, offerMatchesByCardId, normalization);
+        return new CollectionQueryResult(ordered, normalization);
     }
 
     private static IReadOnlyCollection<ECardTag>? RetainedTags(
