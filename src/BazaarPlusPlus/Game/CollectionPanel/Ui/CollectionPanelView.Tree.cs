@@ -189,7 +189,7 @@ internal sealed partial class CollectionPanelView
             out _,
             card: false
         );
-        tierSizeChipRow.style.flexWrap = Wrap.Wrap;
+        tierSizeChipRow.style.flexWrap = Wrap.NoWrap;
         tierSizeChipRow.style.justifyContent = Justify.FlexStart;
         _sizeChipRow = CreateCombinedFilterChipSegment();
         _tierChipRow = CreateCombinedFilterChipSegment();

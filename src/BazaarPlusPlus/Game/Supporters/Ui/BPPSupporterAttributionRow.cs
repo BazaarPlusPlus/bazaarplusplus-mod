@@ -157,7 +157,7 @@ internal static class BPPSupporterAttributionRow
         button.style.minWidth = Sizes.SupporterActionMinWidth;
         button.style.flexGrow = 0f;
         button.style.flexShrink = 0f;
-        button.style.marginLeft = UiSpacing.Sm;
+        button.style.marginLeft = StyleKeyword.Auto;
         button.style.marginTop = 2f;
         button.style.marginBottom = 2f;
         button.style.fontSize = Sizes.FontSmall;

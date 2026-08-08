@@ -55,7 +55,10 @@ internal sealed partial class CollectionPanelView
         if (_tierChipRow == null)
             return;
         if (TierChipsMatch(tiers))
+        {
+            ApplyTierChipLayout();
             return;
+        }
         ClearChipRow(_tierChips, _tierChipRow, keepFirst: false);
         var index = 0;
         foreach (var tier in tiers)
@@ -68,13 +71,24 @@ internal sealed partial class CollectionPanelView
                 () => _commands.ToggleTier(tier),
                 contentWidth: true
             );
-            UiStyle.HorizontalPadding(chip.style, UiSpacing.Lg);
+            UiStyle.HorizontalPadding(chip.style, CurrentTierChipHorizontalPadding());
             StyleCollectionGroupChip(chip, Colors.CollectionChipBackground, TierTextColor(tier));
             _tierChips[tier] = chip;
             _tierChipRow.Add(chip);
             index++;
         }
+        ApplyTierChipLayout();
     }
+
+    private void ApplyTierChipLayout()
+    {
+        var horizontalPadding = CurrentTierChipHorizontalPadding();
+        foreach (var chip in _tierChips.Values)
+            UiStyle.HorizontalPadding(chip.style, horizontalPadding);
+    }
+
+    private static float CurrentTierChipHorizontalPadding() =>
+        CollectionPanelText.IsChineseLanguage() ? UiSpacing.Lg : UiSpacing.Sm;
 
     private bool HeroChipsMatch(IReadOnlyList<EHero> heroes)
     {
