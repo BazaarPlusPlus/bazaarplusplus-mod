@@ -119,6 +119,41 @@ public sealed class NativePairedTooltipArchitectureTests
     }
 
     [Fact]
+    public void Combat_impact_lock_keeps_owned_native_tooltips_raycast_transparent()
+    {
+        var sourceRoot = MainSourceRoot(RepoRoot());
+        var controller = File.ReadAllText(
+            Path.Combine(sourceRoot, "Game", "PostCombatImpact", "PostCombatImpactController.cs")
+        );
+        var patch = File.ReadAllText(
+            Path.Combine(sourceRoot, "Patches", "PostCombatImpact", "PostCombatImpactRecapPatch.cs")
+        );
+
+        var lockCall = controller.IndexOf("primary.SetLockedFlag(true);", StringComparison.Ordinal);
+        var initialSuppression = controller.IndexOf(
+            "SuppressTooltipRaycasts(primary);",
+            lockCall,
+            StringComparison.Ordinal
+        );
+        Assert.True(lockCall >= 0 && initialSuppression > lockCall);
+
+        Assert.Contains("OwnsNativeTooltip(controller)", controller, StringComparison.Ordinal);
+        Assert.Contains(
+            "canvasGroup.blocksRaycasts = false;",
+            controller,
+            StringComparison.Ordinal
+        );
+        Assert.Contains("canvasGroup.interactable = false;", controller, StringComparison.Ordinal);
+        Assert.Contains(
+            "[HarmonyPatch(typeof(BaseTooltipController), \"ToggleInteractabilityOnCanvas\")]",
+            patch,
+            StringComparison.Ordinal
+        );
+        Assert.Contains("[HarmonyPostfix]", patch, StringComparison.Ordinal);
+        Assert.Contains("OnNativeTooltipInteractabilityChanged(", patch, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Cancelling_a_prepared_auxiliary_keeps_it_concealed_until_native_teardown()
     {
         var host = File.ReadAllText(
@@ -134,7 +169,7 @@ public sealed class NativePairedTooltipArchitectureTests
             StringComparison.Ordinal
         );
         var methodEnd = host.IndexOf(
-            "internal void ReleasePrepared",
+            "internal bool ReleaseForNativeShow",
             methodStart,
             StringComparison.Ordinal
         );
@@ -201,6 +236,61 @@ public sealed class NativePairedTooltipArchitectureTests
         Assert.True(
             reuseCheck >= 0 && reuseClose > reuseCheck && recreate > reuseClose,
             "a matching held gate must be reused closed before the restore-then-recreate fallback"
+        );
+    }
+
+    [Fact]
+    public void A_new_native_show_reactivates_pooled_text_nodes_before_assigning_content()
+    {
+        var host = File.ReadAllText(
+            Path.Combine(
+                MainSourceRoot(RepoRoot()),
+                "GameInterop",
+                "Tooltips",
+                "NativePairedTooltipHost.cs"
+            )
+        );
+        var releaseStart = host.IndexOf(
+            "internal bool ReleaseForNativeShow",
+            StringComparison.Ordinal
+        );
+        var releaseEnd = host.IndexOf(
+            "// ── Open / content",
+            releaseStart,
+            StringComparison.Ordinal
+        );
+        Assert.True(releaseStart >= 0 && releaseEnd > releaseStart);
+        var release = host[releaseStart..releaseEnd];
+        Assert.Contains("RestorePreparedNativeHostForNativeShow(controller);", release);
+
+        var restoreStart = host.IndexOf(
+            "internal void RestoreForNativeShow()",
+            StringComparison.Ordinal
+        );
+        Assert.True(restoreStart >= 0);
+        var restore = host[restoreStart..];
+        Assert.Contains("Restore(restoreContentVisibility: false);", restore);
+        Assert.Contains("Controller.headerText.gameObject.SetActive(true);", restore);
+        Assert.Contains("Controller.bodyText.gameObject.SetActive(true);", restore);
+        Assert.DoesNotContain("Controller.dividerParent.SetActive", restore);
+    }
+
+    [Fact]
+    public void Native_auxiliary_anomaly_storms_are_partitioned_by_category_and_phase()
+    {
+        var events = File.ReadAllText(
+            Path.Combine(
+                MainSourceRoot(RepoRoot()),
+                "Game",
+                "PostCombatImpact",
+                "PostCombatImpactLogEvents.cs"
+            )
+        );
+
+        Assert.Contains(
+            "new BppLogStormPolicy([AnomalyCategory, AnomalyPhase])",
+            events,
+            StringComparison.Ordinal
         );
     }
 

@@ -220,17 +220,22 @@ internal sealed class NativePairedTooltipSession
     }
 
     /// <summary>
-    /// Hands back a prepared-but-not-active native host snapshot.
+    /// Hands the pooled host to a confirmed new native show, releasing an active custom
+    /// presentation when necessary.
     /// </summary>
     /// <remarks>
-    /// Called when some other code is about to show the native auxiliary tooltip this session had
-    /// only prepared. Skipping this leaves the native layout's padding and anchors permanently
-    /// rewritten.
+    /// Native Show does not reactivate header/body, so this handoff restores native geometry and
+    /// normalizes those text nodes instead of blindly replaying an inactive captured state.
     /// </remarks>
-    internal void ReleasePrepared(AuxiliaryTooltipController controller)
+    internal bool ReleaseForNativeShow(AuxiliaryTooltipController controller)
     {
-        RestorePreparedNativeHost(restoreContentVisibility: true, expectedController: controller);
+        var displacedActivePresentation = OwnsAuxiliary(controller);
+        if (displacedActivePresentation)
+            Release(restoreNativeContent: false);
+
+        RestorePreparedNativeHostForNativeShow(controller);
         RestorePreparedAuxiliaryGate(expectedController: controller);
+        return displacedActivePresentation;
     }
 
     // ── Open / content ─────────────────────────────────────────────────────────────────────
@@ -728,6 +733,20 @@ internal sealed class NativePairedTooltipSession
         _preparedNativeHost.Restore(restoreContentVisibility);
         if (restoreContentVisibility)
             _preparedNativeHost = null;
+    }
+
+    private void RestorePreparedNativeHostForNativeShow(
+        AuxiliaryTooltipController expectedController
+    )
+    {
+        if (
+            _preparedNativeHost == null
+            || !ReferenceEquals(_preparedNativeHost.Controller, expectedController)
+        )
+            return;
+
+        _preparedNativeHost.RestoreForNativeShow();
+        _preparedNativeHost = null;
     }
 
     private void RestorePreparedAuxiliaryGate(AuxiliaryTooltipController? expectedController = null)
@@ -1318,6 +1337,21 @@ internal sealed class NativePairedTooltipSession
                 Controller.backgroundImage.sprite = _backgroundSprite;
                 Controller.backgroundImage.enabled = _backgroundImageWasEnabled;
             }
+        }
+
+        internal void RestoreForNativeShow()
+        {
+            // A pooled auxiliary can arrive here after Combat Impact deliberately kept the
+            // native text nodes inactive through teardown. The native Show method only assigns
+            // strings; it never reactivates header/body, so restoring that captured inactive
+            // state would render a layout-collapsed background with no content. A confirmed new
+            // native show owns fresh content: restore geometry/art, normalize its text nodes, and
+            // leave divider visibility to the native showDivider argument that runs next.
+            Restore(restoreContentVisibility: false);
+            if (Controller.headerText != null)
+                Controller.headerText.gameObject.SetActive(true);
+            if (Controller.bodyText != null)
+                Controller.bodyText.gameObject.SetActive(true);
         }
     }
 }

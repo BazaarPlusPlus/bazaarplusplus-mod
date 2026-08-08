@@ -33,39 +33,22 @@ internal sealed class HistoryPanelReplayService
         _ghostSyncService = ghostSyncService;
     }
 
-    // Capture the Unity-owned dimensions/FPS on the UI thread, then resolve FFmpeg and its
-    // actual-settings encoder profile in the background. Per-refresh gates only read warm state.
+    // Capture Unity-owned dimensions/FPS and load the desktop native plugin on the UI thread.
     public void PrewarmRecordingAvailability()
     {
-        var pluginsDirectoryPath = _pluginsDirectoryPath;
-        var videoDirectoryPath = _videoDirectoryPath;
-        var hasSettings = ReplayVideoCaptureSettingsCache.TryCaptureCurrent(
-            out var captureSettings
-        );
-        _ = Task.Run(() =>
+        ReplayVideoCaptureSettingsCache.TryCaptureCurrent(out _);
+        var backend = ReplayVideoBackendPolicy.Current;
+        if (backend == ReplayVideoBackend.MacNative)
         {
-            var ffmpegExecutable = FfmpegLocator.Resolve(pluginsDirectoryPath);
-            if (
-                hasSettings
-                && !string.IsNullOrWhiteSpace(ffmpegExecutable)
-                && !string.IsNullOrWhiteSpace(videoDirectoryPath)
-            )
-            {
-                FfmpegVideoEncoderSelector.Prewarm(
-                    ffmpegExecutable,
-                    videoDirectoryPath,
-                    captureSettings.Width,
-                    captureSettings.Height,
-                    captureSettings.Fps
-                );
-            }
-        });
+            MacMetalVideoEncoder.TryGetAvailability(out _);
+            return;
+        }
+        if (backend == ReplayVideoBackend.WindowsNative)
+            WindowsMediaFoundationVideoEncoder.TryGetAvailability(out _);
     }
 
     // Recording is feasible only when the replay itself can run AND the shared recording gate
-    // passes (async GPU readback + ffmpeg + video directory — the same gate the recorder
-    // enforces at capture time). FfmpegLocator.Resolve hits the prewarmed cache here (no probe
-    // on the UI thread).
+    // passes (a native desktop encoder plus a video directory). The backend probe is warm here.
     public bool CanRecordReplay(HistoryBattleRecord? battle, out string reason)
     {
         return CanRecordReplay(battle, out reason, out _);

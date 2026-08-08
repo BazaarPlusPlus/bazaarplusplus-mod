@@ -7,30 +7,17 @@ internal static class CombatImpactMetricFormatter
 {
     internal static string CausedSummary(CombatImpactSource source, bool chinese)
     {
-        var parts = new List<string>();
         var isSkill = string.Equals(
             source.Entity.TypeLabel,
             "Skill",
             StringComparison.OrdinalIgnoreCase
         );
-        if (isSkill && source.TriggerCount > 0)
-        {
-            parts.Add(
-                chinese
-                    ? $"触发 {source.TriggerCount} 次"
-                    : $"{source.TriggerCount} trigger{(source.TriggerCount == 1 ? string.Empty : "s")}"
-            );
-        }
-        else if (!isSkill && source.UseCount > 0)
-        {
-            parts.Add(
-                chinese
-                    ? $"使用 {source.UseCount} 次"
-                    : $"{source.UseCount} use{(source.UseCount == 1 ? string.Empty : "s")}"
-            );
-        }
+        if (isSkill || source.UseCount <= 0)
+            return string.Empty;
 
-        return string.Join(" · ", parts);
+        return chinese
+            ? $"使用 {source.UseCount} 次"
+            : $"{source.UseCount} use{(source.UseCount == 1 ? string.Empty : "s")}";
     }
 
     internal static string TriggerSources(CombatImpactGroup group, bool chinese)
@@ -47,13 +34,23 @@ internal static class CombatImpactMetricFormatter
     internal static string TriggerSourceLabel(bool chinese) =>
         chinese ? "触发来源：" : "Triggered by:";
 
-    internal static string TriggerSourceValues(CombatImpactGroup group) =>
-        string.Join(
+    internal static string TriggerSourceValues(CombatImpactGroup group)
+    {
+        if (
+            group.TriggerPresentationState
+                is CombatImpactTriggerPresentationState.None
+                    or CombatImpactTriggerPresentationState.HiddenSelfOnly
+            || group.TriggerSources.Count == 0
+        )
+            return string.Empty;
+
+        return string.Join(
             " · ",
             group.TriggerSources.Select(trigger =>
-                $"{trigger.Entity.Name.Replace('\n', ' ')} ×{trigger.Count}"
+                $"{trigger.Entity.Name.Replace('\n', ' ')} ×{trigger.ObservedActivationBatchCount}"
             )
         );
+    }
 
     internal static string Group(
         CombatImpactGroup group,
@@ -91,9 +88,13 @@ internal static class CombatImpactMetricFormatter
             )
             {
                 parts.Add(
-                    chinese
-                        ? $"生效 {authoritative.Value} 次"
-                        : $"{authoritative.Value} application{(authoritative.Value == 1 ? string.Empty : "s")}"
+                    authoritative.CanReconcileApplicationCount
+                        ? chinese
+                            ? $"生效 {authoritative.Value} 次"
+                            : $"{authoritative.Value} application{(authoritative.Value == 1 ? string.Empty : "s")}"
+                        : chinese
+                            ? $"影响 {authoritative.Value} 张卡牌"
+                            : $"{authoritative.Value} card{(authoritative.Value == 1 ? string.Empty : "s")} affected"
                 );
             }
         }
@@ -115,7 +116,7 @@ internal static class CombatImpactMetricFormatter
         var parts = new List<string>();
         if (impact.HealthAmount > 0)
         {
-            var amount = Integer(impact.HealthAmount);
+            var amount = PeriodicAmount(impact.HealthAmount);
             var isRegen =
                 group.Kind == CombatImpactKind.AttributeChange
                 && group.NativeAttributeKey == "RegenApplyAmount";
@@ -134,7 +135,7 @@ internal static class CombatImpactMetricFormatter
 
         if (impact.ShieldAmount > 0)
         {
-            var amount = Integer(impact.ShieldAmount);
+            var amount = PeriodicAmount(impact.ShieldAmount);
             parts.Add(
                 string.IsNullOrWhiteSpace(shieldMarker)
                     ? chinese
@@ -156,9 +157,6 @@ internal static class CombatImpactMetricFormatter
                 : string.Empty;
 
         var value = Value(target.ObservedValue.Value, target.Unit, ShouldShowSign(group), chinese);
-        var needsObservedBasis = group.HasDivergentTargetCoverage;
-        if (needsObservedBasis)
-            value = chinese ? $"已记录 {value}" : $"{value} recorded";
         return ShouldShowCount(group.Kind, group.Surface, group.OccurrenceBasis)
             ? $"{count} · {value}"
             : value;
@@ -212,6 +210,7 @@ internal static class CombatImpactMetricFormatter
             surface == CombatImpactEventSurface.AppliedEffect
             && nativeAttributeKey
                 is "RegenApplyAmount"
+                    or "TempoApplyAmount"
                     or "TempoRemoveAmount"
                     or "BurnRemoveAmount"
                     or "PoisonRemoveAmount"
@@ -248,28 +247,6 @@ internal static class CombatImpactMetricFormatter
             : value;
     }
 
-    internal static IReadOnlyList<string> CausedDisclosures(
-        CombatImpactSource? source,
-        bool chinese
-    )
-    {
-        if (source == null)
-            return [];
-
-        var disclosures = new List<string>();
-        var unresolvedTargetCount = source.Groups.Sum(group => group.UnresolvedTargetCount);
-        if (unresolvedTargetCount > 0)
-        {
-            disclosures.Add(
-                chinese
-                    ? $"* 明细不完整：{unresolvedTargetCount} 个效果缺少目标数据。"
-                    : $"* Partial breakdown: {unresolvedTargetCount} effect{(unresolvedTargetCount == 1 ? string.Empty : "s")} had no target data."
-            );
-        }
-
-        return disclosures;
-    }
-
     internal static string Value(
         int value,
         CombatImpactValueUnit unit,
@@ -299,4 +276,8 @@ internal static class CombatImpactMetricFormatter
             : value.ToString("0.00", CultureInfo.InvariantCulture);
 
     private static string Integer(int value) => value.ToString("N0", CultureInfo.InvariantCulture);
+
+    private static string Integer(long value) => value.ToString("N0", CultureInfo.InvariantCulture);
+
+    private static string PeriodicAmount(int value) => Integer(value);
 }

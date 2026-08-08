@@ -1,6 +1,8 @@
 #nullable enable
+using BazaarGameClient.Domain.Models.Cards;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.Input;
+using BazaarPlusPlus.GameInterop.Cards;
 using BazaarPlusPlus.GameInterop.Fonts;
 using BazaarPlusPlus.GameInterop.TagTypography;
 using TheBazaar;
@@ -11,15 +13,22 @@ using UnityEngine.UI;
 namespace BazaarPlusPlus.Game.MusicNotes;
 
 /// <summary>
-/// Hold-to-peek badge overlay for the music-note board mechanic: while the shared preview
-/// modifier (HoldUpgradePreview, default Shift) is held outside combat/recap/replay, every
+/// Key-activated badge overlay for the music-note board mechanic: while the shared preview
+/// action (HoldUpgradePreview, default Shift) is active outside combat/recap/replay, every
 /// unlocked player socket shows the note letter it holds — or, via the anchor rule, the letter
 /// it would become — under the socket. Placed notes render as a chip tinted with the letter's
-/// category accent color; implied letters render as dim neutral chips. Each letter's
-/// item-category identity (Burn, Heal, Weapon, ...) comes from the note templates' condition
-/// graphs and reuses the game's own keyword icon and accent color; unresolvable tags degrade
-/// to the letter alone. Purely visual: the canvas has no raycaster and every graphic is
-/// raycast-transparent.
+/// category accent color; implied letters render as dim neutral chips; a note whose occupying
+/// item passes its occupancy gate glows in its category color over a more saturated plate.
+/// While an item card is hovered, chips split three ways against that card: gold outer glow
+/// when it fits and enough contiguous room exists for its size (its own span counts as
+/// free), gold letter without glow when the letter matches but other items block every
+/// covering placement, and desaturated grey at unchanged opacity when it misses — boosted
+/// chips stay boosted, live state outranks the what-if layer. States differ only through
+/// glow, hue/saturation, or markers — never font weight, footprint, or opacity shifts.
+/// Each letter's item-category identity (Burn, Heal, Weapon, ...) comes from
+/// the note templates' condition graphs and reuses the game's own keyword icon and accent
+/// color; unresolvable tags degrade to the letter alone. Purely visual: the canvas has no
+/// raycaster and every graphic is raycast-transparent.
 /// </summary>
 internal sealed class MusicNoteSocketOverlay : MonoBehaviour
 {
@@ -32,9 +41,16 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
     // badge row reads as a single aligned strip.
     private const float LetterFontSize = 20f;
 
+    // State language (user-set constraint): states differ only through glow, hue/saturation,
+    // or added markers — never font weight, footprint, or opacity shifts. Every state keeps
+    // its base kind's alpha values; negative states desaturate, positive states glow.
+
     // TMP sprite tint for implied badges: multiplied toward grey so inactive icons read as
     // ghosted, while active sprites render untinted full-color.
     private const string ImpliedIconTint = "#7A7C82A8";
+
+    // Hover-miss icons: same multiply alpha as the implied tint, colder and darker grey.
+    private const string MissIconTint = "#63656CA8";
 
     private static readonly Color ImpliedBackColor = new(0.05f, 0.06f, 0.08f, 0.52f);
     private static readonly Color ActiveLetterColor = Color.white;
@@ -46,22 +62,53 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
     private static readonly Color ActiveEdgeColor = new(0.88f, 0.71f, 0.38f, 0.62f);
     private static readonly Color ImpliedEdgeColor = new(0.55f, 0.52f, 0.46f, 0.16f);
 
+    // Boosted plates trade the bronze trim for gold at the same trim alpha.
+    private static readonly Color BoostedEdgeColor = new(1f, 0.90f, 0.55f, 0.62f);
+
+    // Outer glow colors: gold marks "the hovered card works here"; boosted glows in the
+    // letter's own category color (computed from the accent) so a live note reads as lit.
+    private static readonly Color MatchGlowColor = new(1f, 0.88f, 0.52f, 0.90f);
+
+    // Hover-miss desaturation: same alphas as the base kind, chroma stripped.
+    private static readonly Color PlateMissBackColor = new(0.16f, 0.17f, 0.19f, 0.94f);
+    private static readonly Color PlateMissEdgeColor = new(0.52f, 0.51f, 0.49f, 0.62f);
+    private static readonly Color PlateMissLetterColor = new(0.62f, 0.64f, 0.68f, 1f);
+    private static readonly Color GhostMissLetterColor = new(0.42f, 0.44f, 0.48f, 0.88f);
+    private static readonly Color GhostHighlightLetterColor = new(1f, 1f, 1f, 0.88f);
+
+    // Match-but-blocked: the letter goes gold without a glow — "this letter works for the
+    // hovered card, but other items block every placement covering it".
+    private static readonly Color PlateMatchBlockedLetterColor = new(1f, 0.83f, 0.50f, 1f);
+    private static readonly Color GhostMatchBlockedLetterColor = new(1f, 0.83f, 0.50f, 0.88f);
+
     private static readonly string[] LetterNames = BuildLetterNames();
+
+    // Canvas-space bleed of the halo sprite beyond the chip rect.
+    private const float HaloMargin = 8f;
 
     private static Sprite? _roundedSprite;
     private static Sprite? _roundedEdgeSprite;
+    private static Sprite? _haloSprite;
 
     private sealed class BadgeSlot
     {
-        internal BadgeSlot(RectTransform root, Image back, Image edge, TextMeshProUGUI letter)
+        internal BadgeSlot(
+            RectTransform root,
+            Image halo,
+            Image back,
+            Image edge,
+            TextMeshProUGUI letter
+        )
         {
             Root = root;
+            Halo = halo;
             Back = back;
             Edge = edge;
             Letter = letter;
         }
 
         internal RectTransform Root { get; }
+        internal Image Halo { get; }
         internal Image Back { get; }
         internal Image Edge { get; }
         internal TextMeshProUGUI Letter { get; }
@@ -82,10 +129,10 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
             return;
         }
 
-        var badges = MusicNoteBoardReader.Read();
+        var view = MusicNoteBoardReader.Read();
         var board = Singleton<BoardManager>.Instance;
         var mainCamera = Camera.main;
-        if (badges == null || badges.Count == 0 || board == null || mainCamera == null)
+        if (view == null || view.Badges.Count == 0 || board == null || mainCamera == null)
         {
             SetVisible(false);
             return;
@@ -100,7 +147,7 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
         if (!_visible)
             KeywordIconSpriteProvider.BeginResolvePass();
         SetVisible(true);
-        Render(badges, board, mainCamera);
+        Render(view, board, mainCamera);
     }
 
     private void OnDisable()
@@ -121,7 +168,7 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
 
     private static bool ShouldShow()
     {
-        if (!BppHotkeyService.IsHeld(BppHotkeyActionId.HoldUpgradePreview))
+        if (!BppHotkeyService.IsActive(BppHotkeyActionId.HoldUpgradePreview))
             return false;
 
         try
@@ -177,11 +224,31 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
         return true;
     }
 
-    private void Render(List<MusicNoteSocketBadge> badges, BoardManager board, Camera mainCamera)
+    private void Render(MusicNoteBoardView view, BoardManager board, Camera mainCamera)
     {
+        // Skills and socket-effect cards never occupy an item socket, so only a hovered item
+        // card switches the strip into fits-vs-misses comparison mode.
+        var hoveredItem = HoveredCardTracker.TryGetHoveredCard() as ItemCard;
+        var run = Data.Run;
+
+        // A socket is blocked for the hovered item when another item covers it or the hand
+        // socket is locked; the hovered item's own span counts as free (it can move there).
+        bool[]? blockedForHovered = null;
+        if (hoveredItem != null)
+        {
+            blockedForHovered = new bool[view.HandOccupants.Length];
+            for (var i = 0; i < blockedForHovered.Length; i++)
+            {
+                var occupant = view.HandOccupants[i];
+                blockedForHovered[i] =
+                    view.HandLocked[i]
+                    || (occupant != null && !ReferenceEquals(occupant, hoveredItem));
+            }
+        }
+
         var sockets = board.playerItemSockets;
         var used = 0;
-        foreach (var badge in badges)
+        foreach (var badge in view.Badges)
         {
             var socket = FindSocket(sockets, badge.SocketIndex);
             if (socket == null)
@@ -196,8 +263,35 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
                 break;
             used++;
 
+            var hoverFit = MusicNoteHoverFit.None;
+            // No run means the gate cannot be evaluated — degrade to "no comparison", never
+            // to "miss": Satisfies() returns false on a null run and would dim the chip.
+            if (
+                hoveredItem != null
+                && run != null
+                && blockedForHovered != null
+                && badge.OccupancyGate is { Count: > 0 } gate
+            )
+            {
+                if (!MusicNoteFitEvaluator.Satisfies(gate, hoveredItem, run, badge.PlacedNote))
+                    hoverFit = MusicNoteHoverFit.Misses;
+                else
+                    hoverFit = MusicNoteBoardPlacement.CanCoverSocket(
+                        blockedForHovered,
+                        badge.SocketIndex,
+                        (int)hoveredItem.Size
+                    )
+                        ? MusicNoteHoverFit.Fits
+                        : MusicNoteHoverFit.FitsBlocked;
+            }
+            var visual = MusicNoteBadgeStyling.Resolve(
+                badge.Kind == MusicNoteSocketBadgeKind.Active,
+                badge.IsBoosted,
+                hoverFit
+            );
+
             PositionSlot(slot, screen);
-            StyleSlot(slot, badge);
+            StyleSlot(slot, badge, visual);
         }
 
         for (var i = used; i < _slots.Count; i++)
@@ -234,7 +328,11 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
             slot.Root.gameObject.SetActive(true);
     }
 
-    private static void StyleSlot(BadgeSlot slot, in MusicNoteSocketBadge badge)
+    private static void StyleSlot(
+        BadgeSlot slot,
+        in MusicNoteSocketBadge badge,
+        MusicNoteBadgeVisual visual
+    )
     {
         var isActive = badge.Kind == MusicNoteSocketBadgeKind.Active;
 
@@ -274,11 +372,17 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
         // glyph metrics — a standalone Image loses the baseline and each icon sits at its own
         // vertical offset. The asset is assigned explicitly so resolution never depends on the
         // global TMP fallback chain.
+        var iconTint = visual switch
+        {
+            MusicNoteBadgeVisual.Ghost => ImpliedIconTint,
+            MusicNoteBadgeVisual.GhostDimmed or MusicNoteBadgeVisual.PlateDimmed => MissIconTint,
+            _ => null,
+        };
         var letterName = LetterNames[(int)badge.Letter % LetterNames.Length];
         var text =
             iconAsset == null ? letterName
-            : isActive ? $"<sprite name=\"{iconName}\"> {letterName}"
-            : $"<sprite name=\"{iconName}\" color={ImpliedIconTint}> {letterName}";
+            : iconTint == null ? $"<sprite name=\"{iconName}\"> {letterName}"
+            : $"<sprite name=\"{iconName}\" color={iconTint}> {letterName}";
         if (slot.Letter.spriteAsset != iconAsset)
             slot.Letter.spriteAsset = iconAsset;
         if (!string.Equals(slot.RenderedText, text, StringComparison.Ordinal))
@@ -287,20 +391,83 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
             slot.RenderedText = text;
         }
 
-        slot.Letter.color = isActive ? ActiveLetterColor : ImpliedLetterColor;
-        slot.Edge.color = isActive ? ActiveEdgeColor : ImpliedEdgeColor;
-        if (isActive)
+        var accent = accentColor ?? ActiveAccentFallbackColor;
+
+        // Positive states glow: gold for "the hovered card works here", the category color
+        // for a note that is live right now. The halo toggles via Image.enabled, never alpha.
+        Color? glow = visual switch
         {
-            // Chip tinted toward the category color, matching how the game colors keywords.
-            var accent = accentColor ?? ActiveAccentFallbackColor;
-            var back = Color.Lerp(accent, Color.black, 0.58f);
-            back.a = 0.94f;
-            slot.Back.color = back;
-        }
-        else
+            MusicNoteBadgeVisual.Boosted => BoostedGlowColor(accent),
+            MusicNoteBadgeVisual.GhostHighlighted or MusicNoteBadgeVisual.PlateHighlighted =>
+                MatchGlowColor,
+            _ => null,
+        };
+        if (glow is Color glowColor)
         {
-            slot.Back.color = ImpliedBackColor;
+            if (!slot.Halo.enabled)
+                slot.Halo.enabled = true;
+            slot.Halo.color = glowColor;
         }
+        else if (slot.Halo.enabled)
+        {
+            slot.Halo.enabled = false;
+        }
+
+        slot.Letter.color = visual switch
+        {
+            MusicNoteBadgeVisual.Ghost => ImpliedLetterColor,
+            MusicNoteBadgeVisual.GhostHighlighted => GhostHighlightLetterColor,
+            MusicNoteBadgeVisual.GhostMatchBlocked => GhostMatchBlockedLetterColor,
+            MusicNoteBadgeVisual.PlateMatchBlocked => PlateMatchBlockedLetterColor,
+            MusicNoteBadgeVisual.GhostDimmed => GhostMissLetterColor,
+            MusicNoteBadgeVisual.PlateDimmed => PlateMissLetterColor,
+            _ => ActiveLetterColor, // Plate, PlateHighlighted, Boosted
+        };
+        slot.Edge.color = visual switch
+        {
+            MusicNoteBadgeVisual.Ghost
+            or MusicNoteBadgeVisual.GhostHighlighted
+            or MusicNoteBadgeVisual.GhostMatchBlocked
+            or MusicNoteBadgeVisual.GhostDimmed => ImpliedEdgeColor,
+            MusicNoteBadgeVisual.PlateDimmed => PlateMissEdgeColor,
+            MusicNoteBadgeVisual.Boosted or MusicNoteBadgeVisual.PlateMatchBlocked =>
+                BoostedEdgeColor,
+            _ => ActiveEdgeColor, // Plate, PlateHighlighted
+        };
+
+        // Plates tint toward the category color, matching how the game colors keywords; the
+        // boosted plate pulls further toward the accent, and hover-miss plates lose their
+        // chroma instead of their opacity.
+        Color back;
+        switch (visual)
+        {
+            case MusicNoteBadgeVisual.Ghost:
+            case MusicNoteBadgeVisual.GhostHighlighted:
+            case MusicNoteBadgeVisual.GhostMatchBlocked:
+            case MusicNoteBadgeVisual.GhostDimmed:
+                back = ImpliedBackColor;
+                break;
+            case MusicNoteBadgeVisual.Boosted:
+                back = Color.Lerp(accent, Color.black, 0.40f);
+                back.a = 0.94f;
+                break;
+            case MusicNoteBadgeVisual.PlateDimmed:
+                back = PlateMissBackColor;
+                break;
+            default: // Plate, PlateHighlighted
+                back = Color.Lerp(accent, Color.black, 0.58f);
+                back.a = 0.94f;
+                break;
+        }
+        slot.Back.color = back;
+    }
+
+    // Lift the accent toward white so the glow reads as light, not as a colored slab.
+    private static Color BoostedGlowColor(Color accent)
+    {
+        var glow = Color.Lerp(accent, Color.white, 0.30f);
+        glow.a = 0.85f;
+        return glow;
     }
 
     private BadgeSlot? GetSlot(int index)
@@ -332,6 +499,27 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
         root.anchorMin = new Vector2(0.5f, 0.5f);
         root.anchorMax = new Vector2(0.5f, 0.5f);
         root.pivot = new Vector2(0.5f, 1f);
+
+        // Outer glow layer, behind the back plate and bleeding HaloMargin past the chip rect;
+        // starts disabled and is toggled per state. ignoreLayout keeps it out of the fitter.
+        var haloObject = new GameObject(
+            "Halo",
+            typeof(RectTransform),
+            typeof(Image),
+            typeof(LayoutElement)
+        );
+        haloObject.transform.SetParent(rootObject.transform, false);
+        var haloRect = (RectTransform)haloObject.transform;
+        haloRect.anchorMin = Vector2.zero;
+        haloRect.anchorMax = Vector2.one;
+        haloRect.offsetMin = new Vector2(-HaloMargin, -HaloMargin);
+        haloRect.offsetMax = new Vector2(HaloMargin, HaloMargin);
+        haloObject.GetComponent<LayoutElement>().ignoreLayout = true;
+        var halo = haloObject.GetComponent<Image>();
+        halo.sprite = GetHaloSprite();
+        halo.type = Image.Type.Sliced;
+        halo.raycastTarget = false;
+        halo.enabled = false;
 
         // The background lives on an ignoreLayout child stretched to the root: an Image on
         // the layout root itself would feed its sprite's native size into the size fitter
@@ -394,7 +582,7 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
         letter.alignment = TextAlignmentOptions.Center;
         letter.raycastTarget = false;
 
-        return new BadgeSlot(root, back, edge, letter);
+        return new BadgeSlot(root, halo, back, edge, letter);
     }
 
     private void SetVisible(bool visible)
@@ -472,10 +660,58 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
         return _roundedEdgeSprite;
     }
 
-    private static float RoundedSignedDistance(int x, int y, int size, float radius)
+    // Soft outer glow hugging the chip silhouette: peaks at the boundary of the inner
+    // chip-sized rounded rect and falls off quadratically across the margin. A short inner
+    // feather keeps translucent ghost backs from showing a hard halo line underneath.
+    private static Sprite GetHaloSprite()
+    {
+        if (_haloSprite != null)
+            return _haloSprite;
+
+        const int size = 52;
+        const float radius = 11f;
+        const float margin = HaloMargin;
+        const float innerFeather = 2.5f;
+        var texture = new Texture2D(size, size, TextureFormat.ARGB32, false)
+        {
+            filterMode = FilterMode.Bilinear,
+            wrapMode = TextureWrapMode.Clamp,
+        };
+
+        for (var y = 0; y < size; y++)
+        {
+            for (var x = 0; x < size; x++)
+            {
+                var distance = RoundedSignedDistance(x, y, size, radius, margin);
+                float alpha;
+                if (distance <= 0f)
+                {
+                    alpha = Mathf.Clamp01(1f + distance / innerFeather);
+                }
+                else
+                {
+                    var falloff = 1f - Mathf.Clamp01(distance / margin);
+                    alpha = falloff * falloff;
+                }
+                texture.SetPixel(x, y, new Color(1f, 1f, 1f, alpha * 0.9f));
+            }
+        }
+
+        texture.Apply();
+        _haloSprite = CreateSlicedSprite(texture, size, radius + margin);
+        return _haloSprite;
+    }
+
+    private static float RoundedSignedDistance(
+        int x,
+        int y,
+        int size,
+        float radius,
+        float inset = 0f
+    )
     {
         var halfSize = size * 0.5f;
-        var innerHalfExtent = halfSize - radius;
+        var innerHalfExtent = halfSize - inset - radius;
         var distanceX = Mathf.Abs(x + 0.5f - halfSize) - innerHalfExtent;
         var distanceY = Mathf.Abs(y + 0.5f - halfSize) - innerHalfExtent;
         var outsideX = Mathf.Max(distanceX, 0f);

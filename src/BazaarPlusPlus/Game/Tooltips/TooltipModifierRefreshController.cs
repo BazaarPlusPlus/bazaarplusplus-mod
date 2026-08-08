@@ -81,7 +81,7 @@ internal sealed class TooltipModifierRefreshController : MonoBehaviour
 
     private ResolveInputs ReadResolveInputs()
     {
-        var holdUpgrade = BppHotkeyService.IsHeld(BppHotkeyActionId.HoldUpgradePreview);
+        var holdUpgrade = BppHotkeyService.IsActive(BppHotkeyActionId.HoldUpgradePreview);
         var holdEnchant = BppHotkeyService.IsHeld(BppHotkeyActionId.HoldEnchantPreview);
         var enchantMode = _config?.EnchantPreviewModeConfig?.Value;
         var pedestalKind = ChoiceScreenPedestalKind.None;

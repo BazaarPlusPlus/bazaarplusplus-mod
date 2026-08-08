@@ -37,7 +37,6 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
     private const float HeaderHintFontScale = 0.6f;
     private const float SummaryFontScale = 0.75f;
     private const float TriggerSummaryFontScale = 0.64f;
-    private const float DisclosureFontScale = 0.62f;
     private const float GroupLabelFontScale = 1f;
     private const float GroupMetricFontScale = 1f;
     private const float GroupSecondaryMetricFontScale = 0.62f;
@@ -299,17 +298,11 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
 
     public bool OnNativeAuxiliaryTooltipShowing(AuxiliaryTooltipController controller)
     {
-        if (!_session.OwnsAuxiliary(controller))
-        {
-            // Someone else is about to show the native auxiliary tooltip this session had only
-            // prepared. Handing the snapshot back here is what keeps the native layout's padding
-            // and anchors from staying permanently rewritten.
-            _session.ReleasePrepared(controller);
-            return false;
-        }
-
-        _session.Release(restoreNativeContent: true);
-        return true;
+        // A confirmed native show must receive a fully usable pooled host, not merely the exact
+        // content-active flags captured before Combat Impact took it over. Native Show assigns
+        // text but never reactivates header/body, so replaying an inactive snapshot produces an
+        // empty, layout-collapsed frame.
+        return _session.ReleaseForNativeShow(controller);
     }
 
     public bool OnNativeAuxiliaryTooltipHiding(AuxiliaryTooltipController controller)
@@ -546,11 +539,6 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
                 _causedBlocks.Add(block);
             }
         }
-        BuildDisclosures(
-            bodyTemplate,
-            root,
-            CombatImpactMetricFormatter.CausedDisclosures(source, IsChinese())
-        );
         _causedMoreText = BuildMoreRow(bodyTemplate, root);
     }
 
@@ -828,15 +816,18 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
                 string.Empty,
                 useNumberFont: false
             ) ?? string.Empty;
-        var iconText = CloneText(
-            textTemplate,
-            header,
-            effectIcon,
-            GroupLabelFontScale,
-            preferredWidth: GroupIconColumnPreferredWidth,
-            minWidth: GroupIconColumnPreferredWidth
-        );
-        iconText.alignment = TextAlignmentOptions.MidlineLeft;
+        if (!string.IsNullOrWhiteSpace(effectIcon))
+        {
+            var iconText = CloneText(
+                textTemplate,
+                header,
+                effectIcon,
+                GroupLabelFontScale,
+                preferredWidth: GroupIconColumnPreferredWidth,
+                minWidth: GroupIconColumnPreferredWidth
+            );
+            iconText.alignment = TextAlignmentOptions.MidlineLeft;
+        }
 
         var labelText = CloneText(
             textTemplate,
@@ -968,35 +959,6 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         image.raycastTarget = false;
         AddLayout(divider, preferredHeight: 1f, flexibleWidth: 1f);
         return divider;
-    }
-
-    private static void BuildDisclosures(
-        TMP_Text textTemplate,
-        RectTransform parent,
-        IReadOnlyList<string> disclosures
-    )
-    {
-        if (disclosures.Count == 0)
-            return;
-
-        AddDivider(parent);
-        var root = CreateVertical("ImpactDisclosures", parent, 2f);
-        AddLayout(root.gameObject, preferredHeight: -1f, flexibleWidth: 1f);
-        foreach (var disclosure in disclosures)
-        {
-            var text = CloneText(
-                textTemplate,
-                root,
-                disclosure,
-                DisclosureFontScale,
-                flexibleWidth: 1f
-            );
-            text.alignment = TextAlignmentOptions.Left;
-            text.color = DisclosureColor;
-            text.alpha = 0.76f;
-            text.textWrappingMode = TextWrappingModes.Normal;
-            text.overflowMode = TextOverflowModes.Overflow;
-        }
     }
 
     private static TMP_Text BuildMoreRow(TMP_Text textTemplate, RectTransform parent)

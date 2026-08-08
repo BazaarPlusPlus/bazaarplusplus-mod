@@ -1,9 +1,11 @@
+using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Game.Input;
 
 var failures = new List<string>();
 
 CheckPrefixConstants();
 CheckBindingFailureGate();
+CheckActivationState();
 
 void Check(bool condition, string message)
 {
@@ -55,6 +57,48 @@ void CheckBindingFailureGate()
     Check(
         gate.ShouldReport(action, "invalid-a", "invalid"),
         "cleared lifecycle reopens the failure gate"
+    );
+}
+
+void CheckActivationState()
+{
+    var state = new HotkeyActivationState();
+
+    Check(
+        !state.Resolve(HotkeyActivationMode.Hold, "shift", false, false, 1),
+        "hold mode is inactive while released"
+    );
+    Check(
+        state.Resolve(HotkeyActivationMode.Hold, "shift", true, true, 2),
+        "hold mode follows the physical key"
+    );
+    Check(
+        state.Resolve(HotkeyActivationMode.Toggle, "shift", false, true, 3),
+        "first toggle press activates"
+    );
+    Check(
+        state.Resolve(HotkeyActivationMode.Toggle, "shift", false, true, 3),
+        "multiple readers cannot toggle twice in one frame"
+    );
+    Check(
+        state.Resolve(HotkeyActivationMode.Toggle, "shift", false, false, 4),
+        "toggle remains active after release"
+    );
+    Check(
+        !state.Resolve(HotkeyActivationMode.Toggle, "shift", false, true, 5),
+        "second toggle press deactivates"
+    );
+    Check(
+        !state.Resolve(HotkeyActivationMode.Toggle, "f6", false, false, 6),
+        "changing the binding clears the latch"
+    );
+    Check(
+        state.Resolve(HotkeyActivationMode.Toggle, "f6", false, true, 7),
+        "new binding can activate after reset"
+    );
+    Check(
+        !state.Resolve(HotkeyActivationMode.Hold, "f6", false, false, 8),
+        "changing back to hold clears the latch"
     );
 }
 

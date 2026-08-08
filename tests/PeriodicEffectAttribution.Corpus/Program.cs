@@ -162,7 +162,6 @@ static object BuildEvidenceSnapshot(
         {
             report.Attribution.Results,
             report.Attribution.ExactResults,
-            report.Attribution.ConstrainedResults,
             report.Attribution.ProportionalResults,
             report.Attribution.ResultsByKindAndProof,
             report.Attribution.HealthByKind,
@@ -173,6 +172,12 @@ static object BuildEvidenceSnapshot(
             report.Attribution.AllocationDecisionsByKindAndProof,
             report.Attribution.AllocatedHealthByKindAndProof,
             report.Attribution.AllocatedShieldByKindAndProof,
+            report.Attribution.MeasuredHealthByCombatantAndKind,
+            report.Attribution.MeasuredShieldByCombatantAndKind,
+            report.Attribution.AllocatedHealthByCombatantAndKind,
+            report.Attribution.AllocatedShieldByCombatantAndKind,
+            report.Attribution.ResidualHealthByCombatantAndKind,
+            report.Attribution.ResidualShieldByCombatantAndKind,
             report.Attribution.UnattributedHealthByKind,
             report.Attribution.UnattributedShieldByKind,
             report.Attribution.UnattributedHealthByOrigin,
@@ -483,9 +488,7 @@ static void Validate(CorpusInventoryReport report)
         throw new InvalidOperationException("Attribution model produced no source results.");
     if (
         report.Attribution.Results
-        != report.Attribution.ExactResults
-            + report.Attribution.ConstrainedResults
-            + report.Attribution.ProportionalResults
+        != report.Attribution.ExactResults + report.Attribution.ProportionalResults
     )
     {
         throw new InvalidOperationException(
@@ -494,13 +497,9 @@ static void Validate(CorpusInventoryReport report)
     }
     if (
         report.Attribution.HealthByKind.Values.Sum()
-            != report.Attribution.ExactHealthAmount
-                + report.Attribution.ConstrainedHealthAmount
-                + report.Attribution.ProportionalHealthAmount
+            != report.Attribution.ExactHealthAmount + report.Attribution.ProportionalHealthAmount
         || report.Attribution.ShieldByKind.Values.Sum()
-            != report.Attribution.ExactShieldAmount
-                + report.Attribution.ConstrainedShieldAmount
-                + report.Attribution.ProportionalShieldAmount
+            != report.Attribution.ExactShieldAmount + report.Attribution.ProportionalShieldAmount
     )
     {
         throw new InvalidOperationException(
@@ -510,7 +509,6 @@ static void Validate(CorpusInventoryReport report)
     if (
         report.Attribution.AllocationDecisions
         != report.Attribution.ExactAllocationDecisions
-            + report.Attribution.ConstrainedAllocationDecisions
             + report.Attribution.ProportionalAllocationDecisions
     )
     {

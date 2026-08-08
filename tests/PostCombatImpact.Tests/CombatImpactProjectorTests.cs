@@ -13,6 +13,12 @@ public sealed class CombatImpactProjectorTests
     [Fact]
     public void F_minor_reconstructs_tempo_from_haste_item_uses_on_the_f_note()
     {
+        var skillTemplateId = Guid.Parse("37251594-5ff0-4604-804e-7259ee666f60");
+        var sourceRule = new CombatImpactPrerequisiteSkillSourceRule(
+            "minor-tempo",
+            skillTemplateId,
+            [ETier.Gold]
+        );
         var simulation = new CombatSim();
         simulation.CardStats["turner"] = new Dictionary<ECardStats, int>
         {
@@ -26,6 +32,13 @@ public sealed class CombatImpactProjectorTests
         {
             [ECardStats.UseCount] = 30,
         };
+        if (OptionalCombatTempoTestValues.TryResolve(out var tempoTypes))
+        {
+            simulation.CardStats["f-minor"] = new Dictionary<ECardStats, int>
+            {
+                [tempoTypes.AddedStatistic] = 14,
+            };
+        }
         var entities = Entities().ToDictionary(item => item.Key, item => item.Value);
         entities["f-minor"] = new CombatImpactEntity(
             "f-minor",
@@ -33,7 +46,7 @@ public sealed class CombatImpactProjectorTests
             "Skill",
             null,
             5,
-            Guid.Parse("37251594-5ff0-4604-804e-7259ee666f60"),
+            skillTemplateId,
             ETier.Gold,
             Attributes: new Dictionary<ECardAttributeType, int>
             {
@@ -49,7 +62,26 @@ public sealed class CombatImpactProjectorTests
             6,
             Guid.Parse("04eca54a-69bf-4874-8b6d-56d284bb58be"),
             CombatantId: ECombatantId.Player,
-            SocketId: EContainerSocketId.Socket_6
+            SocketId: EContainerSocketId.Socket_6,
+            Section: EInventorySection.Hand,
+            PrerequisiteSkillSourceRulesByEffectId: new Dictionary<
+                string,
+                CombatImpactPrerequisiteSkillSourceRule
+            >
+            {
+                [sourceRule.EffectId] = sourceRule,
+            },
+            UseAttributionRules:
+            [
+                new CombatImpactUseAttributionRule(
+                    sourceRule,
+                    new CombatImpactItemTagCondition(
+                        EListComparisonOperator.Any,
+                        HiddenTags: [EHiddenTag.Haste]
+                    ),
+                    2
+                ),
+            ]
         );
         entities["turner"] = new CombatImpactEntity(
             "turner",
@@ -60,7 +92,8 @@ public sealed class CombatImpactProjectorTests
             DisplaySpan: 2,
             CombatantId: ECombatantId.Player,
             SocketId: EContainerSocketId.Socket_5,
-            HiddenTags: new[] { EHiddenTag.Haste }
+            HiddenTags: new[] { EHiddenTag.Haste },
+            Section: EInventorySection.Hand
         );
         entities["non-haste-on-note"] = new CombatImpactEntity(
             "non-haste-on-note",
@@ -69,7 +102,8 @@ public sealed class CombatImpactProjectorTests
             null,
             8,
             CombatantId: ECombatantId.Player,
-            SocketId: EContainerSocketId.Socket_6
+            SocketId: EContainerSocketId.Socket_6,
+            Section: EInventorySection.Hand
         );
         entities["haste-off-note"] = new CombatImpactEntity(
             "haste-off-note",
@@ -79,7 +113,8 @@ public sealed class CombatImpactProjectorTests
             9,
             CombatantId: ECombatantId.Player,
             SocketId: EContainerSocketId.Socket_7,
-            HiddenTags: new[] { EHiddenTag.Haste }
+            HiddenTags: new[] { EHiddenTag.Haste },
+            Section: EInventorySection.Hand
         );
 
         var source = Assert.Single(
@@ -92,8 +127,568 @@ public sealed class CombatImpactProjectorTests
         Assert.Equal(7, tempo.Count);
         Assert.Equal(14, tempo.ObservedValue);
         Assert.Equal("TempoApplyAmount", tempo.NativeAttributeKey);
-        Assert.Equal(CombatImpactEventSurface.PlayerAttribute, tempo.Surface);
+        Assert.Equal(CombatImpactEventSurface.AppliedEffect, tempo.Surface);
         Assert.Equal(CombatImpactOccurrenceBasis.ReconstructedTransition, tempo.OccurrenceBasis);
+        if (OptionalCombatTempoTestValues.TryResolve(out _))
+            Assert.Equal(14, tempo.AuthoritativeMetric?.Value);
+    }
+
+    [Fact]
+    public void A_minor_reconstructs_tempo_from_public_weapon_tags_without_card_specific_logic()
+    {
+        var simulation = new CombatSim();
+        simulation.CardStats["qualifying-item"] = new Dictionary<ECardStats, int>
+        {
+            [ECardStats.UseCount] = 4,
+        };
+        var entities = TempoAttributionEntities(
+            new CombatImpactItemTagCondition(
+                EListComparisonOperator.Any,
+                PublicTags: [ECardTag.Weapon]
+            )
+        );
+
+        var source = Assert.Single(
+            CombatImpactProjector.Project(simulation, entities).Sources,
+            candidate => candidate.Entity.Id == "minor-skill"
+        );
+        var tempo = Assert.Single(source.Groups);
+
+        Assert.Equal(4, source.EffectCount);
+        Assert.Equal(8, tempo.ObservedValue);
+        Assert.Equal("TempoApplyAmount", tempo.NativeAttributeKey);
+        Assert.Equal("qualifying-item", Assert.Single(tempo.TriggerSources).Entity.Id);
+    }
+
+    [Fact]
+    public void A_minor_without_an_a_note_does_not_reconstruct_weapon_uses()
+    {
+        var simulation = new CombatSim();
+        simulation.CardStats["qualifying-item"] = new Dictionary<ECardStats, int>
+        {
+            [ECardStats.UseCount] = 4,
+        };
+        var entities = TempoAttributionEntities(
+            new CombatImpactItemTagCondition(
+                EListComparisonOperator.Any,
+                PublicTags: [ECardTag.Weapon]
+            )
+        );
+        entities.Remove("note-effect");
+
+        var report = CombatImpactProjector.Project(simulation, entities);
+
+        Assert.DoesNotContain(report.Sources, source => source.Entity.Id == "minor-skill");
+        Assert.Empty(report.ProjectionDiagnostics);
+    }
+
+    [Fact]
+    public void Trigger_item_tempo_metric_stays_with_the_item_instead_of_moving_to_the_skill()
+    {
+        if (!OptionalCombatTempoTestValues.TryResolve(out var tempoTypes))
+            return;
+
+        var simulation = new CombatSim();
+        simulation.CardStats["qualifying-item"] = new Dictionary<ECardStats, int>
+        {
+            [ECardStats.UseCount] = 2,
+            [tempoTypes.AddedStatistic] = 9,
+        };
+        var report = CombatImpactProjector.Project(
+            simulation,
+            TempoAttributionEntities(
+                new CombatImpactItemTagCondition(
+                    EListComparisonOperator.Any,
+                    PublicTags: [ECardTag.Weapon]
+                )
+            )
+        );
+
+        var skillTempo = Assert.Single(
+            Assert.Single(report.Sources, source => source.Entity.Id == "minor-skill").Groups
+        );
+        var itemTempo = Assert.Single(
+            Assert.Single(report.Sources, source => source.Entity.Id == "qualifying-item").Groups
+        );
+
+        Assert.Equal(4, skillTempo.ObservedValue);
+        Assert.Null(skillTempo.AuthoritativeMetric);
+        Assert.Null(itemTempo.ObservedValue);
+        Assert.Equal(9, itemTempo.AuthoritativeMetric?.Value);
+    }
+
+    [Fact]
+    public void Socket_effect_authoritative_metric_is_diagnosed_without_moving_it_to_the_skill()
+    {
+        if (!OptionalCombatTempoTestValues.TryResolve(out var tempoTypes))
+            return;
+
+        var simulation = new CombatSim();
+        simulation.CardStats["qualifying-item"] = new Dictionary<ECardStats, int>
+        {
+            [ECardStats.UseCount] = 1,
+        };
+        simulation.CardStats["note-effect"] = new Dictionary<ECardStats, int>
+        {
+            [tempoTypes.AddedStatistic] = 2,
+        };
+        var report = CombatImpactProjector.Project(
+            simulation,
+            TempoAttributionEntities(
+                new CombatImpactItemTagCondition(
+                    EListComparisonOperator.Any,
+                    PublicTags: [ECardTag.Weapon]
+                )
+            )
+        );
+
+        var skillTempo = Assert.Single(
+            Assert.Single(report.Sources, source => source.Entity.Id == "minor-skill").Groups
+        );
+
+        Assert.Equal(2, skillTempo.ObservedValue);
+        Assert.Null(skillTempo.AuthoritativeMetric);
+        Assert.DoesNotContain(report.Sources, source => source.Entity.Id == "note-effect");
+        Assert.Contains(
+            report.ProjectionDiagnostics,
+            diagnostic =>
+                diagnostic.Kind
+                    == CombatImpactProjectionDiagnosticKind.NonDisplayableAuthoritativeMetric
+                && diagnostic.SourceId == "note-effect"
+                && diagnostic.EffectId == "TempoApplyAmount"
+        );
+    }
+
+    [Fact]
+    public void Explicit_minor_tempo_execution_is_subtracted_before_use_count_reconstruction()
+    {
+        var simulation = new CombatSim();
+        simulation.CardStats["qualifying-item"] = new Dictionary<ECardStats, int>
+        {
+            [ECardStats.UseCount] = 3,
+        };
+        var explicitTempo = Executed(
+            "note-effect",
+            EActionCommandType.PlayerModifyAttribute,
+            Player(ECombatantId.Player),
+            triggerSource: "qualifying-item"
+        );
+        explicitTempo.EffectId = "minor-tempo";
+        simulation.Frames[0].Events.Add(explicitTempo);
+
+        var report = CombatImpactProjector.Project(
+            simulation,
+            TempoAttributionEntities(
+                new CombatImpactItemTagCondition(
+                    EListComparisonOperator.Any,
+                    PublicTags: [ECardTag.Weapon]
+                )
+            )
+        );
+        var source = Assert.Single(
+            report.Sources,
+            candidate => candidate.Entity.Id == "minor-skill"
+        );
+        var tempo = Assert.Single(source.Groups);
+
+        Assert.Equal(3, tempo.Count);
+        Assert.Equal(6, tempo.ObservedValue);
+        Assert.Empty(report.ProjectionDiagnostics);
+    }
+
+    [Fact]
+    public void Optional_explicit_tempo_action_uses_the_same_reconciliation_when_available()
+    {
+        if (!OptionalCombatTempoTestValues.TryResolve(out var tempoTypes))
+            return;
+
+        var simulation = new CombatSim();
+        simulation.CardStats["qualifying-item"] = new Dictionary<ECardStats, int>
+        {
+            [ECardStats.UseCount] = 2,
+        };
+        var explicitTempo = Executed(
+            "note-effect",
+            tempoTypes.ApplyAction,
+            Player(ECombatantId.Player),
+            triggerSource: "qualifying-item"
+        );
+        explicitTempo.EffectId = "minor-tempo";
+        simulation.Frames[0].Events.Add(explicitTempo);
+
+        var report = CombatImpactProjector.Project(
+            simulation,
+            TempoAttributionEntities(
+                new CombatImpactItemTagCondition(
+                    EListComparisonOperator.Any,
+                    PublicTags: [ECardTag.Weapon]
+                )
+            )
+        );
+        var tempo = Assert.Single(
+            Assert.Single(report.Sources, source => source.Entity.Id == "minor-skill").Groups
+        );
+
+        Assert.Equal(2, tempo.Count);
+        Assert.Equal(4, tempo.ObservedValue);
+        Assert.Empty(report.ProjectionDiagnostics);
+    }
+
+    [Fact]
+    public void Duplicate_use_rules_keep_observed_source_mapping_without_reconstruction()
+    {
+        var simulation = new CombatSim();
+        simulation.CardStats["qualifying-item"] = new Dictionary<ECardStats, int>
+        {
+            [ECardStats.UseCount] = 2,
+        };
+        var explicitTempo = Executed(
+            "note-effect",
+            EActionCommandType.PlayerModifyAttribute,
+            Player(ECombatantId.Player),
+            triggerSource: "qualifying-item"
+        );
+        explicitTempo.EffectId = "minor-tempo";
+        simulation.Frames[0].Events.Add(explicitTempo);
+        simulation.Frames[0].PlayerUpdates = new CombatSimPlayerUpdate
+        {
+            Attributes =
+            {
+                [EPlayerAttributeType.Tempo] = new CombatSimPlayerAttributeUpdate
+                {
+                    AttributeType = EPlayerAttributeType.Tempo,
+                    PreviousValue = 0,
+                    CurrentValue = 2,
+                },
+            },
+        };
+        var entities = TempoAttributionEntities(
+            new CombatImpactItemTagCondition(
+                EListComparisonOperator.Any,
+                PublicTags: [ECardTag.Weapon]
+            )
+        );
+        var rule = Assert.Single(entities["note-effect"].UseAttributionRules!);
+        entities["note-effect"] = entities["note-effect"] with
+        {
+            UseAttributionRules = [rule, rule],
+        };
+
+        var report = CombatImpactProjector.Project(simulation, entities);
+        var tempo = Assert.Single(
+            Assert.Single(report.Sources, source => source.Entity.Id == "minor-skill").Groups
+        );
+
+        Assert.Equal(1, tempo.Count);
+        Assert.Equal(2, tempo.ObservedValue);
+        Assert.Equal(CombatImpactOccurrenceBasis.ExplicitExecution, tempo.OccurrenceBasis);
+    }
+
+    [Fact]
+    public void Rule_execution_mismatch_blocks_reconstruction_instead_of_double_counting()
+    {
+        var simulation = new CombatSim();
+        simulation.CardStats["qualifying-item"] = new Dictionary<ECardStats, int>
+        {
+            [ECardStats.UseCount] = 3,
+        };
+        var mismatched = Executed(
+            "note-effect",
+            EActionCommandType.CardHaste,
+            CardTarget("qualifying-item"),
+            triggerSource: "qualifying-item"
+        );
+        mismatched.EffectId = "minor-tempo";
+        simulation.Frames[0].Events.Add(mismatched);
+
+        var report = CombatImpactProjector.Project(
+            simulation,
+            TempoAttributionEntities(
+                new CombatImpactItemTagCondition(
+                    EListComparisonOperator.Any,
+                    PublicTags: [ECardTag.Weapon]
+                )
+            )
+        );
+
+        Assert.DoesNotContain(report.Sources, source => source.Entity.Id == "minor-skill");
+        Assert.Contains(
+            report.ProjectionDiagnostics,
+            diagnostic =>
+                diagnostic.Kind == CombatImpactProjectionDiagnosticKind.RuleExecutionMismatch
+        );
+    }
+
+    [Fact]
+    public void Prerequisite_source_resolution_is_scoped_to_the_implementation_owner()
+    {
+        var simulation = new CombatSim();
+        simulation.CardStats["qualifying-item"] = new Dictionary<ECardStats, int>
+        {
+            [ECardStats.UseCount] = 2,
+        };
+        var entities = TempoAttributionEntities(
+            new CombatImpactItemTagCondition(
+                EListComparisonOperator.Any,
+                PublicTags: [ECardTag.Weapon]
+            )
+        );
+        entities["opponent-minor"] = entities["minor-skill"] with
+        {
+            Id = "opponent-minor",
+            CombatantId = ECombatantId.Opponent,
+        };
+
+        var report = CombatImpactProjector.Project(simulation, entities);
+
+        Assert.Equal("minor-skill", Assert.Single(report.Sources).Entity.Id);
+        Assert.Empty(report.ProjectionDiagnostics);
+    }
+
+    [Fact]
+    public void Duplicate_same_owner_prerequisite_skills_block_attribution()
+    {
+        var simulation = new CombatSim();
+        simulation.CardStats["qualifying-item"] = new Dictionary<ECardStats, int>
+        {
+            [ECardStats.UseCount] = 2,
+        };
+        var entities = TempoAttributionEntities(
+            new CombatImpactItemTagCondition(
+                EListComparisonOperator.Any,
+                PublicTags: [ECardTag.Weapon]
+            )
+        );
+        entities["duplicate-minor"] = entities["minor-skill"] with
+        {
+            Id = "duplicate-minor",
+            Order = 8,
+        };
+
+        var report = CombatImpactProjector.Project(simulation, entities);
+
+        Assert.Empty(report.Sources);
+        Assert.Contains(
+            report.ProjectionDiagnostics,
+            diagnostic =>
+                diagnostic.Kind == CombatImpactProjectionDiagnosticKind.AmbiguousPrerequisiteSkill
+        );
+    }
+
+    [Fact]
+    public void Stash_item_with_the_same_socket_number_is_not_reconstructed()
+    {
+        var simulation = new CombatSim();
+        simulation.CardStats["stash-item"] = new Dictionary<ECardStats, int>
+        {
+            [ECardStats.UseCount] = 9,
+        };
+        var entities = TempoAttributionEntities(
+            new CombatImpactItemTagCondition(
+                EListComparisonOperator.Any,
+                PublicTags: [ECardTag.Weapon]
+            )
+        );
+        entities.Remove("qualifying-item");
+        entities["stash-item"] = new CombatImpactEntity(
+            "stash-item",
+            "Stashed Weapon",
+            "Item",
+            null,
+            9,
+            CombatantId: ECombatantId.Player,
+            SocketId: EContainerSocketId.Socket_6,
+            Section: EInventorySection.Stash,
+            Tags: [ECardTag.Weapon]
+        );
+
+        var report = CombatImpactProjector.Project(simulation, entities);
+
+        Assert.Empty(report.Sources);
+        Assert.Empty(report.ProjectionDiagnostics);
+    }
+
+    [Fact]
+    public void Explicit_applications_over_use_count_are_reported_without_balancing_entries()
+    {
+        var simulation = new CombatSim();
+        simulation.CardStats["qualifying-item"] = new Dictionary<ECardStats, int>
+        {
+            [ECardStats.UseCount] = 1,
+        };
+        for (var index = 0; index < 2; index++)
+        {
+            var explicitTempo = Executed(
+                "note-effect",
+                EActionCommandType.PlayerModifyAttribute,
+                Player(ECombatantId.Player),
+                triggerSource: "qualifying-item"
+            );
+            explicitTempo.EffectId = "minor-tempo";
+            simulation.Frames[0].Events.Add(explicitTempo);
+        }
+
+        var report = CombatImpactProjector.Project(
+            simulation,
+            TempoAttributionEntities(
+                new CombatImpactItemTagCondition(
+                    EListComparisonOperator.Any,
+                    PublicTags: [ECardTag.Weapon]
+                )
+            )
+        );
+        var group = Assert.Single(Assert.Single(report.Sources).Groups);
+
+        Assert.Equal(2, group.Count);
+        Assert.Contains(
+            report.ProjectionDiagnostics,
+            diagnostic =>
+                diagnostic.Kind
+                == CombatImpactProjectionDiagnosticKind.ExplicitApplicationsExceedUseCount
+        );
+    }
+
+    [Fact]
+    public void Prerequisite_gated_aura_is_attributed_to_the_unique_visible_skill()
+    {
+        var skillTemplateId = Guid.Parse("0ab8bd31-0655-4f18-844f-844e1452942d");
+        var sourceRule = new CombatImpactPrerequisiteSkillSourceRule(
+            "major-multicast",
+            skillTemplateId,
+            []
+        );
+        var entities = Entities().ToDictionary(item => item.Key, item => item.Value);
+        entities["major-skill"] = new CombatImpactEntity(
+            "major-skill",
+            "A Major",
+            "Skill",
+            null,
+            5,
+            skillTemplateId,
+            CombatantId: ECombatantId.Player
+        );
+        entities["note-effect"] = new CombatImpactEntity(
+            "note-effect",
+            "A Note Socket Effect",
+            "SocketEffect",
+            null,
+            6,
+            CombatantId: ECombatantId.Player,
+            AuraAttributeTypesByEffectId: new Dictionary<string, ECardAttributeType>
+            {
+                [sourceRule.EffectId] = ECardAttributeType.Multicast,
+            },
+            PrerequisiteSkillSourceRulesByEffectId: new Dictionary<
+                string,
+                CombatImpactPrerequisiteSkillSourceRule
+            >
+            {
+                [sourceRule.EffectId] = sourceRule,
+            }
+        );
+        entities["target"] = entities["target"] with { CombatantId = ECombatantId.Player };
+        var target = InstanceId.TryParse("target");
+        var simulation = new CombatSim();
+        simulation
+            .Frames[0]
+            .Events.Add(
+                new CombatSimEventEffectAuraExecuted
+                {
+                    EffectId = sourceRule.EffectId,
+                    Source = InstanceId.TryParse("note-effect"),
+                    AppliedTo = { CardTarget("target") },
+                }
+            );
+        simulation.Frames[0].CardUpdates[target] = new CombatSimCardUpdate
+        {
+            CardInstanceId = target,
+            Attributes =
+            {
+                [ECardAttributeType.Multicast] = new CombatSimCardAttributeUpdate
+                {
+                    AttributeType = ECardAttributeType.Multicast,
+                    PreviousValue = 1,
+                    CurrentValue = 2,
+                },
+            },
+        };
+
+        var source = Assert.Single(
+            CombatImpactProjector.Project(simulation, entities).Sources,
+            candidate => candidate.Entity.Id == "major-skill"
+        );
+
+        Assert.Equal("Multicast", Assert.Single(source.Groups).NativeAttributeKey);
+    }
+
+    [Fact]
+    public void Visible_item_aura_keeps_its_direct_source_even_when_a_skill_is_a_prerequisite()
+    {
+        var skillTemplateId = Guid.NewGuid();
+        var sourceRule = new CombatImpactPrerequisiteSkillSourceRule(
+            "unlocked-aura",
+            skillTemplateId,
+            []
+        );
+        var entities = Entities().ToDictionary(item => item.Key, item => item.Value);
+        entities["unlock-skill"] = new CombatImpactEntity(
+            "unlock-skill",
+            "Unlock Skill",
+            "Skill",
+            null,
+            5,
+            skillTemplateId,
+            CombatantId: ECombatantId.Player
+        );
+        entities["visible-item"] = new CombatImpactEntity(
+            "visible-item",
+            "Visible Item",
+            "Item",
+            null,
+            6,
+            CombatantId: ECombatantId.Player,
+            AuraAttributeTypesByEffectId: new Dictionary<string, ECardAttributeType>
+            {
+                [sourceRule.EffectId] = ECardAttributeType.DamageAmount,
+            },
+            PrerequisiteSkillSourceRulesByEffectId: new Dictionary<
+                string,
+                CombatImpactPrerequisiteSkillSourceRule
+            >
+            {
+                [sourceRule.EffectId] = sourceRule,
+            }
+        );
+        var target = InstanceId.TryParse("target");
+        var simulation = new CombatSim();
+        simulation
+            .Frames[0]
+            .Events.Add(
+                new CombatSimEventEffectAuraExecuted
+                {
+                    EffectId = sourceRule.EffectId,
+                    Source = InstanceId.TryParse("visible-item"),
+                    AppliedTo = { CardTarget("target") },
+                }
+            );
+        simulation.Frames[0].CardUpdates[target] = new CombatSimCardUpdate
+        {
+            CardInstanceId = target,
+            Attributes =
+            {
+                [ECardAttributeType.DamageAmount] = new CombatSimCardAttributeUpdate
+                {
+                    AttributeType = ECardAttributeType.DamageAmount,
+                    PreviousValue = 10,
+                    CurrentValue = 20,
+                },
+            },
+        };
+
+        var source = Assert.Single(CombatImpactProjector.Project(simulation, entities).Sources);
+
+        Assert.Equal("visible-item", source.Entity.Id);
+        Assert.Equal("DamageAmount", Assert.Single(source.Groups).NativeAttributeKey);
     }
 
     [Fact]
@@ -143,6 +738,197 @@ public sealed class CombatImpactProjectorTests
             "×1",
             CombatImpactMetricFormatter.IncomingSource(received, incoming, chinese: false)
         );
+    }
+
+    [Fact]
+    public void Transformed_source_impacts_and_stats_roll_up_to_the_visible_original_item()
+    {
+        var simulation = new CombatSim();
+        simulation
+            .Frames[0]
+            .Events.Add(
+                new CombatSimEventCardTransformed(
+                    "transform-context",
+                    "original-item",
+                    [
+                        new SimEventCardTransformation(
+                            "transformed-item",
+                            Guid.NewGuid().ToString(),
+                            ECardType.Item,
+                            ECombatantId.Player,
+                            EInventorySection.Hand,
+                            EContainerSocketId.Socket_1
+                        ),
+                    ]
+                )
+            );
+        simulation.Frames.Add(new CombatSimFrame());
+        simulation
+            .Frames[1]
+            .Events.Add(
+                Executed("transformed-item", EActionCommandType.CardFreeze, CardTarget("target"))
+            );
+        simulation.Frames.Add(new CombatSimFrame());
+        simulation
+            .Frames[2]
+            .Events.Add(
+                new CombatSimEventCardTransformReverted(
+                    new SimEventCardTransformation(
+                        "original-item",
+                        Guid.NewGuid().ToString(),
+                        ECardType.Item,
+                        ECombatantId.Player,
+                        EInventorySection.Hand,
+                        EContainerSocketId.Socket_1
+                    ),
+                    ["transformed-item"]
+                )
+            );
+        // Real replay payloads keep these as disjoint per-incarnation accounting windows.
+        simulation.CardStats["original-item"] = new Dictionary<ECardStats, int>
+        {
+            [ECardStats.UseCount] = 1,
+            [ECardStats.FrozenCardsCount] = 1,
+        };
+        simulation.CardStats["transformed-item"] = new Dictionary<ECardStats, int>
+        {
+            [ECardStats.UseCount] = 2,
+            [ECardStats.FrozenCardsCount] = 2,
+        };
+        var entities = Entities().ToDictionary(item => item.Key, item => item.Value);
+        entities["original-item"] = new CombatImpactEntity(
+            "original-item",
+            "Original Item",
+            "Item",
+            null,
+            5,
+            CombatantId: ECombatantId.Player
+        );
+        entities["transformed-item"] = new CombatImpactEntity(
+            "transformed-item",
+            "Temporary Form",
+            "Item",
+            null,
+            6,
+            CombatantId: ECombatantId.Player
+        );
+
+        var report = CombatImpactProjector.Project(simulation, entities);
+        var source = Assert.Single(
+            report.Sources,
+            candidate => candidate.Entity.Id == "original-item"
+        );
+        var freeze = Assert.Single(source.Groups);
+
+        Assert.DoesNotContain(
+            report.Sources,
+            candidate => candidate.Entity.Id == "transformed-item"
+        );
+        Assert.Equal(3, source.UseCount);
+        Assert.Equal(3, freeze.AuthoritativeMetric?.Value);
+        Assert.Equal("target", Assert.Single(freeze.Targets).Entity.Id);
+    }
+
+    [Fact]
+    public void Nested_transforms_and_transformed_targets_resolve_to_the_highest_visible_ancestor()
+    {
+        var simulation = new CombatSim();
+        simulation
+            .Frames[0]
+            .Events.Add(Transformed("original-target", "middle-target", ECombatantId.Opponent));
+        simulation.Frames.Add(new CombatSimFrame());
+        simulation
+            .Frames[1]
+            .Events.Add(Transformed("middle-target", "final-target", ECombatantId.Opponent));
+        simulation.Frames.Add(new CombatSimFrame());
+        simulation
+            .Frames[2]
+            .Events.Add(
+                Executed("source", EActionCommandType.CardSlow, CardTarget("final-target"))
+            );
+        var entities = Entities().ToDictionary(item => item.Key, item => item.Value);
+        entities["original-target"] = new CombatImpactEntity(
+            "original-target",
+            "Original Target",
+            "Item",
+            null,
+            5,
+            CombatantId: ECombatantId.Opponent
+        );
+        entities["middle-target"] = new CombatImpactEntity(
+            "middle-target",
+            "Middle Target",
+            "Item",
+            null,
+            6,
+            CombatantId: ECombatantId.Opponent
+        );
+        entities["final-target"] = new CombatImpactEntity(
+            "final-target",
+            "Final Target",
+            "Item",
+            null,
+            7,
+            CombatantId: ECombatantId.Opponent
+        );
+
+        var report = CombatImpactProjector.Project(simulation, entities);
+        var group = Assert.Single(Assert.Single(report.Sources).Groups);
+        var target = Assert.Single(group.Targets);
+
+        Assert.Equal("original-target", target.Entity.Id);
+        Assert.Equal("original-target", Assert.Single(report.Received).Entity.Id);
+    }
+
+    [Fact]
+    public void Malformed_transform_cycles_still_fold_to_one_deterministic_entity()
+    {
+        var simulation = new CombatSim();
+        simulation.Frames[0].Events.Add(Transformed("b-item", "a-item", ECombatantId.Player));
+        simulation.Frames.Add(new CombatSimFrame());
+        simulation.Frames[1].Events.Add(Transformed("a-item", "b-item", ECombatantId.Player));
+        simulation.Frames.Add(new CombatSimFrame());
+        simulation.Frames[2].Events.Add(Transformed("a-item", "c-item", ECombatantId.Player));
+        simulation.Frames.Add(new CombatSimFrame());
+        simulation
+            .Frames[3]
+            .Events.Add(Executed("a-item", EActionCommandType.CardFreeze, CardTarget("target")));
+        simulation
+            .Frames[3]
+            .Events.Add(Executed("b-item", EActionCommandType.CardFreeze, CardTarget("target")));
+        simulation
+            .Frames[3]
+            .Events.Add(Executed("c-item", EActionCommandType.CardFreeze, CardTarget("target")));
+        var entities = Entities().ToDictionary(item => item.Key, item => item.Value);
+        entities["a-item"] = new CombatImpactEntity(
+            "a-item",
+            "A Item",
+            "Item",
+            null,
+            5,
+            CombatantId: ECombatantId.Player
+        );
+        entities["b-item"] = new CombatImpactEntity(
+            "b-item",
+            "B Item",
+            "Item",
+            null,
+            6,
+            CombatantId: ECombatantId.Player
+        );
+        entities["c-item"] = new CombatImpactEntity(
+            "c-item",
+            "C Item",
+            "Item",
+            null,
+            7,
+            CombatantId: ECombatantId.Player
+        );
+
+        var source = Assert.Single(CombatImpactProjector.Project(simulation, entities).Sources);
+
+        Assert.Equal("a-item", source.Entity.Id);
+        Assert.Equal(3, Assert.Single(source.Groups).Count);
     }
 
     [Fact]
@@ -1600,10 +2386,11 @@ public sealed class CombatImpactProjectorTests
 
         Assert.Equal(1, source.EffectCount);
         Assert.Equal(17, source.UseCount);
-        Assert.Equal(1, source.TriggerCount);
-        var trigger = Assert.Single(source.TriggerSources);
+        Assert.Equal(1, source.ObservedActivationBatchCount);
+        var trigger = Assert.Single(Assert.Single(source.Groups).TriggerSources);
         Assert.Equal("Trigger Item", trigger.Entity.Name);
-        Assert.Equal(1, trigger.Count);
+        Assert.Equal(1, trigger.ApplicationCount);
+        Assert.Equal(1, trigger.ObservedActivationBatchCount);
     }
 
     [Fact]
@@ -1635,9 +2422,10 @@ public sealed class CombatImpactProjectorTests
 
         var source = Assert.Single(CombatImpactProjector.Project(simulation, Entities()).Sources);
 
-        Assert.Equal(1, source.TriggerCount);
-        Assert.Equal(1, Assert.Single(source.TriggerSources).Count);
-        Assert.Equal(1, Assert.Single(Assert.Single(source.Groups).TriggerSources).Count);
+        Assert.Equal(1, source.ObservedActivationBatchCount);
+        var trigger = Assert.Single(Assert.Single(source.Groups).TriggerSources);
+        Assert.Equal(2, trigger.ApplicationCount);
+        Assert.Equal(1, trigger.ObservedActivationBatchCount);
     }
 
     [Fact]
@@ -1672,9 +2460,10 @@ public sealed class CombatImpactProjectorTests
         Assert.Equal(10, source.EffectCount);
         Assert.Equal(10, slow.Count);
         Assert.Equal(10, slow.Targets.Count);
-        Assert.Equal(1, source.TriggerCount);
-        Assert.Equal(1, Assert.Single(source.TriggerSources).Count);
-        Assert.Equal(1, Assert.Single(slow.TriggerSources).Count);
+        Assert.Equal(1, source.ObservedActivationBatchCount);
+        var trigger = Assert.Single(slow.TriggerSources);
+        Assert.Equal(10, trigger.ApplicationCount);
+        Assert.Equal(1, trigger.ObservedActivationBatchCount);
     }
 
     [Fact]
@@ -1773,6 +2562,73 @@ public sealed class CombatImpactProjectorTests
     }
 
     [Fact]
+    public void Mixed_self_and_external_trigger_sources_keep_self_to_reconcile_charge_counts()
+    {
+        var simulation = new CombatSim();
+        simulation
+            .Frames[0]
+            .Events.Add(
+                Executed(
+                    "source",
+                    EActionCommandType.CardCharge,
+                    CardTarget("source"),
+                    triggerSource: "trigger"
+                )
+            );
+        simulation.Frames.Add(new CombatSimFrame());
+        simulation
+            .Frames[1]
+            .Events.Add(
+                Executed(
+                    "source",
+                    EActionCommandType.CardCharge,
+                    CardTarget("source"),
+                    triggerSource: "source"
+                )
+            );
+        simulation.Frames.Add(new CombatSimFrame());
+        simulation
+            .Frames[2]
+            .Events.Add(
+                Executed(
+                    "source",
+                    EActionCommandType.CardCharge,
+                    CardTarget("source"),
+                    triggerSource: "trigger"
+                )
+            );
+
+        var source = Assert.Single(
+            CombatImpactProjector
+                .Project(
+                    simulation,
+                    EntitiesWithSourceAttribute(ECardAttributeType.ChargeAmount, 1_000)
+                )
+                .Sources
+        );
+        var charge = Assert.Single(source.Groups);
+
+        Assert.Equal(3, charge.Count);
+        Assert.Equal(3, source.ObservedActivationBatchCount);
+        Assert.Equal(3, charge.TriggerSources.Sum(trigger => trigger.ApplicationCount));
+        Assert.Collection(
+            charge.TriggerSources,
+            trigger =>
+            {
+                Assert.Equal("Trigger Item", trigger.Entity.Name);
+                Assert.Equal(2, trigger.ApplicationCount);
+                Assert.Equal(2, trigger.ObservedActivationBatchCount);
+            },
+            self =>
+            {
+                Assert.Equal("Fairies", self.Entity.Name);
+                Assert.Equal(1, self.ApplicationCount);
+                Assert.Equal(1, self.ObservedActivationBatchCount);
+            }
+        );
+    }
+
+    [Fact]
     public void Same_trigger_source_in_separate_frames_counts_as_separate_activations()
     {
         var simulation = new CombatSim();
@@ -1800,9 +2656,10 @@ public sealed class CombatImpactProjectorTests
 
         var source = Assert.Single(CombatImpactProjector.Project(simulation, Entities()).Sources);
 
-        Assert.Equal(2, source.TriggerCount);
-        Assert.Equal(2, Assert.Single(source.TriggerSources).Count);
-        Assert.Equal(2, Assert.Single(Assert.Single(source.Groups).TriggerSources).Count);
+        Assert.Equal(2, source.ObservedActivationBatchCount);
+        var trigger = Assert.Single(Assert.Single(source.Groups).TriggerSources);
+        Assert.Equal(2, trigger.ApplicationCount);
+        Assert.Equal(2, trigger.ObservedActivationBatchCount);
     }
 
     [Fact]
@@ -1835,8 +2692,66 @@ public sealed class CombatImpactProjectorTests
 
         var source = Assert.Single(CombatImpactProjector.Project(simulation, Entities()).Sources);
 
-        Assert.Equal(1, source.TriggerCount);
-        Assert.Equal("trigger", Assert.Single(source.TriggerSources).Entity.Id);
+        Assert.Equal(1, source.ObservedActivationBatchCount);
+        Assert.Equal(
+            "trigger",
+            Assert.Single(Assert.Single(source.Groups).TriggerSources).Entity.Id
+        );
+    }
+
+    [Fact]
+    public void Trigger_source_fallback_is_not_mislabeled_as_self_trigger()
+    {
+        var simulation = new CombatSim();
+        simulation
+            .Frames[0]
+            .Events.Add(
+                Executed(
+                    "effect",
+                    EActionCommandType.CardSlow,
+                    CardTarget("target"),
+                    triggerSource: "source"
+                )
+            );
+
+        var source = Assert.Single(CombatImpactProjector.Project(simulation, Entities()).Sources);
+        var group = Assert.Single(source.Groups);
+
+        Assert.Equal("source", source.Entity.Id);
+        Assert.Empty(group.TriggerSources);
+        Assert.Equal(1, group.TriggerFallbackApplicationCount);
+        Assert.Equal(1, source.ObservedActivationBatchCount);
+        Assert.Equal(
+            CombatImpactTriggerPresentationState.BreakdownUnavailable,
+            group.TriggerPresentationState
+        );
+    }
+
+    [Fact]
+    public void Unsupported_trigger_reference_is_an_explicit_unattributed_application()
+    {
+        var simulation = new CombatSim();
+        simulation
+            .Frames[0]
+            .Events.Add(
+                Executed(
+                    "source",
+                    EActionCommandType.CardSlow,
+                    CardTarget("target"),
+                    triggerSource: "effect"
+                )
+            );
+
+        var source = Assert.Single(CombatImpactProjector.Project(simulation, Entities()).Sources);
+        var group = Assert.Single(source.Groups);
+
+        Assert.Empty(group.TriggerSources);
+        Assert.Equal(1, group.UnattributedTriggerApplicationCount);
+        Assert.Equal(0, source.ObservedActivationBatchCount);
+        Assert.Equal(
+            CombatImpactTriggerPresentationState.BreakdownUnavailable,
+            group.TriggerPresentationState
+        );
     }
 
     [Fact]
@@ -1986,13 +2901,27 @@ public sealed class CombatImpactProjectorTests
 
         Assert.Equal(10, source.UseCount);
         Assert.Equal(10, source.EffectCount);
+        Assert.Equal(10, source.ObservedActivationBatchCount);
         Assert.Equal(10, haste.Count);
+        var selfTrigger = Assert.Single(haste.TriggerSources);
+        Assert.Equal(zarlic, selfTrigger.Entity.Id);
+        Assert.Equal(10, selfTrigger.ApplicationCount);
+        Assert.Equal(
+            CombatImpactTriggerPresentationState.HiddenSelfOnly,
+            haste.TriggerPresentationState
+        );
         Assert.Equal(10_000, haste.ObservedValue);
+        Assert.Equal(CombatImpactCoverage.Estimated, haste.ObservedCoverage);
         Assert.Equal(CombatImpactValueUnit.Milliseconds, haste.Unit);
         Assert.Equal(10, haste.AuthoritativeMetric?.Value);
         Assert.Equal(
             CombatImpactAuthoritativeBasis.ApplicationCount,
             haste.AuthoritativeMetric?.Basis
+        );
+        Assert.False(haste.ApplicationLedger.ComparableToAuthoritativeCount);
+        Assert.Equal(
+            CombatImpactControlStatus.NotComparable,
+            haste.ApplicationLedger.ControlStatus
         );
         var targetRow = Assert.Single(haste.Targets);
         Assert.Equal("Zarlic", targetRow.Entity.Name);
@@ -2096,10 +3025,10 @@ public sealed class CombatImpactProjectorTests
 
         Assert.Equal(2, fairiesGroup.Count);
         Assert.Equal(2_000, fairiesGroup.ObservedValue);
-        Assert.Equal(CombatImpactCoverage.Exact, fairiesGroup.ObservedCoverage);
+        Assert.Equal(CombatImpactCoverage.Estimated, fairiesGroup.ObservedCoverage);
         Assert.All(fairiesGroup.Targets, target => Assert.Equal(1_000, target.ObservedValue));
         Assert.Equal(2_000, triggerGroup.ObservedValue);
-        Assert.Equal(CombatImpactCoverage.Exact, triggerGroup.ObservedCoverage);
+        Assert.Equal(CombatImpactCoverage.Estimated, triggerGroup.ObservedCoverage);
     }
 
     [Fact]
@@ -2130,7 +3059,7 @@ public sealed class CombatImpactProjectorTests
         );
         var group = Assert.Single(Assert.Single(report.Sources).Groups);
         Assert.Equal(1_000, group.ObservedValue);
-        Assert.Equal(CombatImpactCoverage.Exact, group.ObservedCoverage);
+        Assert.Equal(CombatImpactCoverage.Estimated, group.ObservedCoverage);
     }
 
     [Fact]
@@ -2239,13 +3168,13 @@ public sealed class CombatImpactProjectorTests
             Assert.Equal(expectedKind, caused.Kind);
             Assert.Equal(CombatImpactAggregator.NativeKey(expectedKind), caused.NativeAttributeKey);
             Assert.Equal(2_000, caused.ObservedValue);
-            Assert.Equal(CombatImpactCoverage.Exact, caused.ObservedCoverage);
+            Assert.Equal(CombatImpactCoverage.Estimated, caused.ObservedCoverage);
             Assert.Equal(2_000, causedTarget.ObservedValue);
-            Assert.Equal(CombatImpactCoverage.Exact, causedTarget.ObservedCoverage);
+            Assert.Equal(CombatImpactCoverage.Estimated, causedTarget.ObservedCoverage);
             Assert.Equal(2_000, received.ObservedValue);
-            Assert.Equal(CombatImpactCoverage.Exact, received.ObservedCoverage);
+            Assert.Equal(CombatImpactCoverage.Estimated, received.ObservedCoverage);
             Assert.Equal(2_000, receivedSource.ObservedValue);
-            Assert.Equal(CombatImpactCoverage.Exact, receivedSource.ObservedCoverage);
+            Assert.Equal(CombatImpactCoverage.Estimated, receivedSource.ObservedCoverage);
         }
     }
 
@@ -2322,18 +3251,18 @@ public sealed class CombatImpactProjectorTests
         var finesseCharge = Assert.Single(finesse.Groups);
         Assert.Equal(4, finesseCharge.Count);
         Assert.Equal(4_000, finesseCharge.ObservedValue);
-        Assert.Equal(CombatImpactCoverage.Exact, finesseCharge.ObservedCoverage);
+        Assert.Equal(CombatImpactCoverage.Estimated, finesseCharge.ObservedCoverage);
 
         var wok = Assert.Single(report.Sources, source => source.Entity.Id == "wok");
         var wokCharge = Assert.Single(wok.Groups);
         Assert.Equal(3, wokCharge.Count);
         Assert.Equal(6_000, wokCharge.ObservedValue);
-        Assert.Equal(CombatImpactCoverage.Exact, wokCharge.ObservedCoverage);
+        Assert.Equal(CombatImpactCoverage.Estimated, wokCharge.ObservedCoverage);
 
         var incoming = Assert.Single(Assert.Single(report.Received).Groups);
         Assert.Equal(7, incoming.Count);
         Assert.Equal(10_000, incoming.ObservedValue);
-        Assert.Equal(CombatImpactCoverage.Exact, incoming.ObservedCoverage);
+        Assert.Equal(CombatImpactCoverage.Estimated, incoming.ObservedCoverage);
         Assert.Equal(
             "×7 · 10s",
             CombatImpactMetricFormatter.IncomingGroup(incoming, chinese: false)
@@ -3040,6 +3969,26 @@ public sealed class CombatImpactProjectorTests
             Target = target,
         };
 
+    private static CombatSimEventCardTransformed Transformed(
+        string originalId,
+        string transformedId,
+        ECombatantId combatantId
+    ) =>
+        new(
+            "transform-context",
+            originalId,
+            [
+                new SimEventCardTransformation(
+                    transformedId,
+                    "16b0d645-3a47-45a1-be2a-1e3ee311f33e",
+                    ECardType.Item,
+                    combatantId,
+                    EInventorySection.Hand,
+                    EContainerSocketId.Socket_1
+                ),
+            ]
+        );
+
     private static EffectTargetPlayer Player(ECombatantId target) => new() { Target = target };
 
     private static EffectTargetCard CardTarget(string target) =>
@@ -3246,6 +4195,61 @@ public sealed class CombatImpactProjectorTests
         {
             Attributes = new Dictionary<ECardAttributeType, int> { [attribute] = value },
         };
+        return entities;
+    }
+
+    private static Dictionary<string, CombatImpactEntity> TempoAttributionEntities(
+        CombatImpactItemTagCondition itemCondition
+    )
+    {
+        var skillTemplateId = Guid.Parse("a6a75fbb-864b-4875-815e-e00cf3fe40bd");
+        var sourceRule = new CombatImpactPrerequisiteSkillSourceRule(
+            "minor-tempo",
+            skillTemplateId,
+            [ETier.Gold]
+        );
+        var entities = Entities().ToDictionary(item => item.Key, item => item.Value);
+        entities["minor-skill"] = new CombatImpactEntity(
+            "minor-skill",
+            "A Minor",
+            "Skill",
+            null,
+            5,
+            skillTemplateId,
+            ETier.Gold,
+            CombatantId: ECombatantId.Player
+        );
+        entities["note-effect"] = new CombatImpactEntity(
+            "note-effect",
+            "A Note Socket Effect",
+            "SocketEffect",
+            null,
+            6,
+            DisplaySpan: 1,
+            CombatantId: ECombatantId.Player,
+            SocketId: EContainerSocketId.Socket_6,
+            Section: EInventorySection.Hand,
+            PrerequisiteSkillSourceRulesByEffectId: new Dictionary<
+                string,
+                CombatImpactPrerequisiteSkillSourceRule
+            >
+            {
+                [sourceRule.EffectId] = sourceRule,
+            },
+            UseAttributionRules: [new CombatImpactUseAttributionRule(sourceRule, itemCondition, 2)]
+        );
+        entities["qualifying-item"] = new CombatImpactEntity(
+            "qualifying-item",
+            "Weapon",
+            "Item",
+            null,
+            7,
+            DisplaySpan: 2,
+            CombatantId: ECombatantId.Player,
+            SocketId: EContainerSocketId.Socket_5,
+            Section: EInventorySection.Hand,
+            Tags: [ECardTag.Weapon]
+        );
         return entities;
     }
 

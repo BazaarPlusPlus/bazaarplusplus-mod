@@ -1,7 +1,9 @@
 #nullable enable
 using BazaarGameClient.Domain.Models.Cards;
+using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Domain.Cards.Socket;
 using BazaarGameShared.Domain.Core.Types;
+using BazaarGameShared.Domain.Prerequisites.Conditionals;
 using TheBazaar;
 
 namespace BazaarPlusPlus.Game.MusicNotes;
@@ -22,19 +24,37 @@ internal readonly struct MusicNoteSocketBadge
         int socketIndex,
         MusicNoteSocketBadgeKind kind,
         EMusicNote letter,
-        TCardMusicNoteSocketEffect? placedTemplate
+        TCardMusicNoteSocketEffect? placedTemplate,
+        ICard? placedNote,
+        IReadOnlyList<ITCardConditional>? occupancyGate,
+        bool isBoosted
     )
     {
         SocketIndex = socketIndex;
         Kind = kind;
         Letter = letter;
         PlacedTemplate = placedTemplate;
+        PlacedNote = placedNote;
+        OccupancyGate = occupancyGate;
+        IsBoosted = isBoosted;
     }
 
     internal int SocketIndex { get; }
     internal MusicNoteSocketBadgeKind Kind { get; }
     internal EMusicNote Letter { get; }
     internal TCardMusicNoteSocketEffect? PlacedTemplate { get; }
+
+    /// <summary>The placed note entity, as conditional-context targeting card.</summary>
+    internal ICard? PlacedNote { get; }
+
+    /// <summary>
+    /// The note's occupancy conditions — from the placed template when a note is present,
+    /// else the letter's catalog entry. Null while the catalog is still loading.
+    /// </summary>
+    internal IReadOnlyList<ITCardConditional>? OccupancyGate { get; }
+
+    /// <summary>A placed note whose occupying item passes the gate: the buff is live.</summary>
+    internal bool IsBoosted { get; }
 }
 
 /// <summary>
@@ -44,9 +64,34 @@ internal readonly struct MusicNoteSocketBadge
 /// the board is not readable or no anchor note exists — this is a per-frame path, so failures
 /// stay silent and render as "nothing to show".
 /// </summary>
+/// <summary>
+/// One frame's board read: the socket badges plus the items layer the hover comparison needs
+/// to judge placeability (who covers each hand socket, and which hand sockets are locked).
+/// </summary>
+internal sealed class MusicNoteBoardView
+{
+    internal MusicNoteBoardView(
+        List<MusicNoteSocketBadge> badges,
+        ICard?[] handOccupants,
+        bool[] handLocked
+    )
+    {
+        Badges = badges;
+        HandOccupants = handOccupants;
+        HandLocked = handLocked;
+    }
+
+    internal List<MusicNoteSocketBadge> Badges { get; }
+
+    /// <summary>The item covering each hand socket (repeated across a multi-slot span).</summary>
+    internal ICard?[] HandOccupants { get; }
+
+    internal bool[] HandLocked { get; }
+}
+
 internal static class MusicNoteBoardReader
 {
-    internal static List<MusicNoteSocketBadge>? Read()
+    internal static MusicNoteBoardView? Read()
     {
         try
         {
@@ -59,9 +104,10 @@ internal static class MusicNoteBoardReader
         }
     }
 
-    private static List<MusicNoteSocketBadge>? ReadCore()
+    private static MusicNoteBoardView? ReadCore()
     {
-        var player = Data.Run?.Player;
+        var run = Data.Run;
+        var player = run?.Player;
         var container = player?.Socket?.Container;
         if (player == null || container == null)
             return null;
@@ -71,6 +117,7 @@ internal static class MusicNoteBoardReader
             return null;
 
         var placedTemplates = new TCardMusicNoteSocketEffect?[socketCount];
+        var placedNotes = new SocketEffect?[socketCount];
         foreach (var entity in Data.Entities.Values)
         {
             if (
@@ -84,6 +131,7 @@ internal static class MusicNoteBoardReader
             )
             {
                 placedTemplates[(int)socketId] = noteTemplate;
+                placedNotes[(int)socketId] = socketEffect;
             }
         }
 
@@ -96,6 +144,20 @@ internal static class MusicNoteBoardReader
 
         var letters = MusicNoteLetterMath.InferLetters(placedLetters);
 
+        // The items layer: the card covering socket i is the note's occupying card, exactly
+        // as the game's TTargetCardOccupying resolves it (Hand.Container.Sockets repeats a
+        // multi-slot item across its whole span).
+        var handContainer = player.Hand?.Container;
+        var handSockets = handContainer?.Sockets;
+        var handOccupants = new ICard?[socketCount];
+        var handLocked = new bool[socketCount];
+        for (var i = 0; i < socketCount; i++)
+        {
+            if (handSockets != null && i < handSockets.Length)
+                handOccupants[i] = handSockets[i] as ICard;
+            handLocked[i] = handContainer == null || handContainer.IsSocketLocked(i);
+        }
+
         List<MusicNoteSocketBadge>? badges = null;
         for (var i = 0; i < socketCount; i++)
         {
@@ -104,6 +166,14 @@ internal static class MusicNoteBoardReader
 
             badges ??= new List<MusicNoteSocketBadge>(socketCount);
             var placed = placedTemplates[i];
+            var occupancyGate =
+                placed != null
+                    ? MusicNoteFitEvaluator.ExtractOccupyingConditions(placed)
+                    : MusicNoteTemplateCatalog.TryGetOccupancyGateForLetter((EMusicNote)letter);
+            var isBoosted =
+                placed != null
+                && handOccupants[i] is ICard occupying
+                && MusicNoteFitEvaluator.Satisfies(occupancyGate, occupying, run, placedNotes[i]);
             badges.Add(
                 new MusicNoteSocketBadge(
                     i,
@@ -111,11 +181,14 @@ internal static class MusicNoteBoardReader
                         ? MusicNoteSocketBadgeKind.Active
                         : MusicNoteSocketBadgeKind.Implied,
                     (EMusicNote)letter,
-                    placed
+                    placed,
+                    placedNotes[i],
+                    occupancyGate,
+                    isBoosted
                 )
             );
         }
 
-        return badges;
+        return badges != null ? new MusicNoteBoardView(badges, handOccupants, handLocked) : null;
     }
 }

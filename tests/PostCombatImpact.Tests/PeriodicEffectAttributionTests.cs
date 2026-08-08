@@ -46,15 +46,106 @@ public sealed class PeriodicEffectAttributionTests
         );
 
         var impacts = PeriodicEffectAttribution.Project(simulation, Entities("burner"));
-        var impact = impacts[new PeriodicImpactKey("burner", CombatImpactPeriodicKind.Burn)];
+        var impact = impacts.SourceImpacts[
+            new PeriodicImpactKey("burner", ECombatantId.Opponent, CombatImpactPeriodicKind.Burn)
+        ];
 
         Assert.Equal(4, impact.HealthAmount);
         Assert.Equal(3, impact.ShieldAmount);
         Assert.Equal(CombatImpactPeriodicProof.Exact, impact.Proof);
+        Assert.Equal(ECombatantId.Opponent, Assert.Single(impacts.Allocations).Combatant);
+        AssertLedgerReconciles(impacts);
 
         var report = CombatImpactProjector.Project(simulation, Entities("burner"));
         var burnGroup = Assert.Single(Assert.Single(report.Sources).Groups);
         Assert.Equal(impact, burnGroup.PeriodicImpact);
+    }
+
+    [Fact]
+    public void Source_impacts_preserve_combatant_before_group_rollup()
+    {
+        var apply = new CombatSimFrame
+        {
+            PlayerUpdates = new CombatSimPlayerUpdate
+            {
+                Attributes = Attributes(
+                    (EPlayerAttributeType.Health, 100, 100),
+                    (EPlayerAttributeType.HealthMax, 100, 100),
+                    (EPlayerAttributeType.Burn, 0, 4)
+                ),
+            },
+            OpponentUpdates = new CombatSimPlayerUpdate
+            {
+                Attributes = Attributes(
+                    (EPlayerAttributeType.Health, 100, 100),
+                    (EPlayerAttributeType.HealthMax, 100, 100),
+                    (EPlayerAttributeType.Burn, 0, 6)
+                ),
+            },
+        };
+        apply.Events.Add(
+            Execution("burner", EActionCommandType.PlayerBurnApply, ECombatantId.Player)
+        );
+        apply.Events.Add(
+            Execution("burner", EActionCommandType.PlayerBurnApply, ECombatantId.Opponent)
+        );
+        var tick = new CombatSimFrame
+        {
+            PlayerUpdates = new CombatSimPlayerUpdate
+            {
+                Attributes = Attributes(
+                    (EPlayerAttributeType.Health, 100, 96),
+                    (EPlayerAttributeType.HealthMax, 100, 100),
+                    (EPlayerAttributeType.Burn, 4, 3)
+                ),
+                HealthAdjustments =
+                {
+                    Adjustment(EDamageType.Burn, EPlayerHealthChangeType.Health, -4),
+                },
+            },
+            OpponentUpdates = new CombatSimPlayerUpdate
+            {
+                Attributes = Attributes(
+                    (EPlayerAttributeType.Health, 100, 94),
+                    (EPlayerAttributeType.HealthMax, 100, 100),
+                    (EPlayerAttributeType.Burn, 6, 5)
+                ),
+                HealthAdjustments =
+                {
+                    Adjustment(EDamageType.Burn, EPlayerHealthChangeType.Health, -6),
+                },
+            },
+        };
+        var report = PeriodicEffectAttribution.Project(
+            Simulation([apply, tick], ("burner", ECardStats.BurnAdded, 10)),
+            Entities("burner")
+        );
+
+        Assert.Equal(
+            4,
+            report
+                .SourceImpacts[
+                    new PeriodicImpactKey(
+                        "burner",
+                        ECombatantId.Player,
+                        CombatImpactPeriodicKind.Burn
+                    )
+                ]
+                .HealthAmount
+        );
+        Assert.Equal(
+            6,
+            report
+                .SourceImpacts[
+                    new PeriodicImpactKey(
+                        "burner",
+                        ECombatantId.Opponent,
+                        CombatImpactPeriodicKind.Burn
+                    )
+                ]
+                .HealthAmount
+        );
+        AssertLedgerReconciles(report);
     }
 
     [Fact]
@@ -89,8 +180,10 @@ public sealed class PeriodicEffectAttributionTests
             ("burner", ECardStats.BurnAdded, 10)
         );
 
-        var impact = PeriodicEffectAttribution.Project(simulation, Entities("burner"))[
-            new PeriodicImpactKey("burner", CombatImpactPeriodicKind.Burn)
+        var impact = PeriodicEffectAttribution
+            .Project(simulation, Entities("burner"))
+            .SourceImpacts[
+            new PeriodicImpactKey("burner", ECombatantId.Opponent, CombatImpactPeriodicKind.Burn)
         ];
 
         Assert.Equal(8, impact.HealthAmount);
@@ -139,8 +232,12 @@ public sealed class PeriodicEffectAttributionTests
         );
 
         var impacts = PeriodicEffectAttribution.Project(simulation, Entities("first", "second"));
-        var first = impacts[new PeriodicImpactKey("first", CombatImpactPeriodicKind.Poison)];
-        var second = impacts[new PeriodicImpactKey("second", CombatImpactPeriodicKind.Poison)];
+        var first = impacts.SourceImpacts[
+            new PeriodicImpactKey("first", ECombatantId.Opponent, CombatImpactPeriodicKind.Poison)
+        ];
+        var second = impacts.SourceImpacts[
+            new PeriodicImpactKey("second", ECombatantId.Opponent, CombatImpactPeriodicKind.Poison)
+        ];
 
         Assert.Equal(9, first.HealthAmount);
         Assert.Equal(3, second.HealthAmount);
@@ -178,8 +275,14 @@ public sealed class PeriodicEffectAttributionTests
             ("poisoner", ECardStats.PoisonAdded, 10)
         );
 
-        var impact = PeriodicEffectAttribution.Project(simulation, Entities("poisoner"))[
-            new PeriodicImpactKey("poisoner", CombatImpactPeriodicKind.Poison)
+        var impact = PeriodicEffectAttribution
+            .Project(simulation, Entities("poisoner"))
+            .SourceImpacts[
+            new PeriodicImpactKey(
+                "poisoner",
+                ECombatantId.Opponent,
+                CombatImpactPeriodicKind.Poison
+            )
         ];
 
         Assert.Equal(8, impact.HealthAmount);
@@ -216,7 +319,13 @@ public sealed class PeriodicEffectAttributionTests
         );
 
         var impacts = PeriodicEffectAttribution.Project(simulation, Entities("regenerator"));
-        var impact = impacts[new PeriodicImpactKey("regenerator", CombatImpactPeriodicKind.Regen)];
+        var impact = impacts.SourceImpacts[
+            new PeriodicImpactKey(
+                "regenerator",
+                ECombatantId.Opponent,
+                CombatImpactPeriodicKind.Regen
+            )
+        ];
 
         Assert.Equal(5, impact.HealthAmount);
         Assert.Equal(0, impact.ShieldAmount);
@@ -252,8 +361,14 @@ public sealed class PeriodicEffectAttributionTests
             ("regenerator", ECardStats.RegenAdded, 100)
         );
 
-        var impact = PeriodicEffectAttribution.Project(simulation, Entities("regenerator"))[
-            new PeriodicImpactKey("regenerator", CombatImpactPeriodicKind.Regen)
+        var impact = PeriodicEffectAttribution
+            .Project(simulation, Entities("regenerator"))
+            .SourceImpacts[
+            new PeriodicImpactKey(
+                "regenerator",
+                ECombatantId.Opponent,
+                CombatImpactPeriodicKind.Regen
+            )
         ];
 
         Assert.Equal(97, impact.HealthAmount);
@@ -299,13 +414,27 @@ public sealed class PeriodicEffectAttributionTests
 
         Assert.Equal(
             30,
-            impacts[new PeriodicImpactKey("poisoner", CombatImpactPeriodicKind.Poison)].HealthAmount
+            impacts
+                .SourceImpacts[
+                    new PeriodicImpactKey(
+                        "poisoner",
+                        ECombatantId.Opponent,
+                        CombatImpactPeriodicKind.Poison
+                    )
+                ]
+                .HealthAmount
         );
         Assert.Equal(
             30,
-            impacts[
-                new PeriodicImpactKey("regenerator", CombatImpactPeriodicKind.Regen)
-            ].HealthAmount
+            impacts
+                .SourceImpacts[
+                    new PeriodicImpactKey(
+                        "regenerator",
+                        ECombatantId.Opponent,
+                        CombatImpactPeriodicKind.Regen
+                    )
+                ]
+                .HealthAmount
         );
     }
 
@@ -339,7 +468,7 @@ public sealed class PeriodicEffectAttributionTests
 
         var impacts = PeriodicEffectAttribution.Project(simulation, Entities("regenerator"));
 
-        Assert.Empty(impacts);
+        Assert.Empty(impacts.SourceImpacts);
     }
 
     [Fact]
@@ -368,8 +497,10 @@ public sealed class PeriodicEffectAttributionTests
             ("burner", ECardStats.BurnAdded, 20)
         );
 
-        var impact = PeriodicEffectAttribution.Project(simulation, Entities("burner"))[
-            new PeriodicImpactKey("burner", CombatImpactPeriodicKind.Burn)
+        var impact = PeriodicEffectAttribution
+            .Project(simulation, Entities("burner"))
+            .SourceImpacts[
+            new PeriodicImpactKey("burner", ECombatantId.Opponent, CombatImpactPeriodicKind.Burn)
         ];
 
         Assert.Equal(5, impact.HealthAmount);
@@ -404,7 +535,7 @@ public sealed class PeriodicEffectAttributionTests
 
         var impacts = PeriodicEffectAttribution.Project(simulation, Entities("poisoner"));
 
-        Assert.Empty(impacts);
+        Assert.Empty(impacts.SourceImpacts);
     }
 
     [Fact]
@@ -437,7 +568,7 @@ public sealed class PeriodicEffectAttributionTests
 
         var impacts = PeriodicEffectAttribution.Project(simulation, Entities("poisoner"));
 
-        Assert.Empty(impacts);
+        Assert.Empty(impacts.SourceImpacts);
     }
 
     [Fact]
@@ -467,8 +598,10 @@ public sealed class PeriodicEffectAttributionTests
             ("burner", ECardStats.BurnAdded, 5)
         );
 
-        var impact = PeriodicEffectAttribution.Project(simulation, Entities("burner"))[
-            new PeriodicImpactKey("burner", CombatImpactPeriodicKind.Burn)
+        var impact = PeriodicEffectAttribution
+            .Project(simulation, Entities("burner"))
+            .SourceImpacts[
+            new PeriodicImpactKey("burner", ECombatantId.Opponent, CombatImpactPeriodicKind.Burn)
         ];
 
         Assert.Equal(5, impact.HealthAmount);
@@ -505,7 +638,7 @@ public sealed class PeriodicEffectAttributionTests
 
         var impacts = PeriodicEffectAttribution.Project(simulation, Entities("burner"));
 
-        Assert.Empty(impacts);
+        Assert.Empty(impacts.SourceImpacts);
     }
 
     [Fact]
@@ -537,8 +670,10 @@ public sealed class PeriodicEffectAttributionTests
             ("burner", ECardStats.BurnAdded, 20)
         );
 
-        var impact = PeriodicEffectAttribution.Project(simulation, Entities("burner"))[
-            new PeriodicImpactKey("burner", CombatImpactPeriodicKind.Burn)
+        var impact = PeriodicEffectAttribution
+            .Project(simulation, Entities("burner"))
+            .SourceImpacts[
+            new PeriodicImpactKey("burner", ECombatantId.Opponent, CombatImpactPeriodicKind.Burn)
         ];
 
         Assert.Equal(5, impact.ShieldAmount);
@@ -573,8 +708,10 @@ public sealed class PeriodicEffectAttributionTests
             ("burner", ECardStats.BurnAdded, 20)
         );
 
-        var impact = PeriodicEffectAttribution.Project(simulation, Entities("burner"))[
-            new PeriodicImpactKey("burner", CombatImpactPeriodicKind.Burn)
+        var impact = PeriodicEffectAttribution
+            .Project(simulation, Entities("burner"))
+            .SourceImpacts[
+            new PeriodicImpactKey("burner", ECombatantId.Opponent, CombatImpactPeriodicKind.Burn)
         ];
 
         Assert.Equal(5, impact.HealthAmount);
@@ -609,8 +746,14 @@ public sealed class PeriodicEffectAttributionTests
             ("regenerator", ECardStats.RegenAdded, 10)
         );
 
-        var impact = PeriodicEffectAttribution.Project(simulation, Entities("regenerator"))[
-            new PeriodicImpactKey("regenerator", CombatImpactPeriodicKind.Regen)
+        var impact = PeriodicEffectAttribution
+            .Project(simulation, Entities("regenerator"))
+            .SourceImpacts[
+            new PeriodicImpactKey(
+                "regenerator",
+                ECombatantId.Opponent,
+                CombatImpactPeriodicKind.Regen
+            )
         ];
 
         Assert.Equal(10, impact.HealthAmount);
@@ -647,8 +790,14 @@ public sealed class PeriodicEffectAttributionTests
             ("regenerator", ECardStats.RegenAdded, 20)
         );
 
-        var impact = PeriodicEffectAttribution.Project(simulation, Entities("regenerator"))[
-            new PeriodicImpactKey("regenerator", CombatImpactPeriodicKind.Regen)
+        var impact = PeriodicEffectAttribution
+            .Project(simulation, Entities("regenerator"))
+            .SourceImpacts[
+            new PeriodicImpactKey(
+                "regenerator",
+                ECombatantId.Opponent,
+                CombatImpactPeriodicKind.Regen
+            )
         ];
 
         Assert.Equal(20, impact.HealthAmount);
@@ -679,7 +828,7 @@ public sealed class PeriodicEffectAttributionTests
             EntitiesOwnedBy(ECombatantId.Opponent, "possible-source")
         );
 
-        Assert.Empty(impacts);
+        Assert.Empty(impacts.SourceImpacts);
     }
 
     [Fact]
@@ -709,11 +858,10 @@ public sealed class PeriodicEffectAttributionTests
             },
         };
 
-        var diagnostics = new PeriodicEffectAttributionDiagnostics();
-        var impacts = PeriodicEffectAttribution.Project(simulation, entities, diagnostics);
+        var impacts = PeriodicEffectAttribution.Project(simulation, entities);
 
-        Assert.Empty(impacts);
-        var gap = Assert.Single(diagnostics.Gaps);
+        Assert.Empty(impacts.SourceImpacts);
+        var gap = Assert.Single(impacts.Residuals);
         Assert.Equal(10, gap.HealthAmount);
         Assert.Equal(PeriodicUnknownOrigin.StatusStateAbsent, gap.Origin);
     }
@@ -742,8 +890,12 @@ public sealed class PeriodicEffectAttributionTests
             simulation,
             EntitiesOwnedBy(ECombatantId.Opponent, "possible-source")
         );
-        var impact = impacts[
-            new PeriodicImpactKey("possible-source", CombatImpactPeriodicKind.Regen)
+        var impact = impacts.SourceImpacts[
+            new PeriodicImpactKey(
+                "possible-source",
+                ECombatantId.Opponent,
+                CombatImpactPeriodicKind.Regen
+            )
         ];
 
         Assert.Equal(10, impact.HealthAmount);
@@ -791,7 +943,13 @@ public sealed class PeriodicEffectAttributionTests
         );
 
         var impacts = PeriodicEffectAttribution.Project(simulation, Entities("regenerator"));
-        var impact = impacts[new PeriodicImpactKey("regenerator", CombatImpactPeriodicKind.Regen)];
+        var impact = impacts.SourceImpacts[
+            new PeriodicImpactKey(
+                "regenerator",
+                ECombatantId.Opponent,
+                CombatImpactPeriodicKind.Regen
+            )
+        ];
 
         Assert.Equal(30, impact.HealthAmount);
         Assert.Equal(CombatImpactPeriodicProof.Proportional, impact.Proof);
@@ -835,10 +993,20 @@ public sealed class PeriodicEffectAttributionTests
         );
 
         Assert.DoesNotContain(
-            new PeriodicImpactKey("old-source", CombatImpactPeriodicKind.Burn),
-            impacts
+            new PeriodicImpactKey(
+                "old-source",
+                ECombatantId.Opponent,
+                CombatImpactPeriodicKind.Burn
+            ),
+            impacts.SourceImpacts
         );
-        var impact = impacts[new PeriodicImpactKey("new-source", CombatImpactPeriodicKind.Burn)];
+        var impact = impacts.SourceImpacts[
+            new PeriodicImpactKey(
+                "new-source",
+                ECombatantId.Opponent,
+                CombatImpactPeriodicKind.Burn
+            )
+        ];
         Assert.Equal(6, impact.HealthAmount);
         Assert.Equal(CombatImpactPeriodicProof.Exact, impact.Proof);
     }
@@ -861,18 +1029,17 @@ public sealed class PeriodicEffectAttributionTests
                 ),
             }
         );
-        var diagnostics = new PeriodicEffectAttributionDiagnostics();
+        var impacts = PeriodicEffectAttribution.Project(simulation, Entities());
 
-        var impacts = PeriodicEffectAttribution.Project(simulation, Entities(), diagnostics);
-
-        Assert.Empty(impacts);
-        var gap = Assert.Single(diagnostics.Gaps);
+        Assert.Empty(impacts.SourceImpacts);
+        var gap = Assert.Single(impacts.Residuals);
         Assert.Equal(10, gap.HealthAmount);
         Assert.Equal(PeriodicUnknownOrigin.MissingApplySource, gap.Origin);
+        AssertLedgerReconciles(impacts);
     }
 
     [Fact]
-    public void FormatterKeepsProofInternalAndUsesNativeImpactIcons()
+    public void FormatterKeepsProportionalProofInternalAndUsesNativeImpactIcons()
     {
         var group = new CombatImpactGroup(
             CombatImpactKind.Burn,
@@ -974,13 +1141,14 @@ public sealed class PeriodicEffectAttributionTests
 
     private static CombatSimEventEffectExecuted Execution(
         string sourceId,
-        EActionCommandType action
+        EActionCommandType action,
+        ECombatantId target = ECombatantId.Opponent
     ) =>
         new()
         {
             ActionType = action,
             Source = InstanceId.TryParse(sourceId),
-            Target = new EffectTargetPlayer { Target = ECombatantId.Opponent },
+            Target = new EffectTargetPlayer { Target = target },
         };
 
     private static Dictionary<EPlayerAttributeType, CombatSimPlayerAttributeUpdate> Attributes(
@@ -1039,5 +1207,60 @@ public sealed class PeriodicEffectAttributionTests
             CombatantId: ECombatantId.Opponent
         );
         return entities;
+    }
+
+    private static void AssertLedgerReconciles(PeriodicAttributionReport report)
+    {
+        var booked = report
+            .Allocations.Select(allocation => new
+            {
+                Key = new PeriodicMeasurementKey(allocation.Combatant, allocation.Kind),
+                allocation.HealthAmount,
+                allocation.ShieldAmount,
+            })
+            .Concat(
+                report.Residuals.Select(residual => new
+                {
+                    Key = new PeriodicMeasurementKey(residual.Combatant, residual.Kind),
+                    residual.HealthAmount,
+                    residual.ShieldAmount,
+                })
+            )
+            .GroupBy(entry => entry.Key)
+            .ToDictionary(
+                group => group.Key,
+                group => new PeriodicMeasuredAmounts(
+                    group.Sum(entry => entry.HealthAmount),
+                    group.Sum(entry => entry.ShieldAmount)
+                )
+            );
+
+        foreach (var key in report.MeasuredTotals.Keys.Union(booked.Keys))
+        {
+            report.MeasuredTotals.TryGetValue(key, out var measured);
+            booked.TryGetValue(key, out var accounted);
+            Assert.Equal(measured, accounted);
+        }
+
+        var sourceRollups = report
+            .Allocations.GroupBy(allocation => new PeriodicImpactKey(
+                allocation.SourceId,
+                allocation.Combatant,
+                allocation.Kind
+            ))
+            .ToArray();
+        Assert.Equal(sourceRollups.Length, report.SourceImpacts.Count);
+        foreach (var rollup in sourceRollups)
+        {
+            var impact = report.SourceImpacts[rollup.Key];
+            Assert.Equal(rollup.Sum(allocation => allocation.HealthAmount), impact.HealthAmount);
+            Assert.Equal(rollup.Sum(allocation => allocation.ShieldAmount), impact.ShieldAmount);
+            Assert.Equal(
+                rollup.Any(allocation => allocation.Proof == CombatImpactPeriodicProof.Proportional)
+                    ? CombatImpactPeriodicProof.Proportional
+                    : CombatImpactPeriodicProof.Exact,
+                impact.Proof
+            );
+        }
     }
 }

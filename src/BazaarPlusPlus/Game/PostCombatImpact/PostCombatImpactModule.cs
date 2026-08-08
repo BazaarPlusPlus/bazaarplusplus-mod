@@ -1,5 +1,6 @@
 #nullable enable
 using BazaarGameClient.Domain.Models.Cards;
+using BazaarGameShared.Infra.Messages.CombatSimEvents;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.PostCombatImpact.Data;
@@ -48,10 +49,16 @@ internal interface IPostCombatImpactModule
 
     void OnNativeTooltipChanging(CardTooltipController controller);
 
+    void OnNativeTooltipInteractabilityChanged(
+        BaseTooltipController controller,
+        CanvasGroup canvasGroup
+    );
+
     void OnNativeAuxiliaryTooltipShowing(
         AuxiliaryTooltipController controller,
         Transform anchor,
-        string header
+        string header,
+        string body
     );
 
     void OnNativeAuxiliaryTooltipHiding(AuxiliaryTooltipController controller);
@@ -60,6 +67,7 @@ internal interface IPostCombatImpactModule
 internal sealed class PostCombatImpactModule : IBppFeature, IPostCombatImpactModule
 {
     private readonly IBppEventBus _eventBus;
+    private readonly CombatImpactReportRegistry _reports = new();
     private IDisposable? _subscription;
     private PostCombatImpactController? _runtime;
 
@@ -68,7 +76,7 @@ internal sealed class PostCombatImpactModule : IBppFeature, IPostCombatImpactMod
         _eventBus = eventBus;
     }
 
-    internal CombatImpactReport LatestReport { get; private set; } = CombatImpactReport.Empty;
+    internal CombatImpactReport LatestReport => _reports.Latest;
 
     internal void AttachRuntime(PostCombatImpactController runtime)
     {
@@ -145,11 +153,17 @@ internal sealed class PostCombatImpactModule : IBppFeature, IPostCombatImpactMod
     public void OnNativeTooltipChanging(CardTooltipController controller) =>
         _runtime?.OnNativeTooltipChanging(controller);
 
+    public void OnNativeTooltipInteractabilityChanged(
+        BaseTooltipController controller,
+        CanvasGroup canvasGroup
+    ) => _runtime?.OnNativeTooltipInteractabilityChanged(controller, canvasGroup);
+
     public void OnNativeAuxiliaryTooltipShowing(
         AuxiliaryTooltipController controller,
         Transform anchor,
-        string header
-    ) => _runtime?.OnNativeAuxiliaryTooltipShowing(controller, anchor, header);
+        string header,
+        string body
+    ) => _runtime?.OnNativeAuxiliaryTooltipShowing(controller, anchor, header, body);
 
     public void OnNativeAuxiliaryTooltipHiding(AuxiliaryTooltipController controller) =>
         _runtime?.OnNativeAuxiliaryTooltipHiding(controller);
@@ -163,33 +177,75 @@ internal sealed class PostCombatImpactModule : IBppFeature, IPostCombatImpactMod
     {
         _subscription?.Dispose();
         _subscription = null;
-        LatestReport = CombatImpactReport.Empty;
+        _reports.Reset();
         _runtime?.HideDetails();
     }
 
     private void OnCombatSimObserved(CombatSimObserved observed)
     {
+        var generation = _reports.BeginGeneration();
+        var simulation = observed.Message.Data;
+        if (simulation == null)
+            return;
+
+        IReadOnlyDictionary<string, CombatImpactEntity> entities;
         try
         {
-            var simulation = observed.Message.Data;
-            LatestReport =
-                simulation == null
-                    ? CombatImpactReport.Empty
-                    : CombatImpactProjector.Project(
-                        simulation,
-                        CombatImpactEntitySnapshotReader.Read()
-                    );
+            // This is the only Unity/game-runtime read. The expensive replay projection below
+            // operates only on the detached snapshot and immutable combat message data.
+            entities = CombatImpactEntitySnapshotReader.Read(simulation);
         }
         catch (Exception ex)
         {
-            LatestReport = CombatImpactReport.Empty;
-            BppLog.WarnEvent(
-                PostCombatImpactLogEvents.ProjectionDegraded,
-                ex,
-                PostCombatImpactLogEvents.ReasonCode.Bind(
-                    PostCombatImpactReasonCode.ProjectionException
-                )
-            );
+            ReportProjectionException(ex);
+            return;
         }
+
+        _ = ProjectInBackgroundAsync(simulation, entities, generation);
+    }
+
+    private async Task ProjectInBackgroundAsync(
+        CombatSim simulation,
+        IReadOnlyDictionary<string, CombatImpactEntity> entities,
+        long generation
+    )
+    {
+        try
+        {
+            var report = await Task.Run(() => CombatImpactProjector.Project(simulation, entities))
+                .ConfigureAwait(false);
+            if (!_reports.TryPublish(generation, report))
+                return;
+
+            foreach (var kind in report.ProjectionDiagnostics.Select(item => item.Kind).Distinct())
+            {
+                BppLog.WarnEvent(
+                    PostCombatImpactLogEvents.ProjectionDegraded,
+                    PostCombatImpactLogEvents.ReasonCode.Bind(
+                        PostCombatImpactReasonCode.ProjectionAttributionGap
+                    ),
+                    PostCombatImpactLogEvents.ProjectionCategory.Bind(kind)
+                );
+            }
+        }
+        catch (Exception ex)
+        {
+            if (_reports.TryPublish(generation, CombatImpactReport.Empty))
+                ReportProjectionException(ex);
+        }
+    }
+
+    private static void ReportProjectionException(Exception ex)
+    {
+        BppLog.WarnEvent(
+            PostCombatImpactLogEvents.ProjectionDegraded,
+            ex,
+            PostCombatImpactLogEvents.ReasonCode.Bind(
+                PostCombatImpactReasonCode.ProjectionException
+            ),
+            PostCombatImpactLogEvents.ProjectionCategory.Bind(
+                PostCombatImpactReasonCode.ProjectionException
+            )
+        );
     }
 }
