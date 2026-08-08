@@ -165,7 +165,7 @@ internal static class PostCombatImpactTooltipResetPatch
 {
     [HarmonyPrefix]
     private static void Prefix(CardTooltipController __instance) =>
-        BppPatchHost.Features.PostCombatImpact.OnNativeTooltipChanging(__instance);
+        BppPatchHost.Features.PostCombatImpact.OnNativeTooltipChanging(__instance, "reset");
 }
 
 [HarmonyPatch(typeof(CardTooltipController), nameof(CardTooltipController.ClearCurrentCard))]
@@ -173,7 +173,7 @@ internal static class PostCombatImpactTooltipClearPatch
 {
     [HarmonyPrefix]
     private static void Prefix(CardTooltipController __instance) =>
-        BppPatchHost.Features.PostCombatImpact.OnNativeTooltipChanging(__instance);
+        BppPatchHost.Features.PostCombatImpact.OnNativeTooltipChanging(__instance, "clear");
 }
 
 [HarmonyPatch(typeof(CardTooltipController), "OnDisable")]
@@ -181,5 +181,27 @@ internal static class PostCombatImpactTooltipDisablePatch
 {
     [HarmonyPrefix]
     private static void Prefix(CardTooltipController __instance) =>
-        BppPatchHost.Features.PostCombatImpact.OnNativeTooltipChanging(__instance);
+        BppPatchHost.Features.PostCombatImpact.OnNativeTooltipChanging(__instance, "disable");
+}
+
+// Native code couples blocksRaycasts to the tooltip lock (ToggleInteractabilityOnCanvas). This
+// feature locks the primary to keep it alive, which would otherwise turn the tooltip into a
+// pointer shield: positioned under the cursor (wide recap items, edge-anchored skills) it
+// steals the pointer from the hovered item, firing the synthetic OnPointerExit behind the
+// recap flicker. While the feature owns a controller, every native re-coupling is undone.
+[HarmonyPatch(typeof(BaseTooltipController), "ToggleInteractabilityOnCanvas")]
+internal static class PostCombatImpactTooltipRaycastPassPatch
+{
+    [HarmonyPostfix]
+    private static void Postfix(BaseTooltipController __instance, CanvasGroup ___tooltipCanvasGroup)
+    {
+        if (___tooltipCanvasGroup == null)
+            return;
+        if (!BppPatchHost.TryGetFeatures(out var features) || features == null)
+            return;
+        features.PostCombatImpact.OnNativeTooltipInteractabilityChanged(
+            __instance,
+            ___tooltipCanvasGroup
+        );
+    }
 }

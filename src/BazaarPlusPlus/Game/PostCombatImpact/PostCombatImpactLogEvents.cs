@@ -156,6 +156,36 @@ internal static class PostCombatImpactLogEvents
         new BppLogStormPolicy([AnomalyCategory, AnomalyPhase])
     );
 
+    internal static readonly BppLogFieldDefinition LifecyclePhase = PublicLow(0, "phase");
+    internal static readonly BppLogFieldDefinition LifecycleDetail = PublicLow(1, "detail");
+    internal static readonly BppLogFieldDefinition LifecycleCard = new(
+        2,
+        "card",
+        BppLogFieldPrivacy.Public,
+        BppLogCorrelationPolicy.None,
+        BppLogCardinality.High
+    );
+    internal static readonly BppLogFieldDefinition LifecycleFrame = new(
+        3,
+        "frame",
+        BppLogFieldPrivacy.Public,
+        BppLogCorrelationPolicy.None,
+        BppLogCardinality.High
+    );
+
+    /// <summary>
+    /// Info-level frame-stamped trail of every native/paired tooltip lifecycle transition during
+    /// recap. Exists because the Debug-level interaction trail never reaches the BepInEx disk log
+    /// and carries no frame identity, which made the Equipment Van flicker unattributable: three
+    /// visible phases (show → vanish → re-show) could not be tied to the code paths that caused
+    /// them. Transition-gated — nothing here fires per-frame.
+    /// </summary>
+    internal static readonly BppLogEventDefinition TooltipLifecycle = new(
+        BppLogFeatureScope.PostCombatImpact,
+        "post_combat_impact.tooltip.lifecycle",
+        [LifecyclePhase, LifecycleDetail, LifecycleCard, LifecycleFrame]
+    );
+
     private static BppLogFieldDefinition PublicLow(int order, string name) =>
         new(
             order,
