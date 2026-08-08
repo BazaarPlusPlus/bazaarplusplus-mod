@@ -42,6 +42,10 @@ internal sealed class CollectionNativeCardPreviewOwner : INativeCardPreviewOwner
 
     public void OnAcquired(NativeCardPreviewOwnerContext context)
     {
+        // CardPreviewBase loads the tier-frame prefab during SetUp, after the factory's
+        // initial layer pass. Reapply the layer here so native frame Renderers move from
+        // their prefab layer onto the collection overlay camera's clipped layer as well.
+        NativeCardPreviewReflection.ApplyLayerRecursive(context.Root, Layer);
         EnsureMaskableGraphics(context.Root);
 
         var marker = context.Root.GetComponent<CollectionPanelOwnedMarker>();
