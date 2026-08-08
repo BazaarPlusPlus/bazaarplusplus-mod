@@ -4,52 +4,14 @@ Operating rules for AI agents working in this repository (`AGENTS.md` is a symli
 
 ## Build & Test Commands
 
-The mod targets `netstandard2.1` (C# 12). Game assemblies are resolved via `ManagedPath` — auto-detected from common Steam install paths, or pass explicitly:
+`./run.sh` with no arguments lists every subcommand and what it does; it works on macOS and Windows (Git Bash). Build through it rather than calling `dotnet build` directly — the raw invocation skips the macOS trampoline repair that `run.sh` performs after every game update. The mod targets `netstandard2.1` (C# 12), and game assemblies resolve via `ManagedPath`, auto-detected from common Steam install paths or passed as `-p:ManagedPath=...`.
 
-```powershell
-# Build the mod (Debug, auto-copies to BepInEx/plugins/ if game found)
-dotnet build src/BazaarPlusPlus/BazaarPlusPlus.csproj
+Below is only what `run.sh` cannot tell you:
 
-# Build with explicit game assembly path
-dotnet build src/BazaarPlusPlus/BazaarPlusPlus.csproj -p:ManagedPath="D:\Steam\steamapps\common\The Bazaar\TheBazaar_Data\Managed"
-
-# Build both Debug + Release (Release copies to installer repo if present)
-dotnet build src/BazaarPlusPlus/BazaarPlusPlus.csproj -t:BuildAll
-
-# Run a single xUnit test project (has Microsoft.NET.Test.Sdk)
-dotnet test tests\Architecture.Tests\Architecture.Tests.csproj
-
-# Run an exe-runner test project (no Microsoft.NET.Test.Sdk)
-dotnet run --project tests\ChoiceScreenPedestalResolver.Tests\ChoiceScreenPedestalResolver.Tests.csproj
-
-# Format with the repo-pinned CSharpier version
-./run.sh format
-```
-
-`run.sh` works on macOS and Windows (Git Bash). Subcommands:
-
-- `./run.sh build [--with-bazaaragent] [--fast]` — Debug build (`--fast` skips NuGet restore)
-- `./run.sh publish [--with-bazaaragent] [-p:Name=Value ...]` — production build: fetch remote embedded data, run seed gates, then `-t:BuildAll` (Debug + Release) with installer packaging
-- `./run.sh fetch-data [-p:Name=Value ...]` — refresh remote embedded data
-- `./run.sh restore-locks` — refresh committed NuGet lock files for the six published assemblies
-- `./run.sh restore-locked` — validate published-assembly restores in locked mode without updating lock files
-- `./run.sh test` — run all test projects under `tests/`
-- `./run.sh format` — restore the repo-pinned CSharpier tool and format the source tree
-- `./run.sh format-check` — restore the repo-pinned CSharpier tool and fail on unformatted files
-- `./run.sh decompile [DllName]` — decompile a single game DLL (default: Assembly-CSharp)
-- `./run.sh decompile-all` — decompile all tracked game DLLs
-- `./run.sh decompile-ptr [DllName]` — decompile a single PTR game DLL into `decompiled-vptr/`
-- `./run.sh decompile-all-ptr` — decompile all tracked PTR game DLLs
-- `./run.sh snapshot-managed` — archive the installed Managed dir under `game-libs/`
-- `./run.sh build-matrix` — build the source tree against every archived Managed snapshot
-
-When building from an isolated ticket worktree, explicitly pass `-p:BPPInstallerSourcePath="<absolute-path-to>/bazaarplusplus-installer/src-tauri/resources"` to projects that reference the main mod. The default sibling installer path does not exist beside ticket worktrees.
-
-When running `./run.sh test` (full suite) from an isolated worktree, `run.sh` does not forward `-p:` properties, and injecting `BPPInstallerSourcePath` via environment variable also has no effect — create a `bazaarplusplus-installer` symlink in the worktree's parent directory pointing at the real installer repo. Each new worktree also needs `ln -sfn <main-checkout>/decompiled <worktree>/decompiled` (`decompiled/` is a gitignored local artifact; `NativeCardPreviewCompatibility.Tests` hard-depends on it). Missing either link surfaces as MSB3030 or a missing decompiled source file — easy to misread as a code regression.
-
-Test projects under `tests/` are split per-feature. Some use xUnit + `Microsoft.NET.Test.Sdk` (run via `dotnet test`), others are executable (run via `dotnet run --project`). Check whether the csproj has `Microsoft.NET.Test.Sdk` to determine which.
-
-When changing a direct dependency, edit `Directory.Packages.props`, run `./run.sh restore-locks`, and review the six changed `src/**/packages.lock.json` files with the version change. Do not generate lock files for test projects. Before committing, run `./run.sh restore-locked` so dependency graph drift fails locally, then run the standard build and test commands.
+- Running one test project directly: `dotnet test <csproj>` for xUnit projects, `dotnet run --project <csproj>` for exe-runner ones. Which is which is decided by whether the csproj references `Microsoft.NET.Test.Sdk`.
+- After changing a direct dependency in `Directory.Packages.props`: run `./run.sh restore-locks`, review the six changed `src/**/packages.lock.json` files, then `./run.sh restore-locked` so graph drift fails locally rather than in the installer build. Test projects get no lock files.
+- Building from an isolated ticket worktree: pass `-p:BPPInstallerSourcePath="<absolute-path>/bazaarplusplus-installer/src-tauri/resources"` to projects referencing the main mod, because the default sibling installer path does not exist beside a worktree.
+- Running the full `./run.sh test` from a worktree: `run.sh` forwards no `-p:` properties and ignores the environment variable, so create a `bazaarplusplus-installer` symlink in the worktree's parent directory plus `ln -sfn <main-checkout>/decompiled <worktree>/decompiled` (`decompiled/` is a gitignored local artifact that `NativeCardPreviewCompatibility.Tests` hard-depends on). A missing link surfaces as MSB3030 or a missing decompiled source file, which reads like a code regression.
 
 ## Logs & Debugging
 
@@ -98,7 +60,7 @@ Issues live in this repo's GitHub Issues, operated via the `gh` CLI. See `docs/a
 
 ### Triage labels
 
-The five canonical triage labels are used as-is: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+The five canonical triage labels are used as-is: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`.
 
 ### Domain docs
 

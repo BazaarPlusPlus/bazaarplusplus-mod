@@ -37,16 +37,9 @@ so the dylib still loads and degrades cleanly on older systems.
 Requirements: macOS + Xcode / Command Line Tools SDK, Apple Silicon (arm64). The script
 runs one `clang` command, then copies the dylib into the installer repo (see below).
 
-Load-bearing `clang` flags — do not change without understanding why:
-
-- `-arch arm64` — the only supported target (Apple Silicon).
-- `-fobjc-arc` — ARC manages the ObjC objects (`CATapDescription`, the aggregate-device dict).
-- `-framework CoreAudio -framework Foundation` — the tap APIs are in CoreAudio; the
-  `NSProcessInfo` version gate is in Foundation.
-- `-mmacosx-version-min=11.0` — **NOT 14.2.** This weak-imports the macOS 14.2 tap symbols so
-  the dylib *loads* on macOS 11–14 and `IsSupported` cleanly returns 0 there; the tap symbols
-  are only ever called after the in-dylib `>= 15` gate (`NSProcessInfo`). Bumping it to 14.2
-  would make the dylib fail to load on older systems instead of degrading to a silent video.
+Every `clang` flag in `build.sh` is load-bearing, and the two whose reasons are not obvious from
+the flag itself — the `lib` output prefix and `-mmacosx-version-min=11.0` — carry that reason in a
+comment directly above the command. Read them there before changing the invocation.
 
 ## Where it ships (two-repo split)
 

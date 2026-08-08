@@ -17,7 +17,7 @@ _Avoid_: encounter tracker, run timeline
 
 **Run Snapshot Probe**:
 The on-demand, pull-based read of the current run's recordable facts — day/hour, win/loss, hero, mode, player stats, rank, leaderboard placement (`IRunSnapshotProbe`). Consumers map the snapshot into their own records instead of reading game globals directly.
-_Avoid_: run tracker, direct global-state reads
+_Avoid_: run tracker
 
 **Game Build Channel**:
 The classification of the running client as `Online`, `Ptr`, or `Unknown`, resolved once at startup by `GameBuildInfoResolver` (conflicting signals resolve to `Ptr`). It gates uploads and is stamped on recorded runs, isolating PTR data from the production dataset.
@@ -29,11 +29,10 @@ _Avoid_: RunLoggingController, run logger MonoBehaviour
 
 **Encounter Preview Module**:
 The feature-owned query boundary for event cards, encounter-step rewards, and hero level rewards. Callers supply only a stable template id, current level, and native text they already hold; the module owns everything from plan generation to final presentation.
-_Avoid_: plan runtime facade, Collection encounter helper, patch-built run snapshot
 
 **End-of-Run Capture Workflow**:
 The single run-scoped state machine that owns the end-of-run screenshot flow — readiness, bounded attempts, artifact validation, fail-open terminal outcomes. Harmony patches express only Continue and reveal-start intents through `IEndOfRunCaptureWorkflow`; they never drive capture directly.
-_Avoid_: screenshot gate, capture operation facade, patch-to-driver calls
+_Avoid_: screenshot gate
 
 **Ghost Battle**:
 A PvP battle fetched from the mod backend in which the local player's uploaded build fought inside another player's run (the game's PvP is asynchronous — opponents are ghosts). The imported manifest keeps the recorder's perspective — the challenger occupies the `Player` side — and only the HistoryPanel list row is projected into local perspective by `GhostBattleLocalProjector`. The stored convention is stamped as `PerspectiveVersion` (see [ADR-0007](docs/adr/0007-bazaaragent-external-replay-video-recording.md)).
@@ -43,7 +42,6 @@ _Avoid_: remote battle, opponent battle
 
 **Saved Replay Lifecycle**:
 The single pure owner (`SavedReplayLifecycle`) of a saved-replay playback session's state algebra — start progress, terminal ownership, the time-bounded duplicate-exit suppression window, and the pending menu-return deadline. The runtime feeds observations (time, state exits, scene readiness) and executes the returned decisions; replay exit itself still flows only through `CombatReplayRuntime.TryContinueReplay` per ADR-0007 (which also absorbed ADR-0008's `Continue` agent action).
-_Avoid_: replay exit flags, source-text ownership pins
 
 ## Overlay panels
 
@@ -57,11 +55,11 @@ _Avoid_: panel mutex
 
 **Native Card Preview Host**:
 The sole owning module (`GameInterop/CardPreview`) for the game's native card prefabs: setup, full visibility, hover, tooltip replacement, pooling, and destruction. Consumers open their own scopes through the host instead of holding runtime, reflection, or pool internals.
-_Avoid_: card factory facade, global preview pool
+_Avoid_: global preview pool
 
 **Native Card Preview Scope / Session**:
 A scope is one real UI owner's resource boundary, with its own pool; closing it settles pending acquisitions and destroys its objects. A session is an opaque lease of one set-up card, exposing only the layout root/rect and show/hide/hover intents — callers never hold native components or setup tasks.
-_Avoid_: preview handle, setup-task lease, cross-owner session
+_Avoid_: preview handle
 
 ## Fonts
 
@@ -80,48 +78,44 @@ The unified settings-dock concept for entries that cycle through an ordered valu
 The shared V5 reader/writer boundary that opens a Bundle, verifies manifest-to-payload Run identity,
 and decides whether a Battle has the exact snapshot and replay inputs required for import. Bundle
 composition and Ghost Battle import use the same contract.
-_Avoid_: ghost replay validator, composer-only replayability check
 
 **Mod API Response**:
 The bounded HTTP response boundary for mod-backend JSON: nested and legacy error-envelope shape,
 request ID precedence, `Retry-After`, and the separation between a closed user code and diagnostic
 exception. Endpoint-specific disposition and retry policy stay with each client.
-_Avoid_: generic endpoint result, raw response error text
 
 **Mod API Session**:
 One owned transport lifetime for one mod-backend consumer. It combines normalized routes, standard
 headers and timeout with typed Bundle, Ghost Battle, and health operations, without exposing its
 `HttpClient` or endpoint adapters. Plugin History, each Upload Feed activation, and tools own
 separate sessions.
-_Avoid_: online client bag, shared global HttpClient, public endpoint-client chain
+_Avoid_: shared global HttpClient, public endpoint-client chain
 
 **Bundle Seal Convergence**:
 The pure decision core for one Bundle seal pass. It receives the remaining relative deadline and
 observed input facts, then decides whether to continue, wait, degrade the screenshot, or terminate;
 it owns no clock, SQLite connection, file, codec, or Unity object.
-_Avoid_: seal policy bag, SQLite state machine
 
 **Bundle Queue Store**:
 The concrete Storage owner of `bundle_seal_jobs` and `bundle_outbox` rows, SQL, and multi-row
 transactions. Game workflows translate its storage records into composition and upload behavior;
 there is deliberately no same-shape single-implementation repository interface.
-_Avoid_: outbox repository interface, Game SQL helper
+_Avoid_: outbox repository interface
 
 **Bundle Outbox Files**:
 The Game-owned file port for sealed Bundle artifacts. It exposes root-confined open, existence,
 length, enumeration, and deletion so upload ordering and retention can be tested without moving
 filesystem policy into Storage.
-_Avoid_: bundle file repository, Storage file service
 
 **Upload Feed Session**:
 The behavior object (`IUploadFeedSession`) a feed returns from activation: feature enablement, one upload attempt, feed-private arm signals, and resource disposal. The background pump owns only the Unity cadence, the shutdown drain, and the shared gates (PTR channel precondition, run-lifecycle and `UploadArmRequested` arm signals); it never rewires feed internals.
-_Avoid_: upload activation bag, per-feed upload controller, pump static registry
+_Avoid_: per-feed upload controller
 
 ## Collection panel
 
 **Collection View State**:
 The single owner of the Collection Panel's presentable state (`CollectionViewState`) — filter selections, search mode and debounce, catalog acceptance, and the derived render model. Commands and lifecycle events go in; a complete render outcome (view model plus scroll intents) comes out. The panel's Unity surface only forwards commands and applies outcomes; grid read-back goes through the `ICollectionGridPort` projection contract (`Publish`/`Current`, with explicit empty-before-first-publish semantics). Nothing outside the module reads or writes the filter.
-_Avoid_: filter glue, panel command protocol, ApplyFilters/RefreshView pairing
+_Avoid_: ApplyFilters/RefreshView pairing
 
 ## Collection sources
 
@@ -133,7 +127,6 @@ The set of card templates a source can offer, expressed through structured rules
 
 **Collection Source Kind**:
 The source category used by CollectionPanel source chips: `Merchant` maps to Item sources, `Trainer` maps to Skill sources.
-_Avoid_: merchant-kind tag filtering
 
 ## Day tiers
 
@@ -145,21 +138,19 @@ _Avoid_: DayTierSchedule, hardcoded tier table
 
 **Remote Embedded Catalog**:
 The shared runtime lifecycle for data shipped as an embedded seed, cached under `<GameRoot>/BazaarPlusPlusV5/`, and refreshed from a remote source (`IRemoteEmbeddedCatalog<T>`). The interface exposes only current-snapshot lookup, warm-up, explicit refresh, and disposal; feature modules keep their own parser, logging, and user-facing refresh policy.
-_Avoid_: feature repository loader, dual catalog state machine
+_Avoid_: feature repository loader
 
 **Supporter Catalog Module**:
 The composition-owned Remote Embedded Catalog consumer for supporter data. It preserves fixed-list
 bypass, publishes session-stable snapshots through the supporter facade, owns retry/disposal, and
 translates catalog issues into supporter log events.
-_Avoid_: static supporter refresh task, temporary-directory supporter cache
 
 **Release Manifest**:
 The installer-published `{ "version": ... }` document used only for the main-menu update check. Its
 HTTP/JSON adapter and request-generation lifecycle are separate from Mod API health and installer
 runtime state.
-_Avoid_: Mod API health, installer state
+_Avoid_: Mod API health
 
 **Build Seed Fetch**:
 The build-time transport operation that stages remote embedded seeds, checks coarse transfer
 integrity, runs feature-owned semantic gates, and promotes the complete seed set transactionally.
-_Avoid_: runtime catalog refresh, generic schema validator
