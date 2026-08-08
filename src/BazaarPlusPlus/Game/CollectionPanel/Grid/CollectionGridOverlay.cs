@@ -82,11 +82,22 @@ internal sealed class CollectionGridOverlay
         var clipObject = new GameObject(
             "CollectionPanelOverlayClip",
             typeof(RectTransform),
-            typeof(RectMask2D)
+            typeof(RectMask2D),
+            typeof(Image),
+            typeof(Mask)
         );
         clipObject.layer = _layer;
         clipObject.transform.SetParent(_root.transform, worldPositionStays: false);
         _clipRect = clipObject.GetComponent<RectTransform>();
+
+        // RectMask2D clips standard UI graphics through the UI clip rectangle, but native card
+        // materials may not consume that shader parameter. The invisible Image + Mask pair also
+        // writes a stencil rectangle so mask-aware card art and tier frames are clipped at render
+        // time without painting a solid cover over the panel backdrop.
+        var maskGraphic = clipObject.GetComponent<Image>();
+        maskGraphic.color = Color.white;
+        maskGraphic.raycastTarget = false;
+        clipObject.GetComponent<Mask>().showMaskGraphic = false;
 
         var boardObject = new GameObject("CollectionPanelOverlayBoard", typeof(RectTransform));
         boardObject.layer = _layer;
