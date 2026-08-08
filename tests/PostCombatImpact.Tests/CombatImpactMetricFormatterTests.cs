@@ -67,11 +67,11 @@ public sealed class CombatImpactMetricFormatterTests
         Assert.Empty(CombatImpactMetricFormatter.CausedSummary(source, chinese: false));
         Assert.Empty(CombatImpactMetricFormatter.CausedSummary(source, chinese: true));
         Assert.Equal(
-            "Triggered by: Soul of the District ×10",
+            "Triggered by: Soul of the District ×1",
             CombatImpactMetricFormatter.TriggerSources(group, chinese: false)
         );
         Assert.Equal(
-            "触发来源：Soul of the District ×10",
+            "触发来源：Soul of the District ×1",
             CombatImpactMetricFormatter.TriggerSources(group, chinese: true)
         );
     }
@@ -102,11 +102,11 @@ public sealed class CombatImpactMetricFormatterTests
         };
 
         Assert.Equal(
-            "Triggered by: Trigger ×3",
+            "Triggered by: Trigger ×1",
             CombatImpactMetricFormatter.TriggerSources(group, chinese: false)
         );
         Assert.Equal(
-            "触发来源：Trigger ×3",
+            "触发来源：Trigger ×1",
             CombatImpactMetricFormatter.TriggerSources(group, chinese: true)
         );
 
@@ -117,6 +117,41 @@ public sealed class CombatImpactMetricFormatterTests
         };
         Assert.Empty(CombatImpactMetricFormatter.TriggerSources(unavailable, chinese: false));
         Assert.Empty(CombatImpactMetricFormatter.TriggerSources(unavailable, chinese: true));
+    }
+
+    [Fact]
+    public void Trigger_sources_count_activation_batches_instead_of_target_fan_out()
+    {
+        var dragRacer = new CombatImpactEntity("drag-racer", "Drag Racer", "Item", null, 1);
+        var tambourine = new CombatImpactEntity("tambourine", "Tambourine", "Item", null, 2);
+        var group = Group(
+            CombatImpactKind.Charge,
+            count: 16,
+            observedValue: 16_000,
+            unit: CombatImpactValueUnit.Milliseconds
+        ) with
+        {
+            TriggerSources =
+            [
+                new CombatImpactTriggerSource(
+                    dragRacer,
+                    ApplicationCount: 8,
+                    ObservedActivationBatchCount: 2
+                ),
+                new CombatImpactTriggerSource(
+                    tambourine,
+                    ApplicationCount: 8,
+                    ObservedActivationBatchCount: 2
+                ),
+            ],
+            TriggerPresentationState = CombatImpactTriggerPresentationState.Complete,
+        };
+
+        Assert.Equal(
+            "Triggered by: Drag Racer ×2 · Tambourine ×2",
+            CombatImpactMetricFormatter.TriggerSources(group, chinese: false)
+        );
+        Assert.Equal("×16 · 16s", CombatImpactMetricFormatter.Group(group, chinese: false));
     }
 
     [Fact]

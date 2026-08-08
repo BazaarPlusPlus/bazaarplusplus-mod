@@ -816,15 +816,18 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
                 string.Empty,
                 useNumberFont: false
             ) ?? string.Empty;
-        var iconText = CloneText(
-            textTemplate,
-            header,
-            effectIcon,
-            GroupLabelFontScale,
-            preferredWidth: GroupIconColumnPreferredWidth,
-            minWidth: GroupIconColumnPreferredWidth
-        );
-        iconText.alignment = TextAlignmentOptions.MidlineLeft;
+        if (!string.IsNullOrWhiteSpace(effectIcon))
+        {
+            var iconText = CloneText(
+                textTemplate,
+                header,
+                effectIcon,
+                GroupLabelFontScale,
+                preferredWidth: GroupIconColumnPreferredWidth,
+                minWidth: GroupIconColumnPreferredWidth
+            );
+            iconText.alignment = TextAlignmentOptions.MidlineLeft;
+        }
 
         var labelText = CloneText(
             textTemplate,
