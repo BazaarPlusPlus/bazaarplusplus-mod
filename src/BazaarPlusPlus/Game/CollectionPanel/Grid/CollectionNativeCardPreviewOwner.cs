@@ -4,6 +4,7 @@ using BazaarPlusPlus.GameInterop.CardPreview;
 using BazaarPlusPlus.Infrastructure;
 using TheBazaar.UI;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace BazaarPlusPlus.Game.CollectionPanel.Grid;
 
@@ -41,6 +42,8 @@ internal sealed class CollectionNativeCardPreviewOwner : INativeCardPreviewOwner
 
     public void OnAcquired(NativeCardPreviewOwnerContext context)
     {
+        EnsureMaskableGraphics(context.Root);
+
         var marker = context.Root.GetComponent<CollectionPanelOwnedMarker>();
         var tooltipData =
             context.TooltipData ?? context.Root.GetComponent<CardPreviewBase>()?._tooltipData;
@@ -49,6 +52,12 @@ internal sealed class CollectionNativeCardPreviewOwner : INativeCardPreviewOwner
 
         CollectionTierTooltipRegistry.Register(tooltipData.CardInstance);
         marker.TooltipRegistered = true;
+    }
+
+    private static void EnsureMaskableGraphics(GameObject root)
+    {
+        foreach (var graphic in root.GetComponentsInChildren<MaskableGraphic>(true))
+            graphic.maskable = true;
     }
 
     public void BeforeRelease(NativeCardPreviewOwnerContext context)
