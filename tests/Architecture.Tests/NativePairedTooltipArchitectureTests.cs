@@ -441,6 +441,133 @@ public sealed class NativePairedTooltipArchitectureTests
         );
     }
 
+    [Fact]
+    public void Combat_impact_builds_only_the_visible_perspective_until_shift_requests_the_other()
+    {
+        var sourceRoot = MainSourceRoot(RepoRoot());
+        var view = File.ReadAllText(
+            Path.Combine(
+                sourceRoot,
+                "Patches",
+                "PostCombatImpact",
+                "NativePostCombatImpactTooltipView.cs"
+            )
+        );
+
+        var showStart = view.IndexOf("public bool Show(", StringComparison.Ordinal);
+        var showEnd = view.IndexOf(
+            "public bool SetPerspective(",
+            showStart,
+            StringComparison.Ordinal
+        );
+        Assert.True(showStart >= 0 && showEnd > showStart);
+        var show = view[showStart..showEnd];
+        Assert.Contains(
+            "EnsurePerspectiveBuilt(_activePerspective)",
+            show,
+            StringComparison.Ordinal
+        );
+        Assert.DoesNotContain("BuildCaused(", show, StringComparison.Ordinal);
+        Assert.DoesNotContain("BuildReceived(", show, StringComparison.Ordinal);
+
+        var switchStart = showEnd;
+        var switchEnd = view.IndexOf(
+            "public bool Position(",
+            switchStart,
+            StringComparison.Ordinal
+        );
+        Assert.True(switchEnd > switchStart);
+        var perspectiveSwitch = view[switchStart..switchEnd];
+        var lazyBuild = perspectiveSwitch.IndexOf(
+            "EnsurePerspectiveBuilt(perspective)",
+            StringComparison.Ordinal
+        );
+        var reveal = perspectiveSwitch.IndexOf(
+            "ApplyPerspectiveVisibility(perspective)",
+            StringComparison.Ordinal
+        );
+        Assert.True(
+            lazyBuild >= 0 && reveal > lazyBuild,
+            "the requested perspective must be built inside the masked Shift transition"
+        );
+
+        var ensureStart = view.IndexOf(
+            "private bool EnsurePerspectiveBuilt(",
+            StringComparison.Ordinal
+        );
+        var ensureEnd = view.IndexOf(
+            "private void BuildCaused(",
+            ensureStart,
+            StringComparison.Ordinal
+        );
+        Assert.True(ensureStart >= 0 && ensureEnd > ensureStart);
+        var ensure = view[ensureStart..ensureEnd];
+        Assert.Contains("if (_causedPerspectiveBuilt)", ensure, StringComparison.Ordinal);
+        Assert.Contains("if (_receivedPerspectiveBuilt)", ensure, StringComparison.Ordinal);
+        Assert.Contains("BuildCaused(", ensure, StringComparison.Ordinal);
+        Assert.Contains("BuildReceived(", ensure, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Attaching_paired_content_commits_only_the_final_width_layout()
+    {
+        var host = File.ReadAllText(
+            Path.Combine(
+                MainSourceRoot(RepoRoot()),
+                "GameInterop",
+                "Tooltips",
+                "NativePairedTooltipHost.cs"
+            )
+        );
+        var attachStart = host.IndexOf("internal bool AttachContent(", StringComparison.Ordinal);
+        var attachEnd = host.IndexOf(
+            "internal PlacementResult Position(",
+            attachStart,
+            StringComparison.Ordinal
+        );
+        Assert.True(attachStart >= 0 && attachEnd > attachStart);
+        var attach = host[attachStart..attachEnd];
+
+        var applyWidth = attach.IndexOf("ApplyContentWidth(auxiliary", StringComparison.Ordinal);
+        var rebuild = attach.IndexOf("ForceRebuildLayout(auxiliary);", StringComparison.Ordinal);
+        Assert.True(
+            applyWidth >= 0 && rebuild > applyWidth,
+            "width-dependent columns must be updated before the bounded layout commit"
+        );
+        Assert.Equal(
+            rebuild,
+            attach.LastIndexOf("ForceRebuildLayout(auxiliary);", StringComparison.Ordinal)
+        );
+    }
+
+    [Fact]
+    public void Combat_impact_geometry_settling_reuses_capture_buffers()
+    {
+        var controller = File.ReadAllText(
+            Path.Combine(
+                MainSourceRoot(RepoRoot()),
+                "Game",
+                "PostCombatImpact",
+                "PostCombatImpactController.cs"
+            )
+        );
+        var captureStart = controller.IndexOf(
+            "private static bool TryCaptureGeometry(",
+            StringComparison.Ordinal
+        );
+        var captureEnd = controller.IndexOf(
+            "internal void OnNativeTooltipChanging(",
+            captureStart,
+            StringComparison.Ordinal
+        );
+        Assert.True(captureStart >= 0 && captureEnd > captureStart);
+        var capture = controller[captureStart..captureEnd];
+
+        Assert.Contains("sample.CopyWorldCorners", capture, StringComparison.Ordinal);
+        Assert.DoesNotContain("new Vector3[", capture, StringComparison.Ordinal);
+        Assert.DoesNotContain("new GeometrySample", capture, StringComparison.Ordinal);
+    }
+
     /// <summary>
     /// The pre-existing native card-tooltip content refresher is a different concern and must not
     /// be folded into the paired host.

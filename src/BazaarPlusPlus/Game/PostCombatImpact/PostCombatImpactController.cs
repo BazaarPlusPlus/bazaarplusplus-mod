@@ -24,6 +24,8 @@ internal sealed class PostCombatImpactController : MonoBehaviour
     private const int MaxTransientShowRetries = 2;
 
     private readonly WaitForEndOfFrame _waitForEndOfFrame = new();
+    private readonly GeometrySample _geometrySampleA = new();
+    private readonly GeometrySample _geometrySampleB = new();
     private PostCombatImpactModule? _module;
     private IPostCombatImpactTooltipView? _view;
     private Coroutine? _pendingShow;
@@ -572,7 +574,9 @@ internal sealed class PostCombatImpactController : MonoBehaviour
         // StartCoroutine advances immediately; yield before the controller stores the handle.
         yield return _waitForEndOfFrame;
 
-        GeometrySample? previous = null;
+        var previous = _geometrySampleA;
+        var current = _geometrySampleB;
+        var hasPrevious = false;
         var stableSamples = 0;
         var primaryConverged = false;
         for (var frame = 0; frame < PrimaryGeometrySettleMaxFrames; frame++)
@@ -584,13 +588,14 @@ internal sealed class PostCombatImpactController : MonoBehaviour
                 yield break;
             }
 
-            if (TryCaptureGeometry(primary, auxiliary: null, out var current))
+            if (TryCaptureGeometry(primary, auxiliary: null, current))
             {
                 stableSamples =
-                    previous != null && current.IsNear(previous, GeometryEpsilon)
+                    hasPrevious && current.IsNear(previous, GeometryEpsilon)
                         ? stableSamples + 1
                         : 1;
-                previous = current;
+                (previous, current) = (current, previous);
+                hasPrevious = true;
                 if (stableSamples >= RequiredStableGeometrySamples)
                 {
                     primaryConverged = true;
@@ -599,7 +604,7 @@ internal sealed class PostCombatImpactController : MonoBehaviour
             }
             else
             {
-                previous = null;
+                hasPrevious = false;
                 stableSamples = 0;
             }
 
@@ -655,7 +660,7 @@ internal sealed class PostCombatImpactController : MonoBehaviour
             yield break;
         }
 
-        previous = null;
+        hasPrevious = false;
         stableSamples = 0;
         var pairConverged = false;
         for (var frame = 0; frame < PositionedGeometrySettleMaxFrames; frame++)
@@ -668,13 +673,14 @@ internal sealed class PostCombatImpactController : MonoBehaviour
                 yield break;
             }
 
-            if (TryCaptureGeometry(primary, auxiliary, out var current))
+            if (TryCaptureGeometry(primary, auxiliary, current))
             {
                 stableSamples =
-                    previous != null && current.IsNear(previous, GeometryEpsilon)
+                    hasPrevious && current.IsNear(previous, GeometryEpsilon)
                         ? stableSamples + 1
                         : 1;
-                previous = current;
+                (previous, current) = (current, previous);
+                hasPrevious = true;
                 if (stableSamples >= RequiredStableGeometrySamples)
                 {
                     pairConverged = true;
@@ -683,7 +689,7 @@ internal sealed class PostCombatImpactController : MonoBehaviour
             }
             else
             {
-                previous = null;
+                hasPrevious = false;
                 stableSamples = 0;
             }
         }
@@ -735,36 +741,21 @@ internal sealed class PostCombatImpactController : MonoBehaviour
     private static bool TryCaptureGeometry(
         CardTooltipController primary,
         AuxiliaryTooltipController? auxiliary,
-        out GeometrySample sample
+        GeometrySample sample
     )
     {
         var primaryRect = primary.PositioningRectTransform;
         var contentRect = primary.CanvasContentRectTransform;
         if (primaryRect == null || contentRect == null)
-        {
-            sample = null!;
             return false;
-        }
 
-        var values = new Vector3[auxiliary == null ? 9 : 13];
-        CopyWorldCorners(primaryRect, values, 0);
-        CopyWorldCorners(contentRect, values, 4);
-        values[8] = primary.transform.localScale;
+        sample.Reset(auxiliary == null ? 9 : 13);
+        sample.CopyWorldCorners(primaryRect, 0);
+        sample.CopyWorldCorners(contentRect, 4);
+        sample.SetValue(8, primary.transform.localScale);
         if (auxiliary != null)
-            CopyWorldCorners(auxiliary.PositioningRectTransform, values, 9);
-        sample = new GeometrySample(values);
+            sample.CopyWorldCorners(auxiliary.PositioningRectTransform, 9);
         return true;
-    }
-
-    private static void CopyWorldCorners(
-        RectTransform rect,
-        Vector3[] destination,
-        int destinationIndex
-    )
-    {
-        var corners = new Vector3[4];
-        rect.GetWorldCorners(corners);
-        Array.Copy(corners, 0, destination, destinationIndex, corners.Length);
     }
 
     internal void OnNativeTooltipChanging(CardTooltipController controller)
@@ -1336,20 +1327,27 @@ internal sealed class PostCombatImpactController : MonoBehaviour
 
     private sealed class GeometrySample
     {
-        private readonly Vector3[] _values;
+        private readonly Vector3[] _values = new Vector3[13];
+        private readonly Vector3[] _corners = new Vector3[4];
+        private int _count;
 
-        internal GeometrySample(Vector3[] values)
+        internal void Reset(int count) => _count = count;
+
+        internal void CopyWorldCorners(RectTransform rect, int destinationIndex)
         {
-            _values = values;
+            rect.GetWorldCorners(_corners);
+            Array.Copy(_corners, 0, _values, destinationIndex, _corners.Length);
         }
+
+        internal void SetValue(int index, Vector3 value) => _values[index] = value;
 
         internal bool IsNear(GeometrySample other, float positionEpsilon)
         {
-            if (_values.Length != other._values.Length)
+            if (_count != other._count)
                 return false;
 
             var positionEpsilonSquared = positionEpsilon * positionEpsilon;
-            for (var index = 0; index < _values.Length; index++)
+            for (var index = 0; index < _count; index++)
             {
                 if (index == 8)
                 {

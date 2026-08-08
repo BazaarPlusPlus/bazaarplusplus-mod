@@ -1302,7 +1302,7 @@ public sealed class CombatImpactProjectorTests
         var sourceDamage = Assert.Single(
             Assert.Single(report.Sources, source => source.Entity.Id == "source").Groups
         );
-        Assert.Null(sourceDamage.ObservedValue);
+        Assert.Equal(37_454, sourceDamage.ObservedValue);
         Assert.Equal(37_454, sourceDamage.AuthoritativeMetric?.Value);
         Assert.Equal(1, sourceDamage.CriticalCount);
         Assert.Equal(37_454, sourceDamage.CriticalObservedValue);
@@ -1310,10 +1310,154 @@ public sealed class CombatImpactProjectorTests
         var triggerDamage = Assert.Single(
             Assert.Single(report.Sources, source => source.Entity.Id == "trigger").Groups
         );
-        Assert.Null(triggerDamage.ObservedValue);
+        Assert.Equal(86, triggerDamage.ObservedValue);
         Assert.Equal(86, triggerDamage.AuthoritativeMetric?.Value);
         Assert.Equal(1, triggerDamage.CriticalCount);
         Assert.Equal(86, triggerDamage.CriticalObservedValue);
+    }
+
+    [Fact]
+    public void Maps_mixed_concurrent_damage_crits_from_native_adjustment_order_without_stats()
+    {
+        var simulation = new CombatSim();
+        simulation
+            .Frames[0]
+            .Events.Add(
+                Executed("source", EActionCommandType.PlayerDamage, Player(ECombatantId.Opponent))
+            );
+        simulation
+            .Frames[0]
+            .Events.Add(
+                Executed("trigger", EActionCommandType.PlayerDamage, Player(ECombatantId.Opponent))
+            );
+        simulation.Frames[0].OpponentUpdates = new CombatSimPlayerUpdate
+        {
+            HealthAdjustments =
+            {
+                DamageAdjustment(EPlayerHealthChangeType.Health, -32, isCritical: false),
+                DamageAdjustment(EPlayerHealthChangeType.Health, -62, isCritical: true),
+            },
+        };
+
+        var report = CombatImpactProjector.Project(simulation, Entities());
+        var sourceDamage = Assert.Single(
+            Assert.Single(report.Sources, source => source.Entity.Id == "source").Groups
+        );
+        var triggerDamage = Assert.Single(
+            Assert.Single(report.Sources, source => source.Entity.Id == "trigger").Groups
+        );
+
+        Assert.Equal(32, sourceDamage.ObservedValue);
+        Assert.Equal(0, sourceDamage.CriticalCount);
+        Assert.Equal(62, triggerDamage.ObservedValue);
+        Assert.Equal(1, triggerDamage.CriticalCount);
+        Assert.Equal(62, triggerDamage.CriticalObservedValue);
+    }
+
+    [Fact]
+    public void Maps_split_shield_and_health_damage_before_the_next_concurrent_effect()
+    {
+        var simulation = new CombatSim();
+        simulation
+            .Frames[0]
+            .Events.Add(
+                Executed("source", EActionCommandType.PlayerDamage, Player(ECombatantId.Opponent))
+            );
+        simulation
+            .Frames[0]
+            .Events.Add(
+                Executed("trigger", EActionCommandType.PlayerDamage, Player(ECombatantId.Opponent))
+            );
+        simulation.Frames[0].OpponentUpdates = new CombatSimPlayerUpdate
+        {
+            HealthAdjustments =
+            {
+                DamageAdjustment(EPlayerHealthChangeType.Health, -109, isCritical: true),
+                DamageAdjustment(EPlayerHealthChangeType.Shield, -11, isCritical: true),
+                DamageAdjustment(EPlayerHealthChangeType.Health, -60, isCritical: false),
+            },
+        };
+
+        var report = CombatImpactProjector.Project(simulation, Entities());
+        var sourceDamage = Assert.Single(
+            Assert.Single(report.Sources, source => source.Entity.Id == "source").Groups
+        );
+        var triggerDamage = Assert.Single(
+            Assert.Single(report.Sources, source => source.Entity.Id == "trigger").Groups
+        );
+
+        Assert.Equal(120, sourceDamage.ObservedValue);
+        Assert.Equal(1, sourceDamage.CriticalCount);
+        Assert.Equal(120, sourceDamage.CriticalObservedValue);
+        Assert.Equal(60, triggerDamage.ObservedValue);
+        Assert.Equal(0, triggerDamage.CriticalCount);
+    }
+
+    [Fact]
+    public void Maps_concurrent_heal_and_shield_crits_from_native_adjustments()
+    {
+        var cases = new[]
+        {
+            (
+                EActionCommandType.PlayerHeal,
+                EDamageType.Heal,
+                EPlayerHealthChangeType.Health,
+                CombatImpactKind.Healing
+            ),
+            (
+                EActionCommandType.PlayerShieldApply,
+                EDamageType.Shield,
+                EPlayerHealthChangeType.Shield,
+                CombatImpactKind.Shield
+            ),
+        };
+
+        foreach (var (action, damageType, attribute, expectedKind) in cases)
+        {
+            var simulation = new CombatSim();
+            simulation
+                .Frames[0]
+                .Events.Add(Executed("source", action, Player(ECombatantId.Player)));
+            simulation
+                .Frames[0]
+                .Events.Add(Executed("trigger", action, Player(ECombatantId.Player)));
+            simulation.Frames[0].PlayerUpdates = new CombatSimPlayerUpdate
+            {
+                HealthAdjustments =
+                {
+                    new CombatSimPlayerHealthAdjustment
+                    {
+                        DamageType = damageType,
+                        AttributeChanged = attribute,
+                        Amount = 200,
+                        IsCrit = true,
+                    },
+                    new CombatSimPlayerHealthAdjustment
+                    {
+                        DamageType = damageType,
+                        AttributeChanged = attribute,
+                        Amount = 100,
+                        IsCrit = false,
+                    },
+                },
+            };
+
+            var report = CombatImpactProjector.Project(simulation, Entities());
+            var sourceGroup = Assert.Single(
+                Assert.Single(report.Sources, source => source.Entity.Id == "source").Groups
+            );
+            var triggerGroup = Assert.Single(
+                Assert.Single(report.Sources, source => source.Entity.Id == "trigger").Groups
+            );
+
+            Assert.Equal(expectedKind, sourceGroup.Kind);
+            Assert.Equal(200, sourceGroup.ObservedValue);
+            Assert.Equal(1, sourceGroup.CriticalCount);
+            Assert.Equal(200, sourceGroup.CriticalObservedValue);
+            Assert.Equal(expectedKind, triggerGroup.Kind);
+            Assert.Equal(100, triggerGroup.ObservedValue);
+            Assert.Equal(0, triggerGroup.CriticalCount);
+        }
     }
 
     [Fact]
@@ -1380,6 +1524,41 @@ public sealed class CombatImpactProjectorTests
             report.Sources,
             source => Assert.Equal(0, Assert.Single(source.Groups).CriticalCount)
         );
+    }
+
+    [Fact]
+    public void Uniform_native_crits_mark_each_concurrent_damage_effect_without_stat_inference()
+    {
+        var simulation = new CombatSim();
+        simulation.Frames.Clear();
+        for (var use = 0; use < 4; use++)
+            simulation.Frames.Add(ConcurrentDamageFrame(isCritical: false));
+        simulation.Frames.Add(ConcurrentDamageFrame(isCritical: true, splitFirstHit: true));
+        simulation.CardStats["source"] = new Dictionary<ECardStats, int>
+        {
+            // Deliberately inconsistent with the configured 30-damage baseline. The native
+            // per-adjustment crit flags, not an inferred total, are authoritative for this case.
+            [ECardStats.DamageDone] = 420,
+            [ECardStats.UseCount] = 5,
+        };
+
+        var entities = Entities().ToDictionary(item => item.Key, item => item.Value);
+        entities["source"] = entities["source"] with
+        {
+            Attributes = new Dictionary<ECardAttributeType, int>
+            {
+                [ECardAttributeType.DamageAmount] = 30,
+            },
+        };
+
+        var damage = Assert.Single(
+            Assert.Single(CombatImpactProjector.Project(simulation, entities).Sources).Groups
+        );
+
+        Assert.Equal(15, damage.Count);
+        Assert.Equal(420, damage.AuthoritativeMetric?.Value);
+        Assert.Equal(3, damage.CriticalCount);
+        Assert.Equal(200, damage.CriticalObservedValue);
     }
 
     [Fact]
@@ -4036,6 +4215,53 @@ public sealed class CombatImpactProjectorTests
         };
         return frame;
     }
+
+    private static CombatSimFrame ConcurrentDamageFrame(bool isCritical, bool splitFirstHit = false)
+    {
+        var frame = new CombatSimFrame { OpponentUpdates = new CombatSimPlayerUpdate() };
+        for (var effect = 0; effect < 3; effect++)
+        {
+            frame.Events.Add(
+                Executed("source", EActionCommandType.PlayerDamage, Player(ECombatantId.Opponent))
+            );
+        }
+
+        if (splitFirstHit)
+        {
+            frame.OpponentUpdates.HealthAdjustments.Add(
+                DamageAdjustment(EPlayerHealthChangeType.Health, -10, isCritical)
+            );
+            frame.OpponentUpdates.HealthAdjustments.Add(
+                DamageAdjustment(EPlayerHealthChangeType.Shield, -30, isCritical)
+            );
+        }
+        else
+        {
+            frame.OpponentUpdates.HealthAdjustments.Add(
+                DamageAdjustment(EPlayerHealthChangeType.Health, -30, isCritical)
+            );
+        }
+        frame.OpponentUpdates.HealthAdjustments.Add(
+            DamageAdjustment(EPlayerHealthChangeType.Health, isCritical ? -80 : -30, isCritical)
+        );
+        frame.OpponentUpdates.HealthAdjustments.Add(
+            DamageAdjustment(EPlayerHealthChangeType.Health, isCritical ? -80 : -30, isCritical)
+        );
+        return frame;
+    }
+
+    private static CombatSimPlayerHealthAdjustment DamageAdjustment(
+        EPlayerHealthChangeType attribute,
+        int amount,
+        bool isCritical
+    ) =>
+        new()
+        {
+            DamageType = EDamageType.Damage,
+            AttributeChanged = attribute,
+            Amount = amount,
+            IsCrit = isCritical,
+        };
 
     private static CombatSimCardUpdate HasteUpdate(InstanceId target, int amount) =>
         new()

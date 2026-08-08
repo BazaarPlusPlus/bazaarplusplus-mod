@@ -355,7 +355,6 @@ internal sealed class NativePairedTooltipSession
 
         _contentRoot = contentRoot;
         _onContentWidthChanged = onContentWidthChanged;
-        ForceRebuildLayout(auxiliary);
         ApplyContentWidth(auxiliary, _options.PreferredContentWidth);
         ForceRebuildLayout(auxiliary);
         ApplyNativeHeight(auxiliary);
