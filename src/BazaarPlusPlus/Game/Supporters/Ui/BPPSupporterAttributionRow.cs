@@ -16,7 +16,7 @@ internal static class BPPSupporterAttributionRow
         row.style.flexDirection = FlexDirection.Row;
         row.style.flexWrap = Wrap.Wrap;
         row.style.alignItems = Align.Center;
-        row.style.marginTop = UiSpacing.Md;
+        row.style.marginTop = UiSpacing.Sm;
         UiStyle.FixedHeight(row.style, Sizes.SupporterAttributionReservedHeight);
         return row;
     }
@@ -74,7 +74,8 @@ internal static class BPPSupporterAttributionRow
         label.style.unityTextAlign = TextAnchor.MiddleLeft;
         label.style.whiteSpace = WhiteSpace.NoWrap;
         label.style.marginRight = UiSpacing.Xs;
-        label.style.marginBottom = UiSpacing.Xs;
+        // Keep the row fixed, but lower the attribution copy within it slightly.
+        label.style.marginBottom = UiSpacing.None;
         return label;
     }
 
@@ -128,7 +129,7 @@ internal static class BPPSupporterAttributionRow
         label.style.whiteSpace = WhiteSpace.NoWrap;
         label.style.overflow = Overflow.Hidden;
         label.style.unityTextAlign = TextAnchor.MiddleLeft;
-        label.style.marginBottom = UiSpacing.Xs;
+        label.style.marginBottom = UiSpacing.None;
         label.style.color = ResolveTierText(sample.Tier);
         return label;
     }

@@ -147,7 +147,7 @@ internal sealed partial class CollectionPanelView
 
     private static float CurrentSizeChipWidth() =>
         Sizes.CollectionSizeChipWidth
-        + (CollectionPanelText.IsChineseLanguage() ? 0f : UiSpacing.Sm);
+        - (CollectionPanelText.IsChineseLanguage() ? 0f : UiSpacing.Xs);
 
     private Button CreateSizeChipButton(ECardSize size, Action onClick)
     {
