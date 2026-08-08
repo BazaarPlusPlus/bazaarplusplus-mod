@@ -6,9 +6,10 @@ namespace BazaarPlusPlus.Game.CollectionPanel.Grid;
 
 // Collection-only presentation layer for the native preview root. The board's CardController
 // depends on world-space sockets, colliders, and board interaction state, so the collection uses
-// the same visual idea with screen-space pointer coordinates instead. The whole root stays
-// unrotated because the preview's RawImage and dynamically-loaded MeshRenderer frame do not
-// share one depth buffer in ScreenSpaceOverlay; rotating the root makes their overlap flicker.
+// the same visual idea with screen-space pointer coordinates instead. The root is transformed as
+// one object so the artwork, frame, and gem decorations move together. The artwork is moved a
+// small fixed distance behind the frame to keep the two renderers from becoming coplanar while
+// the root is tilted in ScreenSpaceOverlay.
 internal sealed class CollectionCardHoverVisual : MonoBehaviour
 {
     private RectTransform? _rect;
@@ -16,10 +17,9 @@ internal sealed class CollectionCardHoverVisual : MonoBehaviour
     private Vector3 _baseScale = Vector3.one;
     private Quaternion _baseRotation = Quaternion.identity;
     private Vector3 _baseArtworkPosition;
-    private Vector3 _baseArtworkScale = Vector3.one;
-    private Vector3 _artworkPosition;
-    private float _artworkScaleFactor = 1f;
     private float _scaleFactor = 1f;
+    private float _tiltX;
+    private float _tiltY;
     private float _pointerX;
     private float _pointerY;
     private bool _hovered;
@@ -36,8 +36,6 @@ internal sealed class CollectionCardHoverVisual : MonoBehaviour
         if (_artworkRect != null)
         {
             _baseArtworkPosition = _artworkRect.localPosition;
-            _baseArtworkScale = _artworkRect.localScale;
-            _artworkPosition = _baseArtworkPosition;
         }
         _initialized = true;
         ApplyVisualState();
@@ -76,22 +74,12 @@ internal sealed class CollectionCardHoverVisual : MonoBehaviour
         var smoothing =
             1f - Mathf.Exp(-deltaSeconds / CollectionGridConstants.CardHoverResponseSeconds);
         var targetScale = _hovered ? CollectionGridConstants.CardHoverScale : 1f;
-        var targetArtworkScale = _hovered ? CollectionGridConstants.CardHoverArtworkScale : 1f;
-        var targetArtworkPosition = _baseArtworkPosition;
-        if (_hovered && _artworkRect != null)
-        {
-            var offsetX =
-                Mathf.Max(1f, _artworkRect.rect.width)
-                * CollectionGridConstants.CardHoverArtworkParallax;
-            var offsetY =
-                Mathf.Max(1f, _artworkRect.rect.height)
-                * CollectionGridConstants.CardHoverArtworkParallax;
-            targetArtworkPosition += new Vector3(_pointerX * offsetX, -_pointerY * offsetY, 0f);
-        }
+        var targetTiltX = _hovered ? -_pointerY * CollectionGridConstants.CardHoverTiltDegrees : 0f;
+        var targetTiltY = _hovered ? _pointerX * CollectionGridConstants.CardHoverTiltDegrees : 0f;
 
         _scaleFactor = Mathf.Lerp(_scaleFactor, targetScale, smoothing);
-        _artworkScaleFactor = Mathf.Lerp(_artworkScaleFactor, targetArtworkScale, smoothing);
-        _artworkPosition = Vector3.Lerp(_artworkPosition, targetArtworkPosition, smoothing);
+        _tiltX = Mathf.Lerp(_tiltX, targetTiltX, smoothing);
+        _tiltY = Mathf.Lerp(_tiltY, targetTiltY, smoothing);
         ApplyVisualState();
     }
 
@@ -101,18 +89,15 @@ internal sealed class CollectionCardHoverVisual : MonoBehaviour
         _pointerX = 0f;
         _pointerY = 0f;
         _scaleFactor = 1f;
-        _artworkScaleFactor = 1f;
-        _artworkPosition = _baseArtworkPosition;
+        _tiltX = 0f;
+        _tiltY = 0f;
         if (_initialized && TryGetRect())
         {
             _rect!.localScale = _baseScale;
             _rect.localRotation = _baseRotation;
         }
         if (_artworkRect != null)
-        {
             _artworkRect.localPosition = _baseArtworkPosition;
-            _artworkRect.localScale = _baseArtworkScale;
-        }
     }
 
     private bool TryGetRect()
@@ -138,11 +123,12 @@ internal sealed class CollectionCardHoverVisual : MonoBehaviour
             return;
 
         _rect.localScale = _baseScale * _scaleFactor;
-        _rect.localRotation = _baseRotation;
+        _rect.localRotation = _baseRotation * Quaternion.Euler(_tiltX, _tiltY, 0f);
         if (_artworkRect != null)
         {
-            _artworkRect.localPosition = _artworkPosition;
-            _artworkRect.localScale = _baseArtworkScale * _artworkScaleFactor;
+            var artworkPosition = _baseArtworkPosition;
+            artworkPosition.z += CollectionGridConstants.CardHoverArtworkDepth;
+            _artworkRect.localPosition = artworkPosition;
         }
     }
 }

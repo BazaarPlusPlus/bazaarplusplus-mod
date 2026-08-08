@@ -68,8 +68,8 @@ internal static class CollectionGridConstants
     // (t = 1 - exp(-dt / tau)), so the visible motion finishes within ~3*tau seconds.
     public const float CardFadeInSeconds = 0.18f;
     public const float CardHoverScale = 1.08f;
-    public const float CardHoverArtworkScale = 1.015f;
-    public const float CardHoverArtworkParallax = 0.018f;
+    public const float CardHoverTiltDegrees = 6f;
+    public const float CardHoverArtworkDepth = 0.05f;
     public const float CardHoverResponseSeconds = 0.08f;
 
     // Open is a presentation (deliberate); close is a dismissal (snappy). With out at 0.04
