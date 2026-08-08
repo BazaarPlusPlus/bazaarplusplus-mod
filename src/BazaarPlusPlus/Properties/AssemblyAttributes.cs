@@ -13,7 +13,6 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("RandomHeroPoolPatchCompatibility.Tests")]
 [assembly: InternalsVisibleTo("HistoryPanelFactory.Tests")]
 [assembly: InternalsVisibleTo("BundlePipeline.Tests")]
-[assembly: InternalsVisibleTo("BundleV5E2E")]
 [assembly: InternalsVisibleTo("CombatReplayRecording.Tests")]
 [assembly: InternalsVisibleTo("GhostBattleSync.Tests")]
 [assembly: InternalsVisibleTo("HistoryPanelRepository.Tests")]
