@@ -180,10 +180,14 @@ internal sealed class CollectionPanel : MonoBehaviour
     private void Open()
     {
         var resolved = ResolveOpenSelection();
-        Open(resolved.Selection, resolved.CurrentRunDay);
+        Open(resolved.Selection, resolved.CurrentRunDay, resolved.EncounteredMerchantSourceKeys);
     }
 
-    private (CollectionPanelSelectionState Selection, int? CurrentRunDay) ResolveOpenSelection()
+    private (
+        CollectionPanelSelectionState Selection,
+        int? CurrentRunDay,
+        IReadOnlyList<string> EncounteredMerchantSourceKeys
+    ) ResolveOpenSelection()
     {
         PrepareCatalogReadinessForOpen();
         var failures = new List<CollectionPanelSelectionProbeFailure>(4);
@@ -194,14 +198,22 @@ internal sealed class CollectionPanel : MonoBehaviour
         var hero = isInGameRun ? TryReadCurrentHero(failures) : null;
         var encounterIds = isInGameRun ? TryReadEncounterIds(failures) : EncounterIdsSnapshot.Empty;
         var currentRunDay = isInGameRun ? TryReadCurrentDay(failures) : null;
+        var sourceEntries = CollectionSourceCatalog.Entries;
         var selection = CollectionPanelOpenSelectionResolver.Resolve(
             isInGameRun,
             hero,
             encounterIds.CurrentEncounterTemplateId,
             encounterIds.ChoiceSelectionTemplateIds,
-            CollectionSourceCatalog.Entries,
+            sourceEntries,
             rememberedPreference
         );
+        var encounteredMerchantSourceKeys = isInGameRun
+            ? CollectionPanelOpenSelectionResolver.ResolveEncounteredMerchantSourceKeys(
+                hero,
+                encounterIds.ChoiceSelectionTemplateIds,
+                sourceEntries
+            )
+            : Array.Empty<string>();
 
         _selectionLogState.ObserveOpen(
             failures.Count == 0
@@ -222,7 +234,7 @@ internal sealed class CollectionPanel : MonoBehaviour
                     ),
                 ]
         );
-        return (selection, currentRunDay);
+        return (selection, currentRunDay, encounteredMerchantSourceKeys);
     }
 
     private bool TryReadIsInGameRunForOpen(List<CollectionPanelSelectionProbeFailure> failures)
@@ -308,7 +320,11 @@ internal sealed class CollectionPanel : MonoBehaviour
         Exception exception
     ) => new(probe, CollectionPanelLogReasonCode.ProbeReadFailed, exception);
 
-    private void Open(CollectionPanelSelectionState selection, int? currentRunDay)
+    private void Open(
+        CollectionPanelSelectionState selection,
+        int? currentRunDay,
+        IReadOnlyCollection<string> encounteredMerchantSourceKeys
+    )
     {
         _viewState.ResetSearchForLifecycle();
         // Temporary main-path probe: EnsureView() is heavy one-time UITK construction (visual
@@ -327,7 +343,12 @@ internal sealed class CollectionPanel : MonoBehaviour
                 null
             );
         ApplyOutcome(
-            _viewState.ApplyOpenSelection(selection, BPPSupporters.SampleMany(4), currentRunDay)
+            _viewState.ApplyOpenSelection(
+                selection,
+                BPPSupporters.SampleMany(4),
+                currentRunDay,
+                encounteredMerchantSourceKeys
+            )
         );
         _isVisible = true;
         // SetVisible starts the fade-in ramp; overlay activates so its CanvasGroup starts
@@ -407,6 +428,7 @@ internal sealed class CollectionPanel : MonoBehaviour
         // can finish its fade-out animation before we tear runtime down.
         _view?.TickOpacity(dt);
         _view?.TickLoading(dt);
+        _view?.TickControlsScrollShadow();
         if (_view != null && _overlay != null)
             _overlay.SetAlpha(_view.CurrentOpacity);
 
@@ -664,7 +686,11 @@ internal sealed class CollectionPanel : MonoBehaviour
         public void SetActiveTab(CollectionTabKind tab) =>
             panel.ApplyOutcome(panel._viewState.SetActiveTab(tab));
 
+        public void ResetFilters() => panel.ApplyOutcome(panel._viewState.ResetFilters());
+
         public void ToggleHero(EHero hero) => panel.ApplyOutcome(panel._viewState.ToggleHero(hero));
+
+        public void ToggleAllHeroes() => panel.ApplyOutcome(panel._viewState.ToggleAllHeroes());
 
         public void ToggleTier(ETier tier) => panel.ApplyOutcome(panel._viewState.ToggleTier(tier));
 
@@ -679,11 +705,11 @@ internal sealed class CollectionPanel : MonoBehaviour
         public void ToggleKeyword(CollectionKeywordFacetOption option) =>
             panel.ApplyOutcome(panel._viewState.ToggleKeyword(option));
 
-        public void ToggleTagMatchMode() =>
-            panel.ApplyOutcome(panel._viewState.ToggleTagMatchMode());
+        public void SetKeywordMatchMode(CollectionFacetMatchMode mode) =>
+            panel.ApplyOutcome(panel._viewState.SetKeywordMatchMode(mode));
 
-        public void ToggleKeywordMatchMode() =>
-            panel.ApplyOutcome(panel._viewState.ToggleKeywordMatchMode());
+        public void SetTagMatchMode(CollectionFacetMatchMode mode) =>
+            panel.ApplyOutcome(panel._viewState.SetTagMatchMode(mode));
 
         public void ToggleSource(string sourceKey) =>
             panel.ApplyOutcome(panel._viewState.ToggleSource(sourceKey));

@@ -57,6 +57,7 @@ internal sealed class CollectionViewState
     )? _availableSourcesCache;
 
     private IReadOnlyList<BPPSupporterSample> _supporters = Array.Empty<BPPSupporterSample>();
+    private readonly HashSet<string> _encounteredMerchantSourceKeys = new(StringComparer.Ordinal);
     private int? _currentRunDay;
     private bool _isLoadingCatalog;
     private string? _statusMessage;
@@ -111,10 +112,31 @@ internal sealed class CollectionViewState
         return QueryAndRender(resetControlsScroll: true);
     }
 
+    public CollectionRenderOutcome ToggleAllHeroes()
+    {
+        if (_filter.ToggleAllHeroes())
+        {
+            // A selected merchant/trainer resolves one concrete hero's offer pool before the
+            // hero predicate runs. Leaving it selected would make an all-heroes scope appear
+            // active while still showing only that prior hero's cards.
+            _filter.ClearSelectedSource();
+        }
+        else
+        {
+            PruneInvisibleSourceSelections();
+        }
+        return QueryAndRender(resetControlsScroll: true);
+    }
+
     public CollectionRenderOutcome? ToggleTier(ETier tier)
     {
-        if (!_filter.Tiers.Remove(tier))
+        if (_filter.Tiers.Count == 1 && _filter.Tiers.Contains(tier))
+            _filter.Tiers.Clear();
+        else
+        {
+            _filter.Tiers.Clear();
             _filter.Tiers.Add(tier);
+        }
         return QueryAndRender(resetControlsScroll: true);
     }
 
@@ -126,8 +148,13 @@ internal sealed class CollectionViewState
 
     public CollectionRenderOutcome? ToggleSize(ECardSize size)
     {
-        if (!_filter.Sizes.Remove(size))
+        if (_filter.Sizes.Count == 1 && _filter.Sizes.Contains(size))
+            _filter.Sizes.Clear();
+        else
+        {
+            _filter.Sizes.Clear();
             _filter.Sizes.Add(size);
+        }
         return QueryAndRender(resetControlsScroll: false);
     }
 
@@ -154,16 +181,24 @@ internal sealed class CollectionViewState
         return QueryAndRender(resetControlsScroll: false);
     }
 
-    public CollectionRenderOutcome? ToggleTagMatchMode()
+    public CollectionRenderOutcome? SetKeywordMatchMode(CollectionFacetMatchMode mode)
     {
-        _filter.TagMatchMode = ToggleMatchMode(_filter.TagMatchMode);
+        _filter.KeywordMatchMode = mode;
         return QueryAndRender(resetControlsScroll: false);
     }
 
-    public CollectionRenderOutcome? ToggleKeywordMatchMode()
+    public CollectionRenderOutcome? SetTagMatchMode(CollectionFacetMatchMode mode)
     {
-        _filter.KeywordMatchMode = ToggleMatchMode(_filter.KeywordMatchMode);
+        _filter.TagMatchMode = mode;
         return QueryAndRender(resetControlsScroll: false);
+    }
+
+    public CollectionRenderOutcome ResetFilters()
+    {
+        _filter.ResetFacets();
+        _searchRefreshGate.Cancel();
+        _heroPreferenceStore.Save(_filter.EffectiveHero);
+        return QueryAndRender(resetControlsScroll: true);
     }
 
     public CollectionRenderOutcome? ToggleSource(string sourceKey)
@@ -183,9 +218,6 @@ internal sealed class CollectionViewState
 
     public void SetSearchQuery(string query)
     {
-        if (!_searchMode.IsExpanded)
-            return;
-
         query ??= string.Empty;
         if (string.Equals(_filter.SearchQuery, query, StringComparison.Ordinal))
             return;
@@ -228,11 +260,7 @@ internal sealed class CollectionViewState
     {
         _isLoadingCatalog = true;
         SetStatus(CollectionPanelText.CatalogLoading());
-        var projection = _grid.Publish(
-            Array.Empty<CollectionCardVm>(),
-            _filter.ActiveTab,
-            offerMatchesByCardId: null
-        );
+        var projection = _grid.Publish(Array.Empty<CollectionCardVm>(), _filter.ActiveTab);
         return new CollectionRenderOutcome(
             BuildModel(projection ?? CollectionGridProjection.Empty),
             resetScroll: true,
@@ -272,7 +300,8 @@ internal sealed class CollectionViewState
     public CollectionRenderOutcome ApplyOpenSelection(
         CollectionPanelSelectionState selection,
         IReadOnlyList<BPPSupporterSample> supporters,
-        int? currentRunDay
+        int? currentRunDay,
+        IReadOnlyCollection<string>? encounteredMerchantSourceKeys = null
     )
     {
         if (selection == null)
@@ -285,6 +314,13 @@ internal sealed class CollectionViewState
             PruneInvisibleSourceSelections();
 
         _supporters = supporters;
+        _encounteredMerchantSourceKeys.Clear();
+        if (encounteredMerchantSourceKeys != null)
+        {
+            foreach (var sourceKey in encounteredMerchantSourceKeys)
+                if (!string.IsNullOrWhiteSpace(sourceKey))
+                    _encounteredMerchantSourceKeys.Add(sourceKey.Trim());
+        }
         _currentRunDay = currentRunDay;
         return new CollectionRenderOutcome(
             BuildModel(_grid.Current),
@@ -333,11 +369,7 @@ internal sealed class CollectionViewState
     {
         if (_catalogCards.Count == 0)
         {
-            return _grid.Publish(
-                Array.Empty<CollectionCardVm>(),
-                _filter.ActiveTab,
-                offerMatchesByCardId: null
-            );
+            return _grid.Publish(Array.Empty<CollectionCardVm>(), _filter.ActiveTab);
         }
 
         if (!_isLoadingCatalog)
@@ -355,7 +387,7 @@ internal sealed class CollectionViewState
         );
 
         // Publish first so a null (unavailable grid) skips normalization write-back.
-        var projection = _grid.Publish(query.Cards, _filter.ActiveTab, query.OfferMatchesByCardId);
+        var projection = _grid.Publish(query.Cards, _filter.ActiveTab);
         if (projection == null)
             return null;
 
@@ -399,7 +431,7 @@ internal sealed class CollectionViewState
             Title = CollectionPanelText.Title(),
             Subtitle = CollectionPanelText.Subtitle(),
             Supporters = _supporters,
-            CountText = CollectionPanelText.MatchCount(projection.VisibleCount),
+            VisibleCount = projection.VisibleCount,
             StatusMessage = _statusVisible ? _statusMessage : null,
             IsLoading = _isLoadingCatalog,
             ActiveTab = _filter.ActiveTab,
@@ -408,6 +440,7 @@ internal sealed class CollectionViewState
             HeroFilterVisible = heroFilterPresentation.IsVisible,
             HeroFilterEnabled = heroFilterPresentation.IsEnabled,
             SelectedHero = _filter.SelectedHero,
+            AllHeroesSelected = _filter.AllHeroesSelected,
             SelectedTiers = _filter.Tiers,
             SelectedSizes = _filter.Sizes,
             SelectedTags = _filter.Tags,
@@ -418,6 +451,7 @@ internal sealed class CollectionViewState
             SearchExpanded = _searchMode.IsExpanded,
             SearchQuery = _filter.SearchQuery,
             SelectedSourceKey = profile.ShowSourceFilter ? _filter.SelectedSourceKey : null,
+            EncounteredMerchantSourceKeys = _encounteredMerchantSourceKeys,
             SourceSelectorEnabled = profile.ShowSourceFilter && !_isLoadingCatalog,
             SortPriority = _filter.SortPriority,
             DayFilterVisible = dayFilterPresentation.IsVisible,
@@ -533,9 +567,4 @@ internal sealed class CollectionViewState
         _statusMessage = null;
         _statusVisible = false;
     }
-
-    private static CollectionFacetMatchMode ToggleMatchMode(CollectionFacetMatchMode mode) =>
-        mode == CollectionFacetMatchMode.All
-            ? CollectionFacetMatchMode.Any
-            : CollectionFacetMatchMode.All;
 }

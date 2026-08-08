@@ -124,10 +124,13 @@ internal static class CollectionQuery
             {
                 OfferedCardIds = offeredCardIds,
                 ApplyHeroFilter =
-                    !hasSelectedSource
-                    || (
-                        filter.ActiveTab == CollectionTabKind.Skills
-                        && !sourceResolution.Source!.HasAllHeroesOfferSegment
+                    !filter.AllHeroesSelected
+                    && (
+                        !hasSelectedSource
+                        || (
+                            filter.ActiveTab == CollectionTabKind.Skills
+                            && !sourceResolution.Source!.HasAllHeroesOfferSegment
+                        )
                     ),
                 DayTiers = dayTiers,
                 SuppressDayGate =
@@ -210,6 +213,8 @@ internal static class CollectionQuery
         };
         if (source.SelectedHero.HasValue)
             clone.ToggleHero(source.SelectedHero.Value);
+        if (source.AllHeroesSelected)
+            clone.ToggleAllHeroes();
         clone.Tiers.UnionWith(source.Tiers);
         clone.Sizes.UnionWith(source.Sizes);
         clone.Tags.UnionWith(retainedTags ?? source.Tags);

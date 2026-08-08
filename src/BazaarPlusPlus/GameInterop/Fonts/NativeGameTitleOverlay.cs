@@ -7,9 +7,9 @@ using Object = UnityEngine.Object;
 namespace BazaarPlusPlus.GameInterop.Fonts;
 
 /// <summary>
-/// Renders a UI Toolkit panel title through the game's native serif TMP primary while the
-/// transparent UI Toolkit label remains the layout anchor. UI Toolkit cannot consume that
-/// primary directly because the packaged static TMP asset has no source <see cref="Font"/>.
+/// Renders a UI Toolkit panel title through a selected native TMP primary while the transparent
+/// UI Toolkit label remains the layout anchor. UI Toolkit cannot consume the packaged static TMP
+/// assets directly because they have no source <see cref="Font"/>.
 /// </summary>
 internal sealed class NativeGameTitleOverlay : IDisposable
 {
@@ -21,6 +21,7 @@ internal sealed class NativeGameTitleOverlay : IDisposable
     private readonly CanvasGroup _canvasGroup;
     private readonly TextMeshProUGUI _title;
     private readonly float _fontSizePoints;
+    private NativeGameTypography.OwnedTextRole _role;
     private VisualElement? _layoutAnchor;
     private float _requestedAlpha = 1f;
     private bool _hasValidBounds;
@@ -32,10 +33,12 @@ internal sealed class NativeGameTitleOverlay : IDisposable
         int sortingOrder,
         float fontSizePoints,
         Color color,
-        NativeGameTypography.OwnedTextPreparation typography
+        NativeGameTypography.OwnedTextPreparation typography,
+        NativeGameTypography.OwnedTextRole role
     )
     {
         _fontSizePoints = fontSizePoints;
+        _role = role;
         _root = new GameObject(
             rootName,
             typeof(RectTransform),
@@ -81,9 +84,7 @@ internal sealed class NativeGameTitleOverlay : IDisposable
         if (typography.Apply(_title) != NativeGameTypography.Outcome.Applied)
         {
             Object.Destroy(_root);
-            throw new InvalidOperationException(
-                "Native game heading typography became unavailable."
-            );
+            throw new InvalidOperationException("Native game title typography became unavailable.");
         }
         _title.fontStyle = FontStyles.Normal;
         _title.alignment = TextAlignmentOptions.MidlineLeft;
@@ -104,14 +105,31 @@ internal sealed class NativeGameTitleOverlay : IDisposable
         float fontSizePoints,
         Color color,
         out NativeGameTitleOverlay? overlay
+    ) =>
+        TryCreate(
+            rootName,
+            parent,
+            sortingOrder,
+            fontSizePoints,
+            color,
+            NativeGameTypography.OwnedTextRole.Heading,
+            out overlay
+        );
+
+    internal static bool TryCreate(
+        string rootName,
+        Transform parent,
+        int sortingOrder,
+        float fontSizePoints,
+        Color color,
+        NativeGameTypography.OwnedTextRole role,
+        out NativeGameTitleOverlay? overlay
     )
     {
         overlay = null;
         if (
-            NativeGameTypography.PrepareOwnedText(
-                NativeGameTypography.OwnedTextRole.Heading,
-                out var typography
-            ) != NativeGameTypography.Outcome.Ready
+            NativeGameTypography.PrepareOwnedText(role, out var typography)
+                != NativeGameTypography.Outcome.Ready
             || typography == null
         )
             return false;
@@ -124,7 +142,8 @@ internal sealed class NativeGameTitleOverlay : IDisposable
                 sortingOrder,
                 fontSizePoints,
                 color,
-                typography
+                typography,
+                role
             );
             return true;
         }
@@ -157,6 +176,19 @@ internal sealed class NativeGameTitleOverlay : IDisposable
             return;
 
         _title.text = text ?? string.Empty;
+        var desiredRole = UnicodeFontCoverage.ContainsCjk(_title.text)
+            ? NativeGameTypography.OwnedTextRole.Body
+            : NativeGameTypography.OwnedTextRole.Heading;
+        if (
+            desiredRole != _role
+            && NativeGameTypography.PrepareOwnedText(desiredRole, out var typography)
+                == NativeGameTypography.Outcome.Ready
+            && typography != null
+        )
+        {
+            typography.Apply(_title);
+            _role = desiredRole;
+        }
         if (!string.IsNullOrEmpty(_title.text))
         {
             // The native locale fallbacks populate glyphs lazily. Resolve coverage and preferred

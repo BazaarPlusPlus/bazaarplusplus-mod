@@ -5,7 +5,7 @@ namespace BazaarPlusPlus.Game.CollectionPanel.Data;
 // CollectionFilterState so the existing debounce and filter engine keep one source of truth.
 internal sealed class CollectionSearchModeState
 {
-    public bool IsExpanded { get; private set; }
+    public bool IsExpanded { get; private set; } = true;
 
     public bool Expand(CollectionFilterState filter)
     {
@@ -21,7 +21,7 @@ internal sealed class CollectionSearchModeState
 
     public bool Reset(CollectionFilterState filter)
     {
-        IsExpanded = false;
+        IsExpanded = true;
         return ClearQuery(filter);
     }
 

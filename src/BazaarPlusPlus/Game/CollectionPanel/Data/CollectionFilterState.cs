@@ -30,6 +30,10 @@ internal sealed class CollectionFilterState
                 value == ECardType.Skill ? CollectionTabKind.Skills : CollectionTabKind.Items;
     }
     public EHero? SelectedHero { get; private set; }
+
+    // Keeps the currently selected concrete hero as the return point when the all-heroes scope
+    // is turned back off. The query uses this flag to omit hero scoping entirely.
+    public bool AllHeroesSelected { get; private set; }
     public HashSet<ETier> Tiers { get; } = new();
     public HashSet<ECardTag> Tags { get; } = new();
     public HashSet<EHiddenTag> Keywords { get; } = new();
@@ -75,6 +79,7 @@ internal sealed class CollectionFilterState
             throw new System.ArgumentNullException(nameof(selection));
 
         SelectedHero = NormalizeConcreteHero(selection.SelectedHero);
+        AllHeroesSelected = false;
 
         if (selection.SelectedSourceKind == CollectionSourceKind.Trainer)
         {
@@ -99,8 +104,15 @@ internal sealed class CollectionFilterState
     public EHero ToggleHero(EHero hero)
     {
         var concreteHero = NormalizeConcreteHero(hero);
+        AllHeroesSelected = false;
         SelectedHero = SelectedHero == concreteHero ? null : concreteHero;
         return EffectiveHero;
+    }
+
+    public bool ToggleAllHeroes()
+    {
+        AllHeroesSelected = !AllHeroesSelected;
+        return AllHeroesSelected;
     }
 
     public void ToggleSource(CollectionTabKind activeTab, string sourceKey)
@@ -117,6 +129,23 @@ internal sealed class CollectionFilterState
         )
             ? null
             : sourceKey;
+    }
+
+    public void ResetFacets()
+    {
+        SelectedHero = null;
+        AllHeroesSelected = false;
+        Tiers.Clear();
+        Tags.Clear();
+        Keywords.Clear();
+        Mechanics.Clear();
+        Sizes.Clear();
+        SelectedSourceKey = null;
+        SearchQuery = string.Empty;
+        TagMatchMode = CollectionFacetMatchMode.Any;
+        KeywordMatchMode = CollectionFacetMatchMode.Any;
+        UseRunDayFilter = true;
+        SortPriority = CollectionSortPriority.Quality;
     }
 
     public bool ClearSelectedSource()

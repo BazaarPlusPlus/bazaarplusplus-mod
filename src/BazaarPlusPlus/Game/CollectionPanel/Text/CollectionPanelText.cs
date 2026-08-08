@@ -12,11 +12,7 @@ namespace BazaarPlusPlus.Game.CollectionPanel;
 // current PlayerPreferences language code, fall through to English when nothing else fits.
 internal static class CollectionPanelText
 {
-    private static readonly LocalizedTextSet TitleText = new(
-        "Card Collection",
-        "卡牌图鉴",
-        "卡牌圖鑑"
-    );
+    private static readonly LocalizedTextSet TitleText = new("Card Collection", "图鉴", "圖鑑");
 
     private static readonly LocalizedTextSet SubtitleText = new(
         "Supported by the BazaarPlusPlus community.",
@@ -27,6 +23,11 @@ internal static class CollectionPanelText
     private static readonly LocalizedTextSet ItemsTabText = new("Items", "物品", "物品");
     private static readonly LocalizedTextSet SkillsTabText = new("Skills", "技能", "技能");
     private static readonly LocalizedTextSet CloseText = new("Close", "关闭", "關閉");
+    private static readonly LocalizedTextSet ResetFiltersText = new(
+        "Reset filters",
+        "重置筛选",
+        "重設篩選"
+    );
     private static readonly LocalizedTextSet SearchTooltipText = new(
         "Search names, descriptions, internal ids, tags, and related effects.",
         "搜索名称、描述、内部 ID、标签和相关效果。",
@@ -53,7 +54,12 @@ internal static class CollectionPanelText
         "搜尋技能"
     );
 
-    private static readonly LocalizedTextSet HeroHeaderText = new("Hero", "英雄", "英雄");
+    private static readonly LocalizedTextSet HeroHeaderText = new("Basic", "基础", "基礎");
+    private static readonly LocalizedTextSet AllHeroesTooltipText = new(
+        "Show cards for every hero",
+        "显示所有英雄的卡牌",
+        "顯示所有英雄的卡牌"
+    );
     private static readonly LocalizedTextSet DayHeaderText = new("Day", "天数", "天數");
     private static readonly LocalizedTextSet TierSizeHeaderText = new(
         "Size / Quality",
@@ -70,25 +76,15 @@ internal static class CollectionPanelText
     );
     private static readonly LocalizedTextSet FacetMatchAnyText = new("Any", "任一", "任一");
     private static readonly LocalizedTextSet FacetMatchAllText = new("All", "全部", "全部");
-    private static readonly LocalizedTextSet TagMatchAnyTooltipText = new(
-        "Types: match cards with any selected type. Click to require all.",
-        "类型：匹配任一已选类型的卡。点击切换为必须全部匹配。",
-        "類型：匹配任一已選類型的卡。點擊切換為必須全部匹配。"
-    );
-    private static readonly LocalizedTextSet TagMatchAllTooltipText = new(
-        "Types: require every selected type. Click to match any.",
-        "类型：必须匹配所有已选类型。点击切换为任一匹配。",
-        "類型：必須匹配所有已選類型。點擊切換為任一匹配。"
-    );
     private static readonly LocalizedTextSet KeywordMatchAnyTooltipText = new(
-        "Tags: match cards with any selected tag. Click to require all.",
-        "标签：匹配任一已选标签的卡。点击切换为必须全部匹配。",
-        "標籤：匹配任一已選標籤的卡。點擊切換為必須全部匹配。"
+        "Tags and types: match cards with any selected value. Click to require all.",
+        "标签和类型：匹配任一已选内容的卡。点击切换为必须全部匹配。",
+        "標籤和類型：匹配任一已選內容的卡。點擊切換為必須全部匹配。"
     );
     private static readonly LocalizedTextSet KeywordMatchAllTooltipText = new(
-        "Tags: require every selected tag. Click to match any.",
-        "标签：必须匹配所有已选标签。点击切换为任一匹配。",
-        "標籤：必須匹配所有已選標籤。點擊切換為任一匹配。"
+        "Tags and types: require every selected value. Click to match any.",
+        "标签和类型：必须匹配所有已选内容。点击切换为任一匹配。",
+        "標籤和類型：必須匹配所有已選內容。點擊切換為任一匹配。"
     );
     private static readonly LocalizedTextSet SortHeaderText = new("Sort", "排序", "排序");
     private static readonly LocalizedTextSet SortQualityText = new("Quality", "品质", "品質");
@@ -126,6 +122,8 @@ internal static class CollectionPanelText
 
     internal static string Close() => Resolve(CloseText);
 
+    internal static string ResetFilters() => Resolve(ResetFiltersText);
+
     internal static string SearchTooltip() => Resolve(SearchTooltipText);
 
     internal static string SearchButtonTooltip() => Resolve(SearchButtonTooltipText);
@@ -138,6 +136,8 @@ internal static class CollectionPanelText
             : Resolve(ItemSearchPlaceholderText);
 
     internal static string HeroHeader() => Resolve(HeroHeaderText);
+
+    internal static string AllHeroesTooltip() => Resolve(AllHeroesTooltipText);
 
     internal static string DayHeader() => Resolve(DayHeaderText);
 
@@ -155,11 +155,6 @@ internal static class CollectionPanelText
         mode == CollectionFacetMatchMode.All
             ? Resolve(FacetMatchAllText)
             : Resolve(FacetMatchAnyText);
-
-    internal static string TagMatchModeTooltip(CollectionFacetMatchMode mode) =>
-        mode == CollectionFacetMatchMode.All
-            ? Resolve(TagMatchAllTooltipText)
-            : Resolve(TagMatchAnyTooltipText);
 
     internal static string KeywordMatchModeTooltip(CollectionFacetMatchMode mode) =>
         mode == CollectionFacetMatchMode.All
@@ -215,6 +210,9 @@ internal static class CollectionPanelText
             _ => size.ToString(),
         };
 
+    internal static bool IsChineseLanguage() =>
+        LanguageCodeMatcher.IsChinese(L.CurrentLanguageCode);
+
     // Tag labels intentionally have no entry here: chips resolve through the game's native
     // typography (GameInterop.TagTypography.NativeTagTypography), never a mod-side dictionary.
 
@@ -235,18 +233,6 @@ internal static class CollectionPanelText
             EHero.Stelle => FormatSimple("Stelle", "Stelle", "Stelle"),
             _ => hero.ToString(),
         };
-    }
-
-    internal static string MatchCount(int count)
-    {
-        var languageCode = L.CurrentLanguageCode;
-        if (LanguageCodeMatcher.IsChinese(languageCode))
-            return ChineseScriptConverter.Convert(
-                $"共 {count} 张",
-                $"共 {count} 張",
-                L.CurrentMode
-            );
-        return $"{count} cards";
     }
 
     private static string Resolve(LocalizedTextSet set) => LocalizedTextHelpers.Resolve(set);

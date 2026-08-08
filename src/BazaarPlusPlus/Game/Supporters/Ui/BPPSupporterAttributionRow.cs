@@ -74,7 +74,8 @@ internal static class BPPSupporterAttributionRow
         label.style.unityTextAlign = TextAnchor.MiddleLeft;
         label.style.whiteSpace = WhiteSpace.NoWrap;
         label.style.marginRight = UiSpacing.Xs;
-        label.style.marginBottom = UiSpacing.Xs;
+        // Keep the row fixed, but lower the attribution copy within it slightly.
+        label.style.marginBottom = UiSpacing.None;
         return label;
     }
 
@@ -128,7 +129,7 @@ internal static class BPPSupporterAttributionRow
         label.style.whiteSpace = WhiteSpace.NoWrap;
         label.style.overflow = Overflow.Hidden;
         label.style.unityTextAlign = TextAnchor.MiddleLeft;
-        label.style.marginBottom = UiSpacing.Xs;
+        label.style.marginBottom = UiSpacing.None;
         label.style.color = ResolveTierText(sample.Tier);
         return label;
     }
@@ -156,8 +157,9 @@ internal static class BPPSupporterAttributionRow
         button.style.minWidth = Sizes.SupporterActionMinWidth;
         button.style.flexGrow = 0f;
         button.style.flexShrink = 0f;
-        button.style.marginLeft = UiSpacing.Sm;
-        button.style.marginBottom = UiSpacing.Xs;
+        button.style.marginLeft = StyleKeyword.Auto;
+        button.style.marginTop = 2f;
+        button.style.marginBottom = 2f;
         button.style.fontSize = Sizes.FontSmall;
         button.style.unityFontStyleAndWeight = FontStyle.Bold;
         button.style.unityTextAlign = TextAnchor.MiddleCenter;

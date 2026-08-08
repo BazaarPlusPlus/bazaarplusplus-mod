@@ -65,51 +65,6 @@ AssertTrue(
     "The committed query should refresh once after composition ends and debounce elapses."
 );
 
-var searchModeFilter = new CollectionFilterState();
-var searchModeState = new CollectionSearchModeState();
-AssertFalse(searchModeState.IsExpanded, "Collection search should start collapsed.");
-AssertEqual(
-    string.Empty,
-    searchModeFilter.SearchQuery,
-    "Collection search should start with an empty query."
-);
-searchModeFilter.SearchQuery = "stale item query";
-AssertTrue(
-    searchModeState.Expand(searchModeFilter),
-    "Expanding search should report and clear a stale query."
-);
-AssertTrue(searchModeState.IsExpanded, "Expanding search should enter overlay search mode.");
-AssertEqual(
-    string.Empty,
-    searchModeFilter.SearchQuery,
-    "Every transition into overlay search mode should start with an empty query."
-);
-searchModeFilter.SearchQuery = "active skill query";
-AssertTrue(
-    searchModeState.Collapse(searchModeFilter),
-    "Closing search should report and clear the active query."
-);
-AssertFalse(searchModeState.IsExpanded, "Closing search should restore the default operation row.");
-AssertEqual(
-    string.Empty,
-    searchModeFilter.SearchQuery,
-    "Closing search should remove the actual filter query."
-);
-searchModeState.Expand(searchModeFilter);
-searchModeFilter.SearchQuery = "query before panel close";
-AssertTrue(
-    searchModeState.Reset(searchModeFilter),
-    "Closing the panel should report and clear its active query."
-);
-AssertFalse(
-    searchModeState.IsExpanded,
-    "Closing and reopening the panel should restore collapsed search mode."
-);
-AssertEqual(
-    string.Empty,
-    searchModeFilter.SearchQuery,
-    "Closing and reopening the panel should not restore an old search term."
-);
 var parsedSearchIcon = CollectionSearchSvgIconData.Parse(
     """
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
@@ -2111,7 +2066,6 @@ AssertValues(
         nameof(ECardTag.Friend),
         nameof(ECardTag.Aquatic),
         nameof(ECardTag.Tool),
-        nameof(ECardTag.Drone),
         nameof(ECardTag.Vehicle),
         nameof(ECardTag.Food),
         nameof(ECardTag.Trap),
@@ -2123,12 +2077,13 @@ AssertValues(
         nameof(ECardTag.Core),
         nameof(ECardTag.Tech),
         nameof(ECardTag.Dinosaur),
-        nameof(ECardTag.Ray),
         nameof(ECardTag.Apparel),
         nameof(ECardTag.Merchant),
         nameof(ECardTag.Property),
         nameof(ECardTag.Loot),
         nameof(ECardTag.Instrument),
+        nameof(ECardTag.Drone),
+        nameof(ECardTag.Ray),
     },
     "Tag whitelist should match the curated CollectionPanel tag order."
 );

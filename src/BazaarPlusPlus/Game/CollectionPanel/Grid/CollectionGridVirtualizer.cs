@@ -3,7 +3,6 @@ using System.Diagnostics;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
-using BazaarPlusPlus.Game.CollectionPanel.Sources;
 using BazaarPlusPlus.GameInterop.CardPreview;
 using BazaarPlusPlus.GameInterop.Cards;
 using BazaarPlusPlus.Infrastructure;
@@ -27,10 +26,6 @@ namespace BazaarPlusPlus.Game.CollectionPanel.Grid;
 // move directly to their new indices; removed and not-yet-shown cells are recycled.
 internal sealed class CollectionGridVirtualizer
 {
-    // Re-export of the fitter constant so existing consumers (attribution badge sizing) keep a
-    // stable name without reaching into measurement internals.
-    internal const float FallbackNativeCardHeight = NativeCardCellFitter.FallbackNativeCardHeight;
-
     private readonly CollectionGridOverlay _overlay;
     private readonly INativeCardPreviewScope _previewScope;
     private readonly Dictionary<int, RealizedCell> _realized = new();
@@ -43,10 +38,6 @@ internal sealed class CollectionGridVirtualizer
     private readonly CollectionGridSlotLayer? _slots;
 
     private IReadOnlyList<CollectionCardVm> _visible = Array.Empty<CollectionCardVm>();
-    private IReadOnlyDictionary<
-        Guid,
-        IReadOnlyList<CollectionSourceOfferMatch>
-    > _sourceMatchesByCardId = new Dictionary<Guid, IReadOnlyList<CollectionSourceOfferMatch>>();
     private CollectionGridLayout _layout = CollectionGridLayout.Empty;
     private float _viewportWidth;
     private float _viewportHeight;
@@ -92,21 +83,11 @@ internal sealed class CollectionGridVirtualizer
     // SetVisible swaps in a new ordered visible set (typically after filter change). Cards
     // already shown in both sets retain their native instances and current opacity; only newly
     // realized cards enter the fade-in path. Caller is expected to also reset scrollY to 0.
-    public void SetVisible(
-        IReadOnlyList<CollectionCardVm> visible,
-        CollectionTabKind activeTab,
-        IReadOnlyDictionary<
-            Guid,
-            IReadOnlyList<CollectionSourceOfferMatch>
-        >? sourceMatchesByCardId = null
-    )
+    public void SetVisible(IReadOnlyList<CollectionCardVm> visible, CollectionTabKind activeTab)
     {
         var retention = BuildRetentionPlan(visible);
         BumpGeneration();
         _visible = visible ?? Array.Empty<CollectionCardVm>();
-        _sourceMatchesByCardId =
-            sourceMatchesByCardId
-            ?? new Dictionary<Guid, IReadOnlyList<CollectionSourceOfferMatch>>();
         _gap = CollectionGridConstants.GridGap;
         _layout = CollectionGridLayout.Build(_visible, activeTab);
         RecomputePixelization();
@@ -486,8 +467,6 @@ internal sealed class CollectionGridVirtualizer
         if (hover == null)
             hover = card.AddComponent<CollectionCardHoverRelay>();
         hover.Bind(session);
-        _sourceMatchesByCardId.TryGetValue(vm.Id, out var sourceMatches);
-        CollectionSourceAttributionBadge.Bind(card, sourceMatches);
 
         if (!CollectionGridConstants.UsePolledHover)
             EnsureHitTarget(card);
@@ -751,8 +730,6 @@ internal sealed class CollectionGridVirtualizer
             cell.HoverRelay?.Bind(cell.Session);
             cell.Index = newIndex;
             cell.Vm = _visible[newIndex];
-            _sourceMatchesByCardId.TryGetValue(cell.Vm.Id, out var sourceMatches);
-            CollectionSourceAttributionBadge.Bind(cell.Session.Root, sourceMatches);
             // Same native instance retained: keep warm bounds cache; only cellRect changes.
             BindArtLoadedHook(cell);
             _realized[newIndex] = cell;

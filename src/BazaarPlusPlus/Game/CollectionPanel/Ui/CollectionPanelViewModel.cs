@@ -11,7 +11,7 @@ internal sealed class CollectionPanelViewModel
     public string Subtitle { get; set; } = string.Empty;
     public IReadOnlyList<BPPSupporterSample> Supporters { get; set; } =
         Array.Empty<BPPSupporterSample>();
-    public string CountText { get; set; } = string.Empty;
+    public int VisibleCount { get; set; }
     public string? StatusMessage { get; set; }
     public bool IsLoading { get; set; }
     public CollectionTabKind ActiveTab { get; set; } = CollectionTabKind.Items;
@@ -21,6 +21,7 @@ internal sealed class CollectionPanelViewModel
     public bool HeroFilterVisible { get; set; } = true;
     public bool HeroFilterEnabled { get; set; } = true;
     public EHero? SelectedHero { get; set; }
+    public bool AllHeroesSelected { get; set; }
     public HashSet<ETier> SelectedTiers { get; set; } = new();
     public HashSet<ECardSize> SelectedSizes { get; set; } = new();
     public HashSet<ECardTag> SelectedTags { get; set; } = new();
@@ -31,6 +32,8 @@ internal sealed class CollectionPanelViewModel
     public bool SearchExpanded { get; set; }
     public string SearchQuery { get; set; } = string.Empty;
     public string? SelectedSourceKey { get; set; }
+    public HashSet<string> EncounteredMerchantSourceKeys { get; set; } =
+        new(StringComparer.Ordinal);
     public bool SourceSelectorEnabled { get; set; } = true;
     public CollectionSortPriority SortPriority { get; set; } = CollectionSortPriority.Quality;
 
