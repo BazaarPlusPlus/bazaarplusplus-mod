@@ -215,7 +215,6 @@ internal sealed class CollectionGridVirtualizer
                         _gap,
                         cell.BoundsCache
                     );
-                    cell.HoverVisual?.CaptureBaseScale();
                 }
                 NativeCardCellFitter.Reposition(
                     cell.CachedRect,
@@ -321,11 +320,6 @@ internal sealed class CollectionGridVirtualizer
             )
         );
 
-        var normalizedX = (localX - hoverRect.X) / Mathf.Max(1f, hoverRect.Width) * 2f - 1f;
-        var normalizedY = (contentY - hoverRect.Y) / Mathf.Max(1f, hoverRect.Height) * 2f - 1f;
-        if (_realized.TryGetValue(idx, out var hoveredCell))
-            hoveredCell.HoverVisual?.SetPointer(normalizedX, normalizedY);
-
         // Already fired OnHover for this cell — nothing to do until the cursor leaves.
         if (_hoverDispatched)
             return;
@@ -333,7 +327,6 @@ internal sealed class CollectionGridVirtualizer
         // Successful acquisition means native SetUp and resize have already completed.
         if (_realized.TryGetValue(idx, out var cell))
         {
-            cell.HoverVisual?.SetHovered(true);
             cell.HoverRelay?.OnPointerEnter(null!);
             _hoverDispatched = true;
         }
@@ -367,10 +360,7 @@ internal sealed class CollectionGridVirtualizer
             return;
         }
         if (_realized.TryGetValue(_hoverPollIndex, out var cell))
-        {
-            cell.HoverVisual?.SetHovered(false);
             cell.HoverRelay?.TryInvokeHoverOut();
-        }
         _hoverPollIndex = -1;
         _hoverDispatched = false;
     }
@@ -478,29 +468,16 @@ internal sealed class CollectionGridVirtualizer
             hover = card.AddComponent<CollectionCardHoverRelay>();
         hover.Bind(session);
 
-        var hoverVisual = card.GetComponent<CollectionCardHoverVisual>();
-        if (hoverVisual == null)
-            hoverVisual = card.AddComponent<CollectionCardHoverVisual>();
-
         if (!CollectionGridConstants.UsePolledHover)
             EnsureHitTarget(card);
 
-        var cell = new RealizedCell(
-            index,
-            vm,
-            session,
-            ++_perCellGeneration,
-            hover,
-            hoverVisual,
-            rect
-        );
+        var cell = new RealizedCell(index, vm, session, ++_perCellGeneration, hover, rect);
         _realized[index] = cell;
         BindArtLoadedHook(cell);
         // Fresh session: empty cache measures once here; scroll later reads the warm cache.
         cell.BoundsCache.InvalidateOnRebind();
         var cellRect = _layout.ContentRectFor(index, _unit, _gap, _originX, _originY);
         NativeCardCellFitter.ApplyScale(rect, cellRect, _gap, cell.BoundsCache);
-        hoverVisual.CaptureBaseTransform();
         NativeCardCellFitter.Reposition(
             rect,
             cellRect,
@@ -635,19 +612,9 @@ internal sealed class CollectionGridVirtualizer
         }
     }
 
-    // Advance hover scale and tilt after PollHover has updated the active cell's pointer target.
-    public void TickHover(float deltaSeconds)
-    {
-        if (deltaSeconds <= 0f)
-            return;
-        foreach (var pair in _realized)
-            pair.Value.HoverVisual?.Tick(deltaSeconds);
-    }
-
     private void RecycleCell(RealizedCell cell)
     {
         ClearArtLoadedHook(cell);
-        cell.HoverVisual?.ResetVisual();
         cell.HoverRelay?.Clear();
         cell.Session.Dispose();
     }
@@ -689,7 +656,6 @@ internal sealed class CollectionGridVirtualizer
                 return;
             var cellRect = _layout.ContentRectFor(cell.Index, _unit, _gap, _originX, _originY);
             NativeCardCellFitter.ApplyScale(cell.CachedRect, cellRect, _gap, cell.BoundsCache);
-            cell.HoverVisual?.CaptureBaseScale();
             NativeCardCellFitter.Reposition(
                 cell.CachedRect,
                 cellRect,
@@ -769,7 +735,6 @@ internal sealed class CollectionGridVirtualizer
             _realized[newIndex] = cell;
             var cellRect = _layout.ContentRectFor(newIndex, _unit, _gap, _originX, _originY);
             NativeCardCellFitter.ApplyScale(cell.CachedRect, cellRect, _gap, cell.BoundsCache);
-            cell.HoverVisual?.CaptureBaseScale();
             NativeCardCellFitter.Reposition(
                 cell.CachedRect,
                 cellRect,
@@ -828,7 +793,6 @@ internal sealed class CollectionGridVirtualizer
             INativeCardPreviewSession session,
             int generation,
             CollectionCardHoverRelay hoverRelay,
-            CollectionCardHoverVisual hoverVisual,
             RectTransform cachedRect
         )
         {
@@ -837,7 +801,6 @@ internal sealed class CollectionGridVirtualizer
             Session = session;
             Generation = generation;
             HoverRelay = hoverRelay;
-            HoverVisual = hoverVisual;
             CachedRect = cachedRect;
             BoundsCache = new NativeCardCellBoundsCache();
         }
@@ -847,7 +810,6 @@ internal sealed class CollectionGridVirtualizer
         public INativeCardPreviewSession Session { get; }
         public int Generation { get; }
         public CollectionCardHoverRelay HoverRelay { get; }
-        public CollectionCardHoverVisual HoverVisual { get; }
         public RectTransform CachedRect { get; }
         public NativeCardCellBoundsCache BoundsCache { get; }
         public bool IsShown { get; set; }
