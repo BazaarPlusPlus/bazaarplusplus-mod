@@ -47,7 +47,7 @@ internal static class CombatImpactMetricFormatter
         return string.Join(
             " · ",
             group.TriggerSources.Select(trigger =>
-                $"{trigger.Entity.Name.Replace('\n', ' ')} ×{trigger.ApplicationCount}"
+                $"{trigger.Entity.Name.Replace('\n', ' ')} ×{trigger.ObservedActivationBatchCount}"
             )
         );
     }
