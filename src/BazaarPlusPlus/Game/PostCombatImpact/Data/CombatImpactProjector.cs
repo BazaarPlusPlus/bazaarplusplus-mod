@@ -610,8 +610,19 @@ internal static class CombatImpactProjector
                         cardAttributes,
                         out configuredActionValue
                     );
+                var concurrentHealthAdjustment = default(ResolvedImpactValue);
+                var hasConcurrentHealthAdjustment =
+                    hasKind
+                    && TryResolveConcurrentHealthAdjustment(
+                        frame,
+                        item,
+                        kind,
+                        executed,
+                        out concurrentHealthAdjustment
+                    );
                 var resolved =
                     hasConfiguredDuration ? configuredActionValue
+                    : hasConcurrentHealthAdjustment ? concurrentHealthAdjustment
                     : hasKind
                         ? ResolveValue(
                             frame,
@@ -2313,7 +2324,173 @@ internal static class CombatImpactProjector
         var matches = update
             .HealthAdjustments.Where(adjustment => Matches(kind, adjustment))
             .ToArray();
-        if (matches.Length == 0)
+        return ResolveHealthAdjustments(matches, kind);
+    }
+
+    private static bool TryResolveConcurrentHealthAdjustment(
+        CombatSimFrame frame,
+        CombatSimEventEffectExecuted item,
+        CombatImpactKind kind,
+        IReadOnlyList<CombatSimEventEffectExecuted> executed,
+        out ResolvedImpactValue resolved
+    )
+    {
+        resolved = default;
+        if (
+            kind
+                is not (
+                    CombatImpactKind.DirectDamage
+                    or CombatImpactKind.Healing
+                    or CombatImpactKind.Shield
+                )
+            || item.Target is not EffectTargetPlayer playerTarget
+        )
+            return false;
+
+        var targetId = ResolveTargetId(item.Target);
+        var claimants = executed
+            .Where(candidate =>
+                string.Equals(ResolveTargetId(candidate.Target), targetId, StringComparison.Ordinal)
+                && TryResolveKind(candidate.ActionType, out var candidateKind)
+                && candidateKind == kind
+            )
+            .ToArray();
+        if (claimants.Length <= 1)
+            return false;
+
+        var claimantIndex = Array.FindIndex(
+            claimants,
+            candidate => ReferenceEquals(candidate, item)
+        );
+        if (claimantIndex < 0)
+            return false;
+
+        var update =
+            playerTarget.Target == ECombatantId.Player
+                ? frame.PlayerUpdates
+                : frame.OpponentUpdates;
+        var adjustments = update
+            ?.HealthAdjustments.Where(adjustment => Matches(kind, adjustment))
+            .ToArray();
+        if (adjustments is not { Length: > 0 })
+            return false;
+
+        if (kind != CombatImpactKind.DirectDamage)
+        {
+            if (adjustments.Length != claimants.Length)
+                return false;
+            var healthAdjustment = ResolveHealthAdjustments([adjustments[claimantIndex]], kind);
+            if (!healthAdjustment.HasValue)
+                return false;
+            resolved = healthAdjustment.Value;
+            return true;
+        }
+
+        var candidates = ResolveConcurrentDamageCandidates(
+            adjustments,
+            claimants.Length,
+            claimantIndex
+        );
+        if (candidates.Count == 0)
+            return false;
+
+        var isCritical = candidates[0].IsCritical;
+        if (candidates.Any(candidate => candidate.IsCritical != isCritical))
+            return false;
+
+        var values = candidates.Select(candidate => candidate.Value).Distinct().ToArray();
+        var value = values.Length == 1 ? values[0] : null;
+        resolved = new ResolvedImpactValue(
+            value,
+            CombatImpactValueUnit.Amount,
+            CombatImpactAggregator.NativeKey(kind),
+            isCritical,
+            value.HasValue ? CombatImpactValueBasis.ExactAdjustment : CombatImpactValueBasis.None
+        )
+        {
+            CriticalCount = isCritical ? 1 : 0,
+            CriticalValue = isCritical ? value : null,
+            HasCriticalAdjustmentCandidate = isCritical,
+        };
+        return true;
+    }
+
+    private static IReadOnlyList<ResolvedImpactValue> ResolveConcurrentDamageCandidates(
+        IReadOnlyList<CombatSimPlayerHealthAdjustment> adjustments,
+        int effectCount,
+        int requestedEffectIndex
+    )
+    {
+        const int maximumCandidates = 1_024;
+        var candidates = new List<ResolvedImpactValue>();
+        var partition = new List<IReadOnlyList<CombatSimPlayerHealthAdjustment>>(effectCount);
+        var wasTruncated = false;
+
+        void Visit(int adjustmentIndex)
+        {
+            if (candidates.Count >= maximumCandidates)
+            {
+                wasTruncated = true;
+                return;
+            }
+            if (partition.Count == effectCount)
+            {
+                if (adjustmentIndex != adjustments.Count)
+                    return;
+                var candidate = ResolveHealthAdjustments(
+                    partition[requestedEffectIndex],
+                    CombatImpactKind.DirectDamage
+                );
+                if (candidate.HasValue)
+                    candidates.Add(candidate.Value);
+                return;
+            }
+
+            var remainingEffects = effectCount - partition.Count;
+            var remainingAdjustments = adjustments.Count - adjustmentIndex;
+            if (
+                adjustmentIndex >= adjustments.Count
+                || remainingAdjustments < remainingEffects
+                || remainingAdjustments > remainingEffects * 2
+            )
+                return;
+
+            partition.Add([adjustments[adjustmentIndex]]);
+            Visit(adjustmentIndex + 1);
+            partition.RemoveAt(partition.Count - 1);
+
+            if (
+                adjustmentIndex + 1 >= adjustments.Count
+                || !CanBelongToSameDamageEffect(
+                    adjustments[adjustmentIndex],
+                    adjustments[adjustmentIndex + 1]
+                )
+            )
+                return;
+
+            partition.Add([adjustments[adjustmentIndex], adjustments[adjustmentIndex + 1]]);
+            Visit(adjustmentIndex + 2);
+            partition.RemoveAt(partition.Count - 1);
+        }
+
+        Visit(0);
+        return wasTruncated ? [] : candidates;
+    }
+
+    private static bool CanBelongToSameDamageEffect(
+        CombatSimPlayerHealthAdjustment first,
+        CombatSimPlayerHealthAdjustment second
+    ) =>
+        first.AttributeChanged == EPlayerHealthChangeType.Health
+        && second.AttributeChanged == EPlayerHealthChangeType.Shield
+        && first.IsCrit == second.IsCrit;
+
+    private static ResolvedImpactValue? ResolveHealthAdjustments(
+        IReadOnlyList<CombatSimPlayerHealthAdjustment> matches,
+        CombatImpactKind kind
+    )
+    {
+        if (matches.Count == 0)
             return null;
 
         long aggregate = 0;
