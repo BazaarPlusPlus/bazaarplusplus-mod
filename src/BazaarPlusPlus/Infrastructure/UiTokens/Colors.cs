@@ -51,7 +51,10 @@ internal static class Colors
     // Collection Panel filter chrome follows the compact, near-black tag treatment used by the
     // native settings backdrop: #101113 with the same ~0.902 alpha as its outer Overlay_P.
     public static Color CollectionPanelBackground => FromRgb(16, 17, 19, 0.902f);
-    public static Color CollectionFilterCardBackground => FromRgb(22, 24, 28, 1f);
+    // Slightly lift the RGB channels before applying alpha so the composite remains close to the
+    // former opaque #16181c card color while allowing a restrained amount of the panel backdrop
+    // to show through. Do not lower the old color's alpha directly: it would visibly muddy it.
+    public static Color CollectionFilterCardBackground => FromRgb(23, 25, 29, 0.90f);
     public static Color CollectionFilterTitleText => FromRgb(232, 236, 242, 1f);
     public static Color CollectionChipBackground => FromRgb(28, 30, 34, 1f);
     public static Color CollectionChipBorder => FromRgb(63, 68, 73, 1f);
