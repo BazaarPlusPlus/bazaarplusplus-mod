@@ -104,8 +104,9 @@ internal sealed class CollectionFilterState
     public EHero ToggleHero(EHero hero)
     {
         var concreteHero = NormalizeConcreteHero(hero);
+        var wasAllHeroesSelected = AllHeroesSelected;
         AllHeroesSelected = false;
-        SelectedHero = SelectedHero == concreteHero ? null : concreteHero;
+        SelectedHero = !wasAllHeroesSelected && SelectedHero == concreteHero ? null : concreteHero;
         return EffectiveHero;
     }
 

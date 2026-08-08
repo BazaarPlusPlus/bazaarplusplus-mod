@@ -146,6 +146,50 @@ AssertEqual(
     "Selecting a concrete hero from neutral mode should remain single-select."
 );
 
+var allHeroesSameHeroState = new CollectionFilterState();
+allHeroesSameHeroState.ToggleHero(EHero.Vanessa);
+allHeroesSameHeroState.ToggleAllHeroes();
+allHeroesSameHeroState.ToggleHero(EHero.Vanessa);
+AssertEqual(
+    false,
+    allHeroesSameHeroState.AllHeroesSelected,
+    "Selecting the residual hero from all-heroes should exit all-heroes."
+);
+AssertEqual(
+    EHero.Vanessa,
+    allHeroesSameHeroState.SelectedHero,
+    "Selecting the residual hero from all-heroes should preserve that hero as the scope."
+);
+AssertEqual(
+    EHero.Vanessa,
+    allHeroesSameHeroState.EffectiveHero,
+    "Selecting the residual hero from all-heroes should preserve that effective hero."
+);
+
+var allHeroesDifferentHeroState = new CollectionFilterState();
+allHeroesDifferentHeroState.ToggleHero(EHero.Vanessa);
+allHeroesDifferentHeroState.ToggleAllHeroes();
+allHeroesDifferentHeroState.ToggleHero(EHero.Dooley);
+AssertEqual(
+    false,
+    allHeroesDifferentHeroState.AllHeroesSelected,
+    "Selecting a different hero from all-heroes should exit all-heroes."
+);
+AssertEqual(
+    EHero.Dooley,
+    allHeroesDifferentHeroState.SelectedHero,
+    "Selecting a different hero from all-heroes should use that hero as the scope."
+);
+
+var normalHeroToggleState = new CollectionFilterState();
+normalHeroToggleState.ToggleHero(EHero.Vanessa);
+normalHeroToggleState.ToggleHero(EHero.Vanessa);
+AssertEqual(
+    null,
+    normalHeroToggleState.SelectedHero,
+    "Selecting the active hero twice outside all-heroes should clear the hero scope."
+);
+
 var defaultSelection = CollectionPanelSelectionState.Default;
 AssertEqual(
     EHero.Vanessa,
