@@ -1545,7 +1545,6 @@ internal sealed partial class CollectionPanelView
             active ? Colors.CollectionChipSelectedText : Colors.CollectionChipText,
             active
         );
-        UiStyle.BorderColor(_dayToggleButton.style, Color.black);
     }
 
     private void RefreshHeroChip(EHero hero, Button chip, bool selected)

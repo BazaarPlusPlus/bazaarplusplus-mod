@@ -52,7 +52,6 @@ internal static class Colors
     // native settings backdrop: #101113 with the same ~0.902 alpha as its outer Overlay_P.
     public static Color CollectionPanelBackground => FromRgb(16, 17, 19, 0.902f);
     public static Color CollectionFilterCardBackground => FromRgb(22, 24, 28, 1f);
-    public static Color CollectionFilterCardBorder => FromRgb(0, 0, 0, 1f);
     public static Color CollectionFilterTitleText => FromRgb(232, 236, 242, 1f);
     public static Color CollectionChipBackground => FromRgb(28, 30, 34, 1f);
     public static Color CollectionChipBorder => FromRgb(63, 68, 73, 1f);

@@ -47,7 +47,6 @@ internal sealed partial class CollectionPanelView
         controlDeck.style.flexDirection = FlexDirection.Column;
         controlDeck.style.flexShrink = 0f;
         controlDeck.style.backgroundColor = Colors.CollectionFilterCardBackground;
-        UiStyle.Border(controlDeck.style, Borders.Thin, Colors.CollectionFilterCardBorder);
         UiStyle.Radius(controlDeck.style, Radii.Md);
         UiStyle.Padding(controlDeck.style, UiSpacing.Lg);
         rail.Add(controlDeck);
@@ -95,7 +94,6 @@ internal sealed partial class CollectionPanelView
         _subtitle.style.backgroundColor = Colors.CollectionPanelBackground;
         UiStyle.FixedHeight(_subtitle.style, Sizes.CollectionTabToggleHeight);
         UiStyle.HorizontalPadding(_subtitle.style, UiSpacing.Md);
-        UiStyle.Border(_subtitle.style, Borders.Thin, Color.black);
         UiStyle.Radius(_subtitle.style, Radii.CollectionChip);
         controlDeck.Add(_subtitle);
 
@@ -702,7 +700,6 @@ internal sealed partial class CollectionPanelView
         if (card)
         {
             section.style.backgroundColor = Colors.CollectionFilterCardBackground;
-            UiStyle.Border(section.style, Borders.Thin, Colors.CollectionFilterCardBorder);
             UiStyle.Radius(section.style, Radii.Md);
             UiStyle.Padding(section.style, UiSpacing.Md);
         }
@@ -922,7 +919,6 @@ internal sealed partial class CollectionPanelView
         section.style.flexShrink = 0f;
         section.style.marginTop = marginTop;
         section.style.backgroundColor = Colors.CollectionFilterCardBackground;
-        UiStyle.Border(section.style, Borders.Thin, Colors.CollectionFilterCardBorder);
         UiStyle.Radius(section.style, Radii.Md);
         UiStyle.Padding(section.style, UiSpacing.Md);
         parent.Add(section);
@@ -1008,7 +1004,6 @@ internal sealed partial class CollectionPanelView
         // Match the operation rail's card shell so the catalog reads as two aligned panels.
         _gridViewport.style.backgroundColor = Colors.CollectionFilterCardBackground;
         UiStyle.Radius(_gridViewport.style, Radii.Md);
-        UiStyle.Border(_gridViewport.style, Borders.Thin, Colors.CollectionFilterCardBorder);
         _gridViewport.style.overflow = Overflow.Hidden;
         parent.Add(_gridViewport);
 

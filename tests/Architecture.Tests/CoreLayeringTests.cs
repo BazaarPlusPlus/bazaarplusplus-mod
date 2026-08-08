@@ -870,13 +870,13 @@ public class CoreLayeringTests
             var token in new[]
             {
                 "Colors.CollectionFilterCardBackground",
-                "Colors.CollectionFilterCardBorder",
             }
         )
         {
             Assert.Contains(token, operationRail);
             Assert.Contains(token, grid);
         }
+        Assert.DoesNotContain("CollectionFilterCardBorder", treeSource);
     }
 
     [Fact]
