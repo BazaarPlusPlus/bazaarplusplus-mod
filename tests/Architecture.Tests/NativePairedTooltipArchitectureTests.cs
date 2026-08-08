@@ -119,6 +119,41 @@ public sealed class NativePairedTooltipArchitectureTests
     }
 
     [Fact]
+    public void Combat_impact_lock_keeps_owned_native_tooltips_raycast_transparent()
+    {
+        var sourceRoot = MainSourceRoot(RepoRoot());
+        var controller = File.ReadAllText(
+            Path.Combine(sourceRoot, "Game", "PostCombatImpact", "PostCombatImpactController.cs")
+        );
+        var patch = File.ReadAllText(
+            Path.Combine(sourceRoot, "Patches", "PostCombatImpact", "PostCombatImpactRecapPatch.cs")
+        );
+
+        var lockCall = controller.IndexOf("primary.SetLockedFlag(true);", StringComparison.Ordinal);
+        var initialSuppression = controller.IndexOf(
+            "SuppressTooltipRaycasts(primary);",
+            lockCall,
+            StringComparison.Ordinal
+        );
+        Assert.True(lockCall >= 0 && initialSuppression > lockCall);
+
+        Assert.Contains("OwnsNativeTooltip(controller)", controller, StringComparison.Ordinal);
+        Assert.Contains(
+            "canvasGroup.blocksRaycasts = false;",
+            controller,
+            StringComparison.Ordinal
+        );
+        Assert.Contains("canvasGroup.interactable = false;", controller, StringComparison.Ordinal);
+        Assert.Contains(
+            "[HarmonyPatch(typeof(BaseTooltipController), \"ToggleInteractabilityOnCanvas\")]",
+            patch,
+            StringComparison.Ordinal
+        );
+        Assert.Contains("[HarmonyPostfix]", patch, StringComparison.Ordinal);
+        Assert.Contains("OnNativeTooltipInteractabilityChanged(", patch, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Cancelling_a_prepared_auxiliary_keeps_it_concealed_until_native_teardown()
     {
         var host = File.ReadAllText(

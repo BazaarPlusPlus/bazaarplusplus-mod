@@ -93,53 +93,33 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
     {
         var services = _services;
         if (services == null || _metadataStore == null)
-            return SetAvailability(
-                CurrentReplayRecorderAvailabilityPhase.Unavailable,
-                "Video database is unavailable."
-            );
+            return SetAvailability(CurrentReplayRecorderAvailabilityPhase.Unavailable, "Video database is unavailable.");
 
         var backend = ReplayVideoBackendPolicy.Current;
         if (backend == ReplayVideoBackend.Unsupported)
-            return SetAvailability(
-                CurrentReplayRecorderAvailabilityPhase.Unavailable,
-                "Video recording is supported on macOS and Windows."
-            );
+            return SetAvailability(CurrentReplayRecorderAvailabilityPhase.Unavailable, "Video recording is supported on macOS and Windows.");
 
         var videoDirectory = VideoDirectory(services);
         if (string.IsNullOrWhiteSpace(videoDirectory))
-            return SetAvailability(
-                CurrentReplayRecorderAvailabilityPhase.Unavailable,
-                "Video output directory is unavailable."
-            );
+            return SetAvailability(CurrentReplayRecorderAvailabilityPhase.Unavailable, "Video output directory is unavailable.");
 
         if (!ReplayVideoCaptureSettingsCache.TryCaptureCurrent(out var settings))
-            return SetAvailability(
-                CurrentReplayRecorderAvailabilityPhase.Unavailable,
-                "The current game resolution cannot be recorded."
-            );
+            return SetAvailability(CurrentReplayRecorderAvailabilityPhase.Unavailable, "The current game resolution cannot be recorded.");
 
-        var available =
-            backend == ReplayVideoBackend.MacNative
-                ? MacMetalVideoEncoder.TryGetAvailability(out var nativeReason)
-                : WindowsMediaFoundationVideoEncoder.TryGetAvailability(out nativeReason);
+        var available = backend == ReplayVideoBackend.MacNative
+            ? MacMetalVideoEncoder.TryGetAvailability(out var nativeReason)
+            : WindowsMediaFoundationVideoEncoder.TryGetAvailability(out nativeReason);
         if (!available)
-            return SetAvailability(
-                CurrentReplayRecorderAvailabilityPhase.Unavailable,
-                nativeReason ?? "The native video recorder is unavailable."
-            );
+            return SetAvailability(CurrentReplayRecorderAvailabilityPhase.Unavailable, nativeReason ?? "The native video recorder is unavailable.");
 
         lock (_availabilitySync)
         {
             _availabilitySettings = settings;
             _availabilityVideoDirectory = videoDirectory;
-            _currentReplayAvailability = new CurrentReplayRecorderAvailability(
-                CurrentReplayRecorderAvailabilityPhase.Ready,
-                null
-            );
+            _currentReplayAvailability = new CurrentReplayRecorderAvailability(CurrentReplayRecorderAvailabilityPhase.Ready, null);
             return _currentReplayAvailability;
         }
     }
-
     internal CurrentReplayRecorderAvailability GetCurrentReplayRecordingAvailability()
     {
         lock (_availabilitySync)
@@ -199,7 +179,12 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
                 Source = CombatReplayPlaybackSource.CurrentNative,
                 RecordVideo = true,
             };
-            var request = BuildCaptureRequest(operation.RecordingId, evt, videoDirectory, settings);
+            var request = BuildCaptureRequest(
+                operation.RecordingId,
+                evt,
+                videoDirectory,
+                settings
+            );
             if (request == null)
             {
                 _operations.CompletePreflight(
@@ -393,7 +378,11 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
                 return;
             }
 
-            var request = BuildCaptureRequest(operation.RecordingId, evt, gate.VideoDirectoryPath!);
+            var request = BuildCaptureRequest(
+                operation.RecordingId,
+                evt,
+                gate.VideoDirectoryPath!
+            );
             if (request == null)
             {
                 CompletePreflightFailure(

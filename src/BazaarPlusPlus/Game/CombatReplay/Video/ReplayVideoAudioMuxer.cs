@@ -105,7 +105,13 @@ internal sealed class ReplayVideoAudioMuxer
                     MuxReasonCode.UnsupportedPlatform
                 );
 
-            return MuxNative(backend, recordingId, tempVideoPath, existingWavPaths, finalPath);
+            return MuxNative(
+                backend,
+                recordingId,
+                tempVideoPath,
+                existingWavPaths,
+                finalPath
+            );
         }
         catch (Exception ex)
         {
@@ -249,7 +255,14 @@ internal sealed class ReplayVideoAudioMuxer
                         ? MuxReasonCode.NativeMuxUnavailable
                         : MuxReasonCode.NativeMuxFailed
                 );
-            return FallBack(silentVideoTempPath, wavPaths, finalPath, reason, resultCode, error);
+            return FallBack(
+                silentVideoTempPath,
+                wavPaths,
+                finalPath,
+                reason,
+                resultCode,
+                error
+            );
         }
         catch (Exception ex)
         {
@@ -530,4 +543,5 @@ internal sealed class ReplayVideoAudioMuxer
         foreach (var path in paths)
             TryDelete(path);
     }
+
 }

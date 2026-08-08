@@ -204,7 +204,9 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
                     CombatReplayVideoLogEvents.StatsMaxOutstandingReadbacks.Bind(0),
                     CombatReplayVideoLogEvents.StatsReadbackCopyP95Us.Bind(0),
                     CombatReplayVideoLogEvents.StatsCfrCopyP95Us.Bind(0),
-                    CombatReplayVideoLogEvents.StatsStagingBufferBytes.Bind(0),
+                    CombatReplayVideoLogEvents.StatsStagingBufferBytes.Bind(
+                        0
+                    ),
                     CombatReplayVideoLogEvents.StatsMaxReadbackPayloadBytes.Bind(0),
                     CombatReplayVideoLogEvents.StatsRenderTextureEstimatedBytes.Bind(
                         _captureRenderTexture == null ? 0 : _frameByteLength
@@ -340,7 +342,10 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
         _nativeOutputFrameIndex += plan.TimelineFrameCount;
     }
 
-    private void CaptureWindowsFrames(double now, WindowsMediaFoundationVideoEncoder encoder)
+    private void CaptureWindowsFrames(
+        double now,
+        WindowsMediaFoundationVideoEncoder encoder
+    )
     {
         var pacer = _pacer;
         var renderTexture = _captureRenderTexture;

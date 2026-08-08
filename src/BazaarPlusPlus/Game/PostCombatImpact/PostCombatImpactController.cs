@@ -23,18 +23,12 @@ internal sealed class PostCombatImpactController : MonoBehaviour
     private const float GeometryEpsilon = 0.5f;
     private const int MaxTransientShowRetries = 2;
 
-    // Covers the native card-to-card transition window (~15 frames at 60fps) with margin:
-    // HideCardTooltipController silently no-ops while that transition is active, and no native
-    // caller ever retries, so a hover exited within the window leaves the tooltip stranded.
-    private const int ExitHideWatchMaxFrames = 45;
-
     private readonly WaitForEndOfFrame _waitForEndOfFrame = new();
     private PostCombatImpactModule? _module;
     private IPostCombatImpactTooltipView? _view;
     private Coroutine? _pendingShow;
     private Coroutine? _settlePresentation;
     private Coroutine? _pendingHoverExit;
-    private Coroutine? _exitHideWatch;
     private CardTooltipController? _pendingPrimaryTooltip;
     private Transform? _pendingAuxiliaryAnchor;
     private string? _pendingAuxiliaryHeader;
@@ -141,7 +135,6 @@ internal sealed class PostCombatImpactController : MonoBehaviour
     )
     {
         CancelPendingHoverExit();
-        CancelExitHideWatch();
         if (card.InstanceId.Value is not { Length: > 0 } sourceId)
         {
             LogInteraction(PostCombatImpactReasonCode.SourceIdUnavailable);
@@ -178,7 +171,6 @@ internal sealed class PostCombatImpactController : MonoBehaviour
             sourceId
         );
         CancelAndClearPresentation(preserveOutstandingAuxiliaryRequest: true);
-        LogLifecycle(sameHover ? "hover_retry" : "hover_enter", "hover", card.TemplateId);
         if (!sameHover)
             LogInteractionTrace(
                 PostCombatImpactReasonCode.RecapHoverObserved,
@@ -230,23 +222,13 @@ internal sealed class PostCombatImpactController : MonoBehaviour
             );
             return;
         }
-        // Pointer sitting on the tooltip at exit time is the synthetic-exit signature: the
-        // tooltip landed under the cursor and stole the pointer from the item.
-        var exitOntoTooltip =
-            (_activePrimaryTooltip ?? _pendingPrimaryTooltip)?.IsPointerOverTooltip() == true;
-        var dismissedCard = _hoveredRequest.Card;
+        var dismissedTemplateId = _hoveredRequest.Card.TemplateId;
         ClearHoveredSource();
         CancelAndClearPresentation(preserveOutstandingAuxiliaryRequest: true);
-        LogLifecycle(
-            "hover_exit",
-            exitOntoTooltip ? origin + "_onto_tooltip" : origin.ToString(),
-            dismissedCard.TemplateId
-        );
-        StartExitHideWatch(dismissedCard);
         if (hadWork)
             LogInteractionTrace(
                 PostCombatImpactReasonCode.Dismissed,
-                dismissedCard.TemplateId,
+                dismissedTemplateId,
                 detail: "pointer_exit"
             );
     }
@@ -266,15 +248,13 @@ internal sealed class PostCombatImpactController : MonoBehaviour
         )
             yield break;
 
-        var dismissedCard = _hoveredRequest.Card;
+        var dismissedTemplateId = _hoveredRequest.Card.TemplateId;
         ClearHoveredSource();
         CancelAndClearPresentation(preserveOutstandingAuxiliaryRequest: true);
-        LogLifecycle("hover_exit", "locked_pointer_exit", dismissedCard.TemplateId);
-        StartExitHideWatch(dismissedCard);
         if (hadWork)
             LogInteractionTrace(
                 PostCombatImpactReasonCode.Dismissed,
-                dismissedCard.TemplateId,
+                dismissedTemplateId,
                 detail: "locked_pointer_exit"
             );
     }
@@ -382,12 +362,6 @@ internal sealed class PostCombatImpactController : MonoBehaviour
         // Native positioning clears the lock as it completes. Apply it only after HasShown so the
         // Recap proxy's board CardController cannot tear the primary Tooltip down on the next tick.
         primary.SetLockedFlag(true);
-        // The lock must never turn the tooltip into a pointer shield: native
-        // ToggleInteractabilityOnCanvas couples blocksRaycasts to isLocked, and a tooltip that
-        // blocks raycasts under the cursor steals the pointer from the hovered recap item —
-        // the synthetic OnPointerExit behind the flicker loop. Wide items (Equipment Van) and
-        // edge-anchored skills are exactly the layouts whose tooltip lands on the cursor. The
-        // raycast-pass patch re-asserts this whenever a later native toggle re-couples it.
         SuppressTooltipRaycasts(primary);
 
         if (!IsCurrentHover(request, revision))
@@ -605,11 +579,6 @@ internal sealed class PostCombatImpactController : MonoBehaviour
         {
             if (!IsCurrentPresentation(request, revision, auxiliary, primary))
             {
-                LogLifecycle(
-                    "settle_abort",
-                    DescribePresentationBreak(request, revision, auxiliary, primary),
-                    request.Card.TemplateId
-                );
                 _settlePresentation = null;
                 HideActiveSelection();
                 yield break;
@@ -647,11 +616,6 @@ internal sealed class PostCombatImpactController : MonoBehaviour
         {
             if (!IsCurrentPresentation(request, revision, auxiliary, primary))
             {
-                LogLifecycle(
-                    "settle_abort",
-                    DescribePresentationBreak(request, revision, auxiliary, primary),
-                    request.Card.TemplateId
-                );
                 _settlePresentation = null;
                 HideActiveSelection();
                 yield break;
@@ -699,11 +663,6 @@ internal sealed class PostCombatImpactController : MonoBehaviour
             yield return _waitForEndOfFrame;
             if (!IsCurrentPresentation(request, revision, auxiliary, primary))
             {
-                LogLifecycle(
-                    "settle_abort",
-                    DescribePresentationBreak(request, revision, auxiliary, primary),
-                    request.Card.TemplateId
-                );
                 _settlePresentation = null;
                 HideActiveSelection();
                 yield break;
@@ -742,11 +701,6 @@ internal sealed class PostCombatImpactController : MonoBehaviour
         }
 
         _settlePresentation = null;
-        LogLifecycle(
-            "revealed",
-            hasAttributedImpact ? "attributed" : "plain",
-            request.Card.TemplateId
-        );
         LogInteractionTrace(
             !hasAttributedImpact
                 ? PostCombatImpactReasonCode.ShownWithoutAttributedImpact
@@ -754,31 +708,6 @@ internal sealed class PostCombatImpactController : MonoBehaviour
             request.Card.TemplateId,
             detail: "settled"
         );
-    }
-
-    private string DescribePresentationBreak(
-        HoverRequest request,
-        int revision,
-        AuxiliaryTooltipController? auxiliary,
-        CardTooltipController? primary
-    )
-    {
-        if (!IsCurrentHover(request, revision))
-            return "hover_changed";
-        if (!IsRecapOpen())
-            return "recap_closed";
-        if (auxiliary == null)
-            return "auxiliary_gone";
-        if (primary == null)
-            return "primary_gone";
-        if (!primary.HasShown)
-            return "primary_not_shown";
-        return ReferenceEquals(
-            TheBazaar.Data.TooltipParentComponent?.GetCardTooltipController(request.Card),
-            primary
-        )
-            ? "unknown"
-            : "controller_mismatch";
     }
 
     private bool IsCurrentPresentation(
@@ -838,48 +767,10 @@ internal sealed class PostCombatImpactController : MonoBehaviour
         Array.Copy(corners, 0, destination, destinationIndex, corners.Length);
     }
 
-    /// <summary>
-    /// True while this feature holds or is acquiring the given native tooltip controller: the
-    /// window in which the paired presentation must stay raycast-transparent so it cannot steal
-    /// the pointer from the hovered recap item.
-    /// </summary>
-    private bool OwnsNativeTooltip(object controller) =>
-        ReferenceEquals(_pendingPrimaryTooltip, controller)
-        || ReferenceEquals(_activePrimaryTooltip, controller)
-        || ReferenceEquals(_pendingAuxiliaryController, controller)
-        || ReferenceEquals(_activeAuxiliaryTooltip, controller);
-
-    internal void OnNativeTooltipInteractabilityChanged(
-        BaseTooltipController controller,
-        CanvasGroup canvasGroup
-    )
-    {
-        if (canvasGroup == null || !canvasGroup.blocksRaycasts || !OwnsNativeTooltip(controller))
-            return;
-
-        canvasGroup.blocksRaycasts = false;
-        canvasGroup.interactable = false;
-        LogLifecycle("raycast_pass", "reasserted", _hoveredRequest?.Card.TemplateId ?? Guid.Empty);
-    }
-
-    private void SuppressTooltipRaycasts(BaseTooltipController controller)
-    {
-        var canvasGroup = controller.tooltipCanvasGroup;
-        if (canvasGroup == null)
-            return;
-        canvasGroup.blocksRaycasts = false;
-        canvasGroup.interactable = false;
-    }
-
-    internal void OnNativeTooltipChanging(CardTooltipController controller, string origin)
+    internal void OnNativeTooltipChanging(CardTooltipController controller)
     {
         if (ReferenceEquals(_pendingPrimaryTooltip, controller))
         {
-            LogLifecycle(
-                "native_changing",
-                origin + "_pending",
-                _hoveredRequest?.Card.TemplateId ?? Guid.Empty
-            );
             StopPendingShow(hidePrimary: false, preserveOutstandingAuxiliaryRequest: true);
             return;
         }
@@ -887,11 +778,6 @@ internal sealed class PostCombatImpactController : MonoBehaviour
         if (_view?.OnNativeTooltipChanging(controller) != true)
             return;
 
-        LogLifecycle(
-            "native_changing",
-            origin + "_active",
-            _hoveredRequest?.Card.TemplateId ?? Guid.Empty
-        );
         if (_pendingShow != null || _settlePresentation != null)
             StopPendingShow(hidePrimary: false, preserveOutstandingAuxiliaryRequest: true);
         _selectedSourceId = null;
@@ -899,29 +785,36 @@ internal sealed class PostCombatImpactController : MonoBehaviour
         _activeAuxiliaryTooltip = null;
     }
 
+    internal void OnNativeTooltipInteractabilityChanged(
+        BaseTooltipController controller,
+        CanvasGroup canvasGroup
+    )
+    {
+        if (canvasGroup.blocksRaycasts && OwnsNativeTooltip(controller))
+            SuppressTooltipRaycasts(controller);
+    }
+
+    private bool OwnsNativeTooltip(BaseTooltipController controller) =>
+        ReferenceEquals(_pendingPrimaryTooltip, controller)
+        || ReferenceEquals(_activePrimaryTooltip, controller)
+        || ReferenceEquals(_pendingAuxiliaryController, controller)
+        || ReferenceEquals(_activeAuxiliaryTooltip, controller);
+
+    private static void SuppressTooltipRaycasts(BaseTooltipController controller)
+    {
+        var canvasGroup = controller.tooltipCanvasGroup;
+        if (canvasGroup == null)
+            return;
+
+        canvasGroup.blocksRaycasts = false;
+        canvasGroup.interactable = false;
+    }
+
     internal void OnNativeTooltipPreparing(
         CardTooltipController controller,
         ITooltipData tooltipData
     )
     {
-        // Every native primary show handoff during recap is frame-logged, matched or not: a
-        // re-show of an already-exited card is the signature of the native per-frame retry
-        // engine (RecapItemVisualController.OnMouseOver) and of late async Show continuations.
-        if (IsRecapOpen() && tooltipData is CardTooltipData shownData)
-        {
-            var shownSourceId = shownData.CardInstance?.InstanceId.Value;
-            var matchesHover =
-                _hoveredRequest != null
-                && string.Equals(shownSourceId, _hoveredRequest.SourceId, StringComparison.Ordinal);
-            LogLifecycle(
-                "native_show",
-                _hoveredRequest == null ? "no_hover"
-                    : matchesHover ? "hover_match"
-                    : "hover_mismatch",
-                shownData.CardInstance?.TemplateId ?? Guid.Empty
-            );
-        }
-
         if (
             _hoveredRequest == null
             || _view == null
@@ -973,7 +866,6 @@ internal sealed class PostCombatImpactController : MonoBehaviour
             && string.Equals(_pendingAuxiliaryHeader, header, StringComparison.Ordinal)
         )
         {
-            LogLifecycle("aux_show", "matched", _hoveredRequest?.Card.TemplateId ?? Guid.Empty);
             _nativeAuxiliaryTakeoverActive = false;
             _auxiliaryRequestOutstanding = false;
             _pendingAuxiliaryController = controller;
@@ -982,14 +874,6 @@ internal sealed class PostCombatImpactController : MonoBehaviour
                 _pendingShow = StartCoroutine(ResumeAfterNativeAuxiliaryShow(controller));
             return;
         }
-
-        LogLifecycle(
-            "aux_show",
-            _view != null && string.Equals(header, _view.Header, StringComparison.Ordinal)
-                ? "unmatched_own_header"
-                : "foreign",
-            _hoveredRequest?.Card.TemplateId ?? Guid.Empty
-        );
 
         // A show carrying this feature's own header that fails the request match is the orphan
         // hazard: the prepared concealment was just handed back and nothing re-conceals it.
@@ -1009,11 +893,6 @@ internal sealed class PostCombatImpactController : MonoBehaviour
 
         if (displacedActiveImpact)
         {
-            LogLifecycle(
-                "hide_primary",
-                "aux_displaced",
-                _hoveredRequest?.Card.TemplateId ?? Guid.Empty
-            );
             TheBazaar.Data.TooltipParentComponent?.HideCardTooltipController();
             _selectedSourceId = null;
             _activePrimaryTooltip = null;
@@ -1132,11 +1011,6 @@ internal sealed class PostCombatImpactController : MonoBehaviour
             && IsRecapOpen();
         if (_view?.OnNativeAuxiliaryTooltipHiding(controller) == true)
         {
-            LogLifecycle(
-                "hide_primary",
-                "aux_hiding",
-                _hoveredRequest?.Card.TemplateId ?? Guid.Empty
-            );
             if (_pendingShow != null || _settlePresentation != null)
             {
                 StopPendingShow(hidePrimary: false, preserveOutstandingAuxiliaryRequest: true);
@@ -1198,80 +1072,8 @@ internal sealed class PostCombatImpactController : MonoBehaviour
 
     internal void HideDetails()
     {
-        var exitedCard = _hoveredRequest?.Card;
         ClearHoveredSource();
         CancelAndClearPresentation(preserveOutstandingAuxiliaryRequest: true);
-        if (exitedCard != null)
-            StartExitHideWatch(exitedCard);
-    }
-
-    // ── Exit-hide watch ────────────────────────────────────────────────────────────────────
-    // HideCardTooltipController is a silent no-op while the native card-to-card transition is
-    // active (every Show starts a 0.25s window), and neither the native pointer-exit path nor
-    // this feature retries. A hover exited inside that window strands the native tooltip on
-    // screen. The watch re-issues the hide, bounded, using the game's own public query as the
-    // done-signal: GetCardTooltipController(card) is non-null exactly while that card still
-    // occupies a controller. It never runs while a hover is active, respects the player's
-    // tooltip lock, and stops the moment another card takes the controller over.
-
-    private void StartExitHideWatch(Card exitedCard)
-    {
-        CancelExitHideWatch();
-        if (_hoveredRequest != null || !isActiveAndEnabled)
-            return;
-        _exitHideWatch = StartCoroutine(EnsureExitedPrimaryHidden(exitedCard));
-    }
-
-    private void CancelExitHideWatch()
-    {
-        if (_exitHideWatch == null)
-            return;
-        StopCoroutine(_exitHideWatch);
-        _exitHideWatch = null;
-    }
-
-    private System.Collections.IEnumerator EnsureExitedPrimaryHidden(Card exitedCard)
-    {
-        var retries = 0;
-        string outcome = "timed_out";
-        for (var frame = 0; frame < ExitHideWatchMaxFrames; frame++)
-        {
-            yield return null;
-            if (_hoveredRequest != null)
-            {
-                outcome = "rehovered";
-                break;
-            }
-            if (!IsRecapOpen())
-            {
-                outcome = "recap_closed";
-                break;
-            }
-            var tooltipParent = TheBazaar.Data.TooltipParentComponent;
-            if (tooltipParent == null)
-            {
-                outcome = "runtime_gone";
-                break;
-            }
-            var controller = tooltipParent.GetCardTooltipController(exitedCard);
-            if (controller == null)
-            {
-                outcome = "hidden";
-                break;
-            }
-            if (tooltipParent.IsCardTooltipControllerLocked(controller))
-            {
-                outcome = "locked";
-                break;
-            }
-            retries++;
-            tooltipParent.HideCardTooltipController();
-        }
-
-        _exitHideWatch = null;
-        // The zero-retry happy path (tooltip already gone on the first check) stays silent.
-        if (retries > 0)
-            LogLifecycle("exit_watch", outcome, exitedCard.TemplateId);
     }
 
     private void ClearHoveredSource()
@@ -1365,14 +1167,7 @@ internal sealed class PostCombatImpactController : MonoBehaviour
             ClearResolvedAuxiliaryRequest();
 
         if (hidePrimary && pendingPrimary != null)
-        {
-            LogLifecycle(
-                "hide_primary",
-                "stop_pending",
-                _hoveredRequest?.Card.TemplateId ?? Guid.Empty
-            );
             TheBazaar.Data.TooltipParentComponent?.HideCardTooltipController();
-        }
     }
 
     private void FinishPendingShow(bool hidePrimary)
@@ -1386,14 +1181,7 @@ internal sealed class PostCombatImpactController : MonoBehaviour
         }
         _pendingPrimaryTooltip = null;
         if (hidePrimary && pendingPrimary != null)
-        {
-            LogLifecycle(
-                "hide_primary",
-                "finish_pending",
-                _hoveredRequest?.Card.TemplateId ?? Guid.Empty
-            );
             TheBazaar.Data.TooltipParentComponent?.HideCardTooltipController();
-        }
     }
 
     private void FailPendingShow(
@@ -1413,11 +1201,6 @@ internal sealed class PostCombatImpactController : MonoBehaviour
 
         if (!_auxiliaryRequestOutstanding)
             ClearResolvedAuxiliaryRequest();
-        LogLifecycle(
-            "show_failed",
-            reasonCode.ToString(),
-            _hoveredRequest?.Card.TemplateId ?? Guid.Empty
-        );
         FinishPendingShow(hidePrimary: true);
         if (suppressUntilExit && revision == _hoverRevision)
             _suppressedHoverRevision = revision;
@@ -1467,14 +1250,7 @@ internal sealed class PostCombatImpactController : MonoBehaviour
         var hadSelection = _selectedSourceId != null;
         _view?.Hide();
         if (hadSelection)
-        {
-            LogLifecycle(
-                "hide_primary",
-                "active_selection",
-                _hoveredRequest?.Card.TemplateId ?? Guid.Empty
-            );
             TheBazaar.Data.TooltipParentComponent?.HideCardTooltipController();
-        }
         _selectedSourceId = null;
         _activePrimaryTooltip = null;
         _activeAuxiliaryTooltip = null;
@@ -1491,18 +1267,6 @@ internal sealed class PostCombatImpactController : MonoBehaviour
         _requestedPerspective = CombatImpactPerspective.Caused;
         HideDetails();
     }
-
-    // Frame-stamped Info-level lifecycle trail: unlike the Debug interaction traces this reaches
-    // the BepInEx disk log, so a single in-game reproduction can attribute each visible phase of
-    // a flicker (show → vanish → re-show) to the code path that caused it.
-    private static void LogLifecycle(string phase, string detail, Guid cardTemplateId) =>
-        BppLog.InfoEvent(
-            PostCombatImpactLogEvents.TooltipLifecycle,
-            PostCombatImpactLogEvents.LifecyclePhase.Bind(phase),
-            PostCombatImpactLogEvents.LifecycleDetail.Bind(detail),
-            PostCombatImpactLogEvents.LifecycleCard.Bind(cardTemplateId),
-            PostCombatImpactLogEvents.LifecycleFrame.Bind(Time.frameCount)
-        );
 
     private static void LogInteraction(PostCombatImpactReasonCode reasonCode) =>
         BppLog.DebugEvent(

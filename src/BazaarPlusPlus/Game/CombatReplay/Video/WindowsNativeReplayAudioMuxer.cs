@@ -27,10 +27,7 @@ internal static class WindowsNativeReplayAudioMuxer
     )
     {
         if (string.IsNullOrWhiteSpace(silentVideoPath))
-            throw new ArgumentException(
-                "A silent video path is required.",
-                nameof(silentVideoPath)
-            );
+            throw new ArgumentException("A silent video path is required.", nameof(silentVideoPath));
         if (wavPaths == null || wavPaths.Count != 1)
         {
             return new Result(

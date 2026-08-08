@@ -73,6 +73,7 @@ internal sealed class ReplayVideoEncoderDrain
             {
                 encoder.Dispose();
             }
+
         }
 
         var endedAt = DateTimeOffset.UtcNow;
