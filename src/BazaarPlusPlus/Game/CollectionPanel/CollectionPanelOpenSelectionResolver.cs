@@ -41,6 +41,40 @@ internal static class CollectionPanelOpenSelectionResolver
 
     internal static bool IsConcreteHero(EHero? hero) => hero.HasValue && hero.Value != EHero.Common;
 
+    public static IReadOnlyList<string> ResolveEncounteredMerchantSourceKeys(
+        EHero? currentHero,
+        IReadOnlyCollection<Guid>? choiceSelectionTemplateIds,
+        IEnumerable<CollectionSourceEntry> entries
+    )
+    {
+        if (
+            !IsConcreteHero(currentHero)
+            || choiceSelectionTemplateIds == null
+            || choiceSelectionTemplateIds.Count == 0
+        )
+            return Array.Empty<string>();
+
+        var hero = currentHero!.Value;
+        var sourceKeys = new List<string>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var templateId in choiceSelectionTemplateIds)
+        {
+            if (templateId == Guid.Empty)
+                continue;
+
+            var source = FindSource(
+                hero,
+                templateId,
+                entries,
+                requiredKind: CollectionSourceKind.Merchant
+            );
+            if (source != null && seen.Add(source.SourceKey))
+                sourceKeys.Add(source.SourceKey);
+        }
+
+        return sourceKeys;
+    }
+
     private static CollectionPanelSelectionState ResolveOutOfRunSelection(
         CollectionPanelHeroPreferenceLoadResult? rememberedPreference
     )
@@ -93,11 +127,14 @@ internal static class CollectionPanelOpenSelectionResolver
     private static CollectionSourceEntry? FindSource(
         EHero hero,
         Guid templateId,
-        IEnumerable<CollectionSourceEntry> entries
+        IEnumerable<CollectionSourceEntry> entries,
+        CollectionSourceKind? requiredKind = null
     )
     {
         foreach (var entry in entries)
         {
+            if (requiredKind.HasValue && entry.Kind != requiredKind.Value)
+                continue;
             if (!entry.AppliesToHero(hero))
                 continue;
 

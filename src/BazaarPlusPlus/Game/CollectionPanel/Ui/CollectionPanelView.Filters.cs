@@ -19,6 +19,8 @@ internal sealed partial class CollectionPanelView
     private const string HeroChipPortraitName = "bpp-collection-hero-chip-portrait";
     private const string HeroChipSelectionRingName = "bpp-collection-hero-chip-selection-ring";
     private const string SizeChipIconName = "bpp-collection-size-chip-icon";
+    private const string SourceChipEncounterGradientName =
+        "bpp-collection-source-chip-encounter-gradient";
     private const string SourceChipPortraitName = "bpp-collection-source-chip-portrait";
 
     private static readonly CollectionPortraitFailureGate<
@@ -720,6 +722,7 @@ internal sealed partial class CollectionPanelView
     {
         var icon = new VisualElement { pickingMode = PickingMode.Ignore };
         StretchPortraitToParent(icon);
+        icon.Add(CreateSourceEncounterGradient());
         icon.Add(CreatePortraitLayer(SourceChipPortraitName));
 
         var initials = CreateLabel(Sizes.FontSmall, FontStyle.Bold, Colors.HistoryChipText);
@@ -778,6 +781,7 @@ internal sealed partial class CollectionPanelView
     private static void ResizeSourceIcon(VisualElement icon)
     {
         StretchPortraitToParent(icon);
+        StretchPortraitToParentIfPresent(icon, SourceChipEncounterGradientName);
         StretchPortraitToParentIfPresent(icon, SourceChipPortraitName);
     }
 
@@ -872,11 +876,38 @@ internal sealed partial class CollectionPanelView
             pickingMode = PickingMode.Ignore,
         };
         StretchPortraitToParent(gradient);
-        var themeColor = DarkenHeroThemeColor(HeroVisual.Resolve(hero.ToString()).Background);
+        var themeColor = DarkenPortraitThemeColor(HeroVisual.Resolve(hero.ToString()).Background);
         var state = new HeroGradientVisualState(gradient, themeColor);
         gradient.userData = state;
         gradient.generateVisualContent += context => DrawHeroGradient(context, gradient, state);
         return gradient;
+    }
+
+    private static VisualElement CreateSourceEncounterGradient()
+    {
+        var gradient = new VisualElement
+        {
+            name = SourceChipEncounterGradientName,
+            pickingMode = PickingMode.Ignore,
+        };
+        StretchPortraitToParent(gradient);
+        gradient.style.display = DisplayStyle.None;
+        var themeColor = DarkenPortraitThemeColor(Colors.HistoryGoldAccent);
+        var state = new HeroGradientVisualState(gradient, themeColor);
+        gradient.userData = state;
+        gradient.generateVisualContent += context => DrawHeroGradient(context, gradient, state);
+        return gradient;
+    }
+
+    private static void RefreshSourceEncounterHighlight(VisualElement icon, bool highlighted)
+    {
+        var gradient = icon.Q<VisualElement>(SourceChipEncounterGradientName);
+        if (gradient == null)
+            return;
+
+        gradient.style.display = highlighted ? DisplayStyle.Flex : DisplayStyle.None;
+        if (highlighted)
+            gradient.MarkDirtyRepaint();
     }
 
     private static void DrawHeroGradient(
@@ -929,7 +960,7 @@ internal sealed partial class CollectionPanelView
         mesh.SetNextIndex(3);
     }
 
-    private static Color DarkenHeroThemeColor(Color color) =>
+    private static Color DarkenPortraitThemeColor(Color color) =>
         new(color.r * 0.42f, color.g * 0.42f, color.b * 0.42f, 1f);
 
     private static void BindHeroChipInteraction(Button chip, VisualElement icon)

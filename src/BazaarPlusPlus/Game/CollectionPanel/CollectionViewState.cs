@@ -57,6 +57,7 @@ internal sealed class CollectionViewState
     )? _availableSourcesCache;
 
     private IReadOnlyList<BPPSupporterSample> _supporters = Array.Empty<BPPSupporterSample>();
+    private readonly HashSet<string> _encounteredMerchantSourceKeys = new(StringComparer.Ordinal);
     private int? _currentRunDay;
     private bool _isLoadingCatalog;
     private string? _statusMessage;
@@ -299,7 +300,8 @@ internal sealed class CollectionViewState
     public CollectionRenderOutcome ApplyOpenSelection(
         CollectionPanelSelectionState selection,
         IReadOnlyList<BPPSupporterSample> supporters,
-        int? currentRunDay
+        int? currentRunDay,
+        IReadOnlyCollection<string>? encounteredMerchantSourceKeys = null
     )
     {
         if (selection == null)
@@ -312,6 +314,13 @@ internal sealed class CollectionViewState
             PruneInvisibleSourceSelections();
 
         _supporters = supporters;
+        _encounteredMerchantSourceKeys.Clear();
+        if (encounteredMerchantSourceKeys != null)
+        {
+            foreach (var sourceKey in encounteredMerchantSourceKeys)
+                if (!string.IsNullOrWhiteSpace(sourceKey))
+                    _encounteredMerchantSourceKeys.Add(sourceKey.Trim());
+        }
         _currentRunDay = currentRunDay;
         return new CollectionRenderOutcome(
             BuildModel(_grid.Current),
@@ -442,6 +451,7 @@ internal sealed class CollectionViewState
             SearchExpanded = _searchMode.IsExpanded,
             SearchQuery = _filter.SearchQuery,
             SelectedSourceKey = profile.ShowSourceFilter ? _filter.SelectedSourceKey : null,
+            EncounteredMerchantSourceKeys = _encounteredMerchantSourceKeys,
             SourceSelectorEnabled = profile.ShowSourceFilter && !_isLoadingCatalog,
             SortPriority = _filter.SortPriority,
             DayFilterVisible = dayFilterPresentation.IsVisible,

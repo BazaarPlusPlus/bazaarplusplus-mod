@@ -399,6 +399,11 @@ internal sealed partial class CollectionPanelView : IDisposable
                 pair.Value,
                 string.Equals(pair.Key, model.SelectedSourceKey, StringComparison.Ordinal)
             );
+            if (_sourceChipIcons.TryGetValue(pair.Key, out var sourceIcon))
+                RefreshSourceEncounterHighlight(
+                    sourceIcon,
+                    model.EncounteredMerchantSourceKeys.Contains(pair.Key)
+                );
             pair.Value.SetEnabled(model.SourceSelectorEnabled);
             pair.Value.style.opacity = model.SourceSelectorEnabled ? 1f : 0.58f;
         }

@@ -32,6 +32,8 @@ internal sealed class CollectionPanelViewModel
     public bool SearchExpanded { get; set; }
     public string SearchQuery { get; set; } = string.Empty;
     public string? SelectedSourceKey { get; set; }
+    public HashSet<string> EncounteredMerchantSourceKeys { get; set; } =
+        new(StringComparer.Ordinal);
     public bool SourceSelectorEnabled { get; set; } = true;
     public CollectionSortPriority SortPriority { get; set; } = CollectionSortPriority.Quality;
 
