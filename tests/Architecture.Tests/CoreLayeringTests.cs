@@ -750,6 +750,22 @@ public class CoreLayeringTests
     }
 
     [Fact]
+    public void Collection_grid_covers_native_card_vertical_overflow_without_blocking_input()
+    {
+        var mainSource = MainSourceRoot(RepoRoot());
+        var overlaySource = File.ReadAllText(
+            Path.Combine(mainSource, "Game", "CollectionPanel", "Grid", "CollectionGridOverlay.cs")
+        );
+
+        Assert.Contains("CollectionPanelOverlayBottomOccluder", overlaySource);
+        Assert.Contains("CollectionPanelOverlayTopOccluder", overlaySource);
+        Assert.Contains("LayoutVerticalOccluders();", overlaySource);
+        Assert.Contains("image.raycastTarget = false", overlaySource);
+        Assert.DoesNotContain("CollectionPanelOverlayLeftOccluder", overlaySource);
+        Assert.DoesNotContain("CollectionPanelOverlayRightOccluder", overlaySource);
+    }
+
+    [Fact]
     public void LiveBuildPanel_opens_from_caps_not_settings_dock()
     {
         var repoRoot = RepoRoot();
