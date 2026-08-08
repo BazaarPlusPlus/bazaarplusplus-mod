@@ -126,8 +126,8 @@ internal static class Colors
     public static Color ReplayText => Rgba(0.88f, 0.95f, 1f, 1f);
     public static Color RecordReplayBackground => Rgba(0.45f, 0.19f, 0.24f, 0.98f);
     public static Color RecordReplayText => Rgba(1f, 0.90f, 0.92f, 1f);
-    public static Color CloseBackground => CollectionChipBackground;
-    public static Color CloseText => CollectionChipText;
+    public static Color CloseBackground => Rgba(0.29f, 0.20f, 0.20f, 0.98f);
+    public static Color CloseText => Rgba(0.98f, 0.92f, 0.90f, 1f);
 
     public static Color RankLegendaryBackground => FromRgb(241, 54, 41);
     public static Color RankBronzeBackground => Rgba(0.39f, 0.24f, 0.17f, 0.98f);
