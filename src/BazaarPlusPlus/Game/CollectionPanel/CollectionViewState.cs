@@ -113,8 +113,17 @@ internal sealed class CollectionViewState
 
     public CollectionRenderOutcome ToggleAllHeroes()
     {
-        _filter.ToggleAllHeroes();
-        PruneInvisibleSourceSelections();
+        if (_filter.ToggleAllHeroes())
+        {
+            // A selected merchant/trainer resolves one concrete hero's offer pool before the
+            // hero predicate runs. Leaving it selected would make an all-heroes scope appear
+            // active while still showing only that prior hero's cards.
+            _filter.ClearSelectedSource();
+        }
+        else
+        {
+            PruneInvisibleSourceSelections();
+        }
         return QueryAndRender(resetControlsScroll: true);
     }
 
