@@ -343,7 +343,7 @@ internal sealed partial class CollectionPanelView
             Sizes.ButtonStandardHeight
         );
         button.tooltip = CollectionPanelText.Close();
-        StyleButton(button, Colors.HistoryButtonBackground, Colors.CloseText);
+        StyleButton(button, Colors.HistoryButtonBackground, Colors.CollectionChipText);
         UiStyle.Radius(button.style, Sizes.ButtonStandardHeight / 2f);
         UiStyle.Border(button.style, Borders.Thin, Colors.CollectionChipBorder);
 
@@ -353,7 +353,7 @@ internal sealed partial class CollectionPanelView
             Sizes.CollectionSearchIconSize,
             Sizes.CollectionSearchIconSize
         );
-        icon.style.color = Colors.CloseText;
+        icon.style.color = Colors.CollectionChipText;
         icon.generateVisualContent += context => DrawCloseIcon(context, icon);
         button.Add(icon);
         return button;
