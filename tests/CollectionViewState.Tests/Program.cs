@@ -457,8 +457,7 @@ internal sealed class FakeGridPort : ICollectionGridPort
 
     public CollectionGridProjection? Publish(
         IReadOnlyList<CollectionCardVm> cards,
-        CollectionTabKind activeTab,
-        IReadOnlyDictionary<Guid, IReadOnlyList<CollectionSourceOfferMatch>>? offerMatchesByCardId
+        CollectionTabKind activeTab
     )
     {
         PublishCount++;

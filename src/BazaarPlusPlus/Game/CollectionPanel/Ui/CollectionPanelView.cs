@@ -43,6 +43,7 @@ internal sealed partial class CollectionPanelView : IDisposable
     private Button? _closeButton;
     private VisualElement? _standardOperationControls;
     private VisualElement? _searchInputContainer;
+    private VisualElement? _searchFrame;
     private TextField? _searchField;
     private Label? _searchPlaceholderLabel;
     private Button? _dayToggleButton;
@@ -82,6 +83,8 @@ internal sealed partial class CollectionPanelView : IDisposable
     private float _loadingFrameElapsed;
     private int _loadingFrameIndex;
     private int _stagingIdCopyFeedbackGeneration;
+    private bool _searchFocused;
+    private float _searchFocusPulseElapsed;
 
     private readonly Dictionary<EHero, Button> _heroChips = new();
     private readonly Dictionary<EHero, VisualElement> _heroChipIcons = new();
@@ -231,6 +234,7 @@ internal sealed partial class CollectionPanelView : IDisposable
     {
         if (_root == null || deltaSeconds <= 0f)
             return;
+        TickSearchFocusPulse(deltaSeconds);
         if (Mathf.Approximately(_opacity, _targetOpacity))
         {
             if (_targetOpacity <= 0f && _root.style.display.value != DisplayStyle.None)
@@ -644,6 +648,11 @@ internal sealed partial class CollectionPanelView : IDisposable
         _typography = null;
         _titleOverlay = null;
         _root = null;
+        _searchFrame = null;
+        _searchField = null;
+        _searchPlaceholderLabel = null;
+        _searchFocused = false;
+        _searchFocusPulseElapsed = 0f;
         _stagingIdCopyLabel = null;
         _controlsScrollView = null;
         _controlsScrollShadow = null;

@@ -1,7 +1,6 @@
 #nullable enable
 using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Game.CollectionPanel.Grid;
-using BazaarPlusPlus.Game.CollectionPanel.Sources;
 
 namespace BazaarPlusPlus.Game.CollectionPanel;
 
@@ -20,14 +19,13 @@ internal sealed class CollectionGridPortAdapter : ICollectionGridPort
 
     public CollectionGridProjection? Publish(
         IReadOnlyList<CollectionCardVm> cards,
-        CollectionTabKind activeTab,
-        IReadOnlyDictionary<Guid, IReadOnlyList<CollectionSourceOfferMatch>>? offerMatchesByCardId
+        CollectionTabKind activeTab
     )
     {
         if (_virtualizer == null)
             return null;
 
-        _virtualizer.SetVisible(cards, activeTab, offerMatchesByCardId);
+        _virtualizer.SetVisible(cards, activeTab);
         _hasPublished = true;
         return new CollectionGridProjection(_virtualizer.VisibleCount, _virtualizer.ContentHeight);
     }

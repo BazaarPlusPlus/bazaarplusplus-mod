@@ -418,19 +418,19 @@ internal sealed partial class CollectionPanelView
         painter.lineJoin = LineJoin.Round;
         painter.strokeColor = icon.resolvedStyle.color;
         painter.BeginPath();
-        painter.MoveTo(new Vector2(center.x + radius * 0.82f, center.y - radius * 0.18f));
-        painter.LineTo(new Vector2(center.x + radius * 0.44f, center.y - radius * 0.76f));
-        painter.LineTo(new Vector2(center.x - radius * 0.26f, center.y - radius * 0.88f));
-        painter.LineTo(new Vector2(center.x - radius * 0.82f, center.y - radius * 0.40f));
-        painter.LineTo(new Vector2(center.x - radius * 0.82f, center.y + radius * 0.36f));
-        painter.LineTo(new Vector2(center.x - radius * 0.26f, center.y + radius * 0.84f));
-        painter.LineTo(new Vector2(center.x + radius * 0.46f, center.y + radius * 0.68f));
+        painter.MoveTo(new Vector2(center.x - radius * 0.82f, center.y - radius * 0.18f));
+        painter.LineTo(new Vector2(center.x - radius * 0.44f, center.y - radius * 0.76f));
+        painter.LineTo(new Vector2(center.x + radius * 0.26f, center.y - radius * 0.88f));
+        painter.LineTo(new Vector2(center.x + radius * 0.82f, center.y - radius * 0.40f));
+        painter.LineTo(new Vector2(center.x + radius * 0.82f, center.y + radius * 0.36f));
+        painter.LineTo(new Vector2(center.x + radius * 0.26f, center.y + radius * 0.84f));
+        painter.LineTo(new Vector2(center.x - radius * 0.46f, center.y + radius * 0.68f));
         painter.Stroke();
 
         painter.BeginPath();
-        painter.MoveTo(new Vector2(center.x + radius * 0.16f, center.y - radius * 0.92f));
-        painter.LineTo(new Vector2(center.x + radius * 0.86f, center.y - radius * 0.18f));
-        painter.LineTo(new Vector2(center.x + radius * 0.02f, center.y - radius * 0.10f));
+        painter.MoveTo(new Vector2(center.x - radius * 0.16f, center.y - radius * 0.92f));
+        painter.LineTo(new Vector2(center.x - radius * 0.86f, center.y - radius * 0.18f));
+        painter.LineTo(new Vector2(center.x - radius * 0.02f, center.y - radius * 0.10f));
         painter.Stroke();
     }
 
@@ -455,6 +455,7 @@ internal sealed partial class CollectionPanelView
         UiStyle.Border(frame.style, Borders.Thin, Colors.CollectionChipBorder);
         UiStyle.Radius(frame.style, Radii.CollectionChip);
         UiStyle.HorizontalPadding(frame.style, UiSpacing.Md);
+        _searchFrame = frame;
         container.Add(frame);
 
         var field = new TextField { label = string.Empty };
@@ -506,8 +507,8 @@ internal sealed partial class CollectionPanelView
             var border = Colors.CollectionChipBorder;
             if (focused)
             {
-                background = Colors.CollectionChipSelectedBackground;
-                border = Colors.CollectionChipSelectedBorder;
+                ApplySearchFocusPulse();
+                return;
             }
             else if (hovered)
             {
@@ -532,17 +533,53 @@ internal sealed partial class CollectionPanelView
         field.RegisterCallback<FocusInEvent>(_ =>
         {
             focused = true;
+            _searchFocused = true;
+            _searchFocusPulseElapsed = 0f;
             RefreshFrame();
         });
         field.RegisterCallback<FocusOutEvent>(_ =>
         {
             focused = false;
+            _searchFocused = false;
+            _searchFocusPulseElapsed = 0f;
             RefreshFrame();
         });
         RefreshFrame();
 
         field.RegisterCallback<GeometryChangedEvent>(_ => StyleSearchField(field));
         return container;
+    }
+
+    private void TickSearchFocusPulse(float deltaSeconds)
+    {
+        if (!_searchFocused || _searchFrame == null)
+            return;
+
+        _searchFocusPulseElapsed += deltaSeconds;
+        ApplySearchFocusPulse();
+    }
+
+    private void ApplySearchFocusPulse()
+    {
+        if (_searchFrame == null)
+            return;
+
+        const float pulseSeconds = 2.4f;
+        var phase = _searchFocusPulseElapsed * (Mathf.PI * 2f / pulseSeconds) - Mathf.PI * 0.5f;
+        var pulse = Mathf.SmoothStep(0f, 1f, (Mathf.Sin(phase) + 1f) * 0.5f);
+        _searchFrame.style.backgroundColor = Color.Lerp(
+            Colors.CollectionChipSelectedBackground,
+            Colors.CollectionChipSelectedHoverBackground,
+            pulse
+        );
+        UiStyle.BorderColor(
+            _searchFrame.style,
+            Color.Lerp(
+                Colors.CollectionChipSelectedBorder,
+                Colors.CollectionChipSelectedHoverBorder,
+                pulse
+            )
+        );
     }
 
     private VisualElement CreateSortButtonGroup()

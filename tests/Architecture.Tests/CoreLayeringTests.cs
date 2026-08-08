@@ -719,14 +719,12 @@ public class CoreLayeringTests
         var fitterSource = File.ReadAllText(
             Path.Combine(mainSource, "Game", "CollectionPanel", "Grid", "NativeCardCellFitter.cs")
         );
-        var badgeSource = File.ReadAllText(
-            Path.Combine(
-                mainSource,
-                "Game",
-                "CollectionPanel",
-                "Grid",
-                "CollectionSourceAttributionBadge.cs"
-            )
+        var badgePath = Path.Combine(
+            mainSource,
+            "Game",
+            "CollectionPanel",
+            "Grid",
+            "CollectionSourceAttributionBadge.cs"
         );
 
         // Measurement/fit methods must live in the fitter, not the virtualizer.
@@ -747,8 +745,8 @@ public class CoreLayeringTests
         Assert.Contains("SetSizeWithCurrentAnchors", fitterSource);
         Assert.Contains("MeasureInvocationCount", fitterSource);
 
-        Assert.Contains("BadgeRootHeightScale", badgeSource);
-        Assert.Contains("CollectionGridVirtualizer.FallbackNativeCardHeight / 200f", badgeSource);
+        Assert.False(File.Exists(badgePath));
+        Assert.DoesNotContain("CollectionSourceAttributionBadge", virtualizerSource);
     }
 
     [Fact]
@@ -1687,7 +1685,6 @@ public class CoreLayeringTests
         var surfaces = new[]
         {
             Path.Combine("Game", "CombatStatusBar", "CombatStatusBar.Canvas.cs"),
-            Path.Combine("Game", "CollectionPanel", "Grid", "CollectionSourceAttributionBadge.cs"),
             Path.Combine("Game", "VoiceSubtitles", "VoiceLineDisplay.cs"),
             Path.Combine("GameInterop", "Fonts", "NativeGameTitleOverlay.cs"),
         };

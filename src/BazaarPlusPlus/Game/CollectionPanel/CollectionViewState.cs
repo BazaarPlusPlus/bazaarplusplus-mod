@@ -259,11 +259,7 @@ internal sealed class CollectionViewState
     {
         _isLoadingCatalog = true;
         SetStatus(CollectionPanelText.CatalogLoading());
-        var projection = _grid.Publish(
-            Array.Empty<CollectionCardVm>(),
-            _filter.ActiveTab,
-            offerMatchesByCardId: null
-        );
+        var projection = _grid.Publish(Array.Empty<CollectionCardVm>(), _filter.ActiveTab);
         return new CollectionRenderOutcome(
             BuildModel(projection ?? CollectionGridProjection.Empty),
             resetScroll: true,
@@ -364,11 +360,7 @@ internal sealed class CollectionViewState
     {
         if (_catalogCards.Count == 0)
         {
-            return _grid.Publish(
-                Array.Empty<CollectionCardVm>(),
-                _filter.ActiveTab,
-                offerMatchesByCardId: null
-            );
+            return _grid.Publish(Array.Empty<CollectionCardVm>(), _filter.ActiveTab);
         }
 
         if (!_isLoadingCatalog)
@@ -386,7 +378,7 @@ internal sealed class CollectionViewState
         );
 
         // Publish first so a null (unavailable grid) skips normalization write-back.
-        var projection = _grid.Publish(query.Cards, _filter.ActiveTab, query.OfferMatchesByCardId);
+        var projection = _grid.Publish(query.Cards, _filter.ActiveTab);
         if (projection == null)
             return null;
 

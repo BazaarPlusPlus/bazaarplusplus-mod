@@ -17,7 +17,6 @@ namespace BazaarPlusPlus.Game.CollectionPanel.Grid;
 // change behavior without a recorded decision.
 internal static class NativeCardCellFitter
 {
-    // Shared with CollectionSourceAttributionBadge sizing (via the virtualizer re-export).
     public const float FallbackNativeCardHeight = 484f;
 
     // Diagnostic: increments only when ResolveNativeVisualBounds runs. Scroll-only reposition

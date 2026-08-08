@@ -1,6 +1,5 @@
 #nullable enable
 using BazaarPlusPlus.Game.CollectionPanel.Data;
-using BazaarPlusPlus.Game.CollectionPanel.Sources;
 
 namespace BazaarPlusPlus.Game.CollectionPanel;
 
@@ -29,8 +28,7 @@ internal interface ICollectionGridPort
 {
     CollectionGridProjection? Publish(
         IReadOnlyList<CollectionCardVm> cards,
-        CollectionTabKind activeTab,
-        IReadOnlyDictionary<Guid, IReadOnlyList<CollectionSourceOfferMatch>>? offerMatchesByCardId
+        CollectionTabKind activeTab
     );
 
     CollectionGridProjection Current { get; }
