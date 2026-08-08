@@ -102,7 +102,7 @@ Saved-replay playback state algebra lives in the pure `SavedReplayLifecycle` cor
 
 When recording starts, `CombatReplayVideoRecorder` creates a capture session, stores temp/final output paths, starts audio taps, suppresses selected BPP chrome, saves start metadata, and starts the capture coroutine (`src/BazaarPlusPlus/Game/CombatReplay/Video/CombatReplayVideoRecorder.cs:875-919`). Audio capture is additive: capture failure does not abort video recording. The recorder derives a WAV path, starts the platform capture tap if available, and logs/cleans up on failure (`src/BazaarPlusPlus/Game/CombatReplay/Video/CombatReplayVideoRecorder.cs:935-960`). On playback end, it closes the audio taps, retains only usable sample-bearing WAVs, freezes the finalization inputs into detached contexts, dispatches encoder drain/audio mux/metadata completion off the main thread, and clears the active state so a later replay cannot overwrite those inputs (`src/BazaarPlusPlus/Game/CombatReplay/Video/CombatReplayVideoRecorder.cs:570-633`, `src/BazaarPlusPlus/Game/CombatReplay/Audio/ReplayAudioTapStopper.cs:12-27`).
 
-BPP UI chrome suppression is centralized in `Game/OverlayPanels`. Screenshot mode hides CollectionPanel dock, settings dock, and combat status bar; replay recording mode hides CollectionPanel dock and settings dock while intentionally leaving the combat status bar visible (`src/BazaarPlusPlus/Game/OverlayPanels/BppUiChromeSuppression.cs:13-25`).
+BPP UI chrome suppression is centralized in `Game/OverlayPanels`. Screenshot mode hides the CollectionPanel dock button and the combat status bar; replay recording mode hides only the dock button, intentionally leaving the combat status bar visible. There is no separate settings-dock suppression target (`src/BazaarPlusPlus/Game/OverlayPanels/BppUiChromeSuppression.cs:13-27`).
 
 ## Screenshots, Uploads, And Ghost Battles
 
@@ -124,7 +124,7 @@ Settings-dock rows themselves are data: every cycling or boolean row is a `Cycli
 
 BPP hotkeys are user-rebindable and persisted in config per action. `BppHotkeyActionId` covers five actions: the two hold-preview hotkeys (Ctrl enchant / Shift upgrade defaults) plus toggles for CollectionPanel, LiveBuildPanel, and HistoryPanel (`src/BazaarPlusPlus/Game/Input/BppHotkeyActionId.cs`); rebinding rows are cloned from native settings rows (`src/BazaarPlusPlus/Game/Input/BppKeyBindRowController.cs`), and panel toggle presses are resolved per frame by the Overlay Panel Host. Binding-path normalization, ctrl/shift alias expansion, conflict detection, and the default/display data tables are the pure `HotkeyBindingPathCore` (`src/BazaarPlusPlus/Game/Input/HotkeyBindingPathCore.cs`, compile-linked into the zero-ManagedPath `tests/HotkeyBindingPath.Tests/`); `BppHotkeyService` remains the Unity/config facade. Binding paths in `BazaarPlusPlus.cfg` `[Hotkeys]` are untrusted input: junk normalizes to empty and falls back to the action default. The conflict check compares BPP actions only against other BPP actions, not native `Gameplay/*` bindings.
 
-The settings dock registers all feature rows through `SettingsDockEntryRegistry` with order constants centralized in `BppSettingsDockOrder` (`src/BazaarPlusPlus/Game/Settings/BppSettingsDockOrder.cs`); the roster spans history, name override, bilingual item names, legendary position, enchant preview, event and quest previews, combat status bar, Chinese locale, supporter list, voice subtitles, end-of-run screenshot, and BazaarDB upload (`src/BazaarPlusPlus/BppComposition.cs:162-180`). There is no BPP font selector because all BPP-owned game UI follows the game's font assets.
+The settings dock registers all feature rows through `SettingsDockEntryRegistry` with order constants centralized in `BppSettingsDockOrder` (`src/BazaarPlusPlus/Game/Settings/BppSettingsDockOrder.cs`); the roster spans history, name override, bilingual item names, legendary position, enchant preview, event and quest previews, combat status bar, Chinese locale, supporter list, voice subtitles, end-of-run screenshot, BazaarDB upload, and the platform-gated graphics upscaling rows (`src/BazaarPlusPlus/BppComposition.cs:179-203`). There is no BPP font selector because all BPP-owned game UI follows the game's font assets.
 
 ## Localization And Fonts
 
@@ -148,7 +148,7 @@ HistoryPanel, CollectionPanel, and LiveBuildPanel consume supporter samples for 
 
 BazaarAgent is optional. The host plugin declares `[BepInDependency(BppPluginMetadata.Guid)]`, reads `BazaarAgentGameBridge.Current`, creates a pure runtime controller, pumps it from `Update()`, and disposes it on destroy (`src/BazaarPlusPlus.BazaarAgentHost/BazaarAgentHostPlugin.cs:16-63`).
 
-The host listens only on loopback. The default port is fixed at `127.0.0.1:47900`, with a 32 MiB cap for raw replay-record request bodies (`src/BazaarPlusPlus.BazaarAgent/Contract/BazaarAgentPorts.cs:6-20`, `src/BazaarPlusPlus.BazaarAgent/Transport/BazaarAgentHttpServer.cs:96`). Current decision routes are:
+The host listens only on loopback. The default port is fixed at `127.0.0.1:47900`, and every request body is capped at 64 KiB by `BazaarAgentHttpServer.MaxBodyBytes` (`src/BazaarPlusPlus.BazaarAgent/Contract/BazaarAgentPorts.cs`, `src/BazaarPlusPlus.BazaarAgent/Transport/BazaarAgentHttpServer.cs`). Current decision routes are:
 
 - `GET /v3/context`
 - `POST /v3/actions` (one action with the next state delta)
@@ -159,7 +159,7 @@ The v3 Agent protocol is intentionally context-small and has no compatibility ro
 
 `ReturnToMenu` remains available only in `EndRunVictory`/`EndRunDefeat` while the scene loader is not transitioning; `Continue` remains available only at replay `FinishedAwaitingContinue`, and both retain their existing game-side guards. Card names use the native localized template title with authored/internal-name fallbacks rather than runtime `Card.Name`. A successful action is held until gameplay-state confirmation; after 10 seconds the response is HTTP 202 with `status="accepted"`.
 
-Those routes are dispatched in `BazaarAgentHttpServer.HandleContextAsync()` (`src/BazaarPlusPlus.BazaarAgent/Transport/BazaarAgentHttpServer.cs:161-207`). Replay record accepts a raw binary GhostBattlePayload msgpack+gzip body and optional battle id from header/query before queueing a start command; replay continue queues an explicit continue command (`src/BazaarPlusPlus.BazaarAgent/Transport/BazaarAgentHttpServer.cs:353-395`).
+Those routes are dispatched in `BazaarAgentHttpServer.HandleContextAsync()`. The V1 replay-control routes were removed per ADR-0007; replay now exits only through the `Continue` Flow action (`src/BazaarPlusPlus.BazaarAgent/Transport/BazaarAgentHttpServer.cs`).
 
 ## Decision Records
 

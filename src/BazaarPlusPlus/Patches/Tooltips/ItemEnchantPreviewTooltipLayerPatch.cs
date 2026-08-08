@@ -28,7 +28,7 @@ internal static class TooltipLayerOverride
         if (controller == null)
             return;
 
-        // Probe evidence (docs/drafts/2026-07-08-tooltip-overlay-third-recurrence.md): the
+        // Probe evidence: the
         // occluder is the OTHER pooled tooltip clone (the locked tooltip with its monster
         // board), not something inside this clone, so sibling order inside this prefab is
         // irrelevant. Every clone's root canvas shares one sorting order and overrideSorting
