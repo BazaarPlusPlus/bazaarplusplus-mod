@@ -68,6 +68,7 @@ internal sealed partial class CollectionPanelView : IDisposable
     private VisualElement? _heroFilterSection;
     private VisualElement? _tierFilterSection;
     private ScrollView? _controlsScrollView;
+    private VisualElement? _controlsScrollShadow;
     private ScrollViewDragScroller? _controlsDragScroller;
     private VisualElement? _gridViewport;
     private ScrollView? _gridScrollView;
@@ -297,6 +298,16 @@ internal sealed partial class CollectionPanelView : IDisposable
     {
         if (_controlsScrollView != null)
             _controlsScrollView.scrollOffset = new Vector2(_controlsScrollView.scrollOffset.x, 0f);
+    }
+
+    public void TickControlsScrollShadow()
+    {
+        if (_controlsScrollShadow == null || _controlsScrollView == null)
+            return;
+
+        _controlsScrollShadow.style.display = _controlsScrollView.scrollOffset.y > 0.5f
+            ? DisplayStyle.Flex
+            : DisplayStyle.None;
     }
 
     public void Refresh(CollectionPanelViewModel model)
@@ -631,6 +642,7 @@ internal sealed partial class CollectionPanelView : IDisposable
         _root = null;
         _stagingIdCopyLabel = null;
         _controlsScrollView = null;
+        _controlsScrollShadow = null;
         _controlsDragScroller = null;
         _gridDragScroller = null;
     }

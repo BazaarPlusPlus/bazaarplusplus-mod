@@ -407,6 +407,7 @@ internal sealed class CollectionPanel : MonoBehaviour
         // can finish its fade-out animation before we tear runtime down.
         _view?.TickOpacity(dt);
         _view?.TickLoading(dt);
+        _view?.TickControlsScrollShadow();
         if (_view != null && _overlay != null)
             _overlay.SetAlpha(_view.CurrentOpacity);
 

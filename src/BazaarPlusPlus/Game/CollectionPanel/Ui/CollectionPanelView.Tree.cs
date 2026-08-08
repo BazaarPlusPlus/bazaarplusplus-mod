@@ -91,7 +91,7 @@ internal sealed partial class CollectionPanelView
         _subtitle = BPPSupporterAttributionRow.Create();
         _subtitle.style.flexWrap = Wrap.NoWrap;
         _subtitle.style.overflow = Overflow.Hidden;
-        _subtitle.style.marginTop = UiSpacing.Lg;
+        _subtitle.style.marginTop = UiSpacing.Xl;
         _subtitle.style.backgroundColor = Colors.CollectionPanelBackground;
         UiStyle.FixedHeight(_subtitle.style, Sizes.CollectionTabToggleHeight);
         UiStyle.HorizontalPadding(_subtitle.style, UiSpacing.Md);
@@ -134,9 +134,34 @@ internal sealed partial class CollectionPanelView
         _dayToggleButton = CreateDayToggleButton();
         _standardOperationControls.Add(_dayToggleButton);
 
-        // Hero context stays visible while the remaining filters scroll.
+        var controlsViewport = new VisualElement();
+        controlsViewport.style.flexGrow = 1f;
+        controlsViewport.style.flexShrink = 1f;
+        controlsViewport.style.minHeight = 0f;
+        controlsViewport.style.position = Position.Relative;
+        controlsViewport.style.overflow = Overflow.Hidden;
+        rail.Add(controlsViewport);
+
+        var controlsScroll = new ScrollView(ScrollViewMode.Vertical);
+        controlsScroll.style.flexGrow = 1f;
+        controlsScroll.style.flexShrink = 1f;
+        controlsScroll.style.minHeight = 0f;
+        controlsScroll.horizontalScrollerVisibility = ScrollerVisibility.Hidden;
+        controlsScroll.verticalScrollerVisibility = ScrollerVisibility.Auto;
+        controlsScroll.mouseWheelScrollSize = CollectionGridConstants.MouseWheelScrollPoints;
+        controlsScroll.contentContainer.style.flexDirection = FlexDirection.Column;
+        controlsScroll.contentContainer.style.minHeight = 0f;
+        _controlsScrollView = controlsScroll;
+        _controlsDragScroller = new ScrollViewDragScroller(controlsScroll);
+        controlsViewport.Add(controlsScroll);
+
+        _controlsScrollShadow = CreateControlsScrollShadow();
+        controlsViewport.Add(_controlsScrollShadow);
+
+        // All filter cards, including the foundational hero/size/quality card, scroll below the
+        // fixed control deck above.
         _heroFilterSection = CreateFilterSection(
-            rail,
+            controlsScroll,
             CollectionPanelText.HeroHeader(),
             UiSpacing.Xl,
             out _heroChipRow,
@@ -166,19 +191,6 @@ internal sealed partial class CollectionPanelView
         _tierChipRow.style.marginLeft = UiSpacing.Sm;
         _tierChipRow.style.flexWrap = Wrap.NoWrap;
         _tierChipRow.style.justifyContent = Justify.FlexStart;
-
-        var controlsScroll = new ScrollView(ScrollViewMode.Vertical);
-        controlsScroll.style.flexGrow = 1f;
-        controlsScroll.style.flexShrink = 1f;
-        controlsScroll.style.minHeight = 0f;
-        controlsScroll.horizontalScrollerVisibility = ScrollerVisibility.Hidden;
-        controlsScroll.verticalScrollerVisibility = ScrollerVisibility.Auto;
-        controlsScroll.mouseWheelScrollSize = CollectionGridConstants.MouseWheelScrollPoints;
-        controlsScroll.contentContainer.style.flexDirection = FlexDirection.Column;
-        controlsScroll.contentContainer.style.minHeight = 0f;
-        _controlsScrollView = controlsScroll;
-        _controlsDragScroller = new ScrollViewDragScroller(controlsScroll);
-        rail.Add(controlsScroll);
 
         // Keyword filter (EHiddenTag gameplay keywords). This is the common secondary filter for
         // Items and Skills, so keep it directly below Quality.
@@ -259,6 +271,64 @@ internal sealed partial class CollectionPanelView
         row.style.flexShrink = 0f;
         row.style.marginTop = marginTop;
         return row;
+    }
+
+    private static VisualElement CreateControlsScrollShadow()
+    {
+        var shadow = new VisualElement { pickingMode = PickingMode.Ignore };
+        shadow.style.position = Position.Absolute;
+        shadow.style.left = 0f;
+        shadow.style.right = 0f;
+        shadow.style.top = 0f;
+        UiStyle.FixedHeight(shadow.style, Sizes.CollectionScrollShadowHeight);
+        shadow.style.display = DisplayStyle.None;
+        shadow.generateVisualContent += context => DrawControlsScrollShadow(context, shadow);
+        return shadow;
+    }
+
+    private static void DrawControlsScrollShadow(MeshGenerationContext context, VisualElement shadow)
+    {
+        var rect = shadow.contentRect;
+        if (rect.width <= 0f || rect.height <= 0f)
+            return;
+
+        var top = Colors.WithAlpha(Colors.CollectionPanelBackground, 0.92f);
+        var bottom = Colors.Clear;
+        var mesh = context.Allocate(4, 6);
+        mesh.SetNextVertex(
+            new Vertex
+            {
+                position = new Vector3(rect.xMin, rect.yMin, Vertex.nearZ),
+                tint = top,
+            }
+        );
+        mesh.SetNextVertex(
+            new Vertex
+            {
+                position = new Vector3(rect.xMax, rect.yMin, Vertex.nearZ),
+                tint = top,
+            }
+        );
+        mesh.SetNextVertex(
+            new Vertex
+            {
+                position = new Vector3(rect.xMax, rect.yMax, Vertex.nearZ),
+                tint = bottom,
+            }
+        );
+        mesh.SetNextVertex(
+            new Vertex
+            {
+                position = new Vector3(rect.xMin, rect.yMax, Vertex.nearZ),
+                tint = bottom,
+            }
+        );
+        mesh.SetNextIndex(0);
+        mesh.SetNextIndex(1);
+        mesh.SetNextIndex(2);
+        mesh.SetNextIndex(0);
+        mesh.SetNextIndex(2);
+        mesh.SetNextIndex(3);
     }
 
     private static VisualElement CreateOperationSpacer()
