@@ -367,7 +367,7 @@ internal sealed partial class CollectionPanelView : IDisposable
         foreach (var pair in _keywordChips)
         {
             var display = ResolveTagDisplay(pair.Key);
-            ApplyTagChipContent(pair.Value, display);
+            ApplyTagChipContent(pair.Value, display, TagIconSize(pair.Key));
             RefreshChip(pair.Value, IsKeywordOptionSelected(pair.Key, model), display.AccentColor);
         }
         foreach (var pair in _sourceChips)

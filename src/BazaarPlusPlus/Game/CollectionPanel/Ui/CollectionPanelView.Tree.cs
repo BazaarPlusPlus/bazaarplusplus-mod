@@ -758,6 +758,7 @@ internal sealed partial class CollectionPanelView
             Colors.CollectionFilterTitleText
         );
         label.text = title;
+        label.style.marginLeft = UiSpacing.Xs;
         label.style.whiteSpace = WhiteSpace.NoWrap;
         header.Add(label);
 

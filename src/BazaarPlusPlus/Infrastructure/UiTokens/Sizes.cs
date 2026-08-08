@@ -28,6 +28,7 @@ internal static class Sizes
     public const float HeroChipButtonSize = 56f;
     public const int HeroChipsPerRow = 8;
     public const float TagChipIconSize = 16f;
+    public const float CollectionLifestealTagIconSize = 19f;
     public const int CollectionTagFontSize = 14;
     // 16px is a restrained nested-card heading: clearly above 14px chips without competing with
     // the page title.

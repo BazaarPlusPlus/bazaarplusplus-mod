@@ -2111,7 +2111,6 @@ AssertValues(
         nameof(ECardTag.Friend),
         nameof(ECardTag.Aquatic),
         nameof(ECardTag.Tool),
-        nameof(ECardTag.Drone),
         nameof(ECardTag.Vehicle),
         nameof(ECardTag.Food),
         nameof(ECardTag.Trap),
@@ -2123,12 +2122,13 @@ AssertValues(
         nameof(ECardTag.Core),
         nameof(ECardTag.Tech),
         nameof(ECardTag.Dinosaur),
-        nameof(ECardTag.Ray),
         nameof(ECardTag.Apparel),
         nameof(ECardTag.Merchant),
         nameof(ECardTag.Property),
         nameof(ECardTag.Loot),
         nameof(ECardTag.Instrument),
+        nameof(ECardTag.Drone),
+        nameof(ECardTag.Ray),
     },
     "Tag whitelist should match the curated CollectionPanel tag order."
 );

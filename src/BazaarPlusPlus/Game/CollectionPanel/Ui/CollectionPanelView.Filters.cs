@@ -171,7 +171,7 @@ internal sealed partial class CollectionPanelView
         var glyph = new VisualElement { pickingMode = PickingMode.Ignore };
         glyph.style.position = Position.Absolute;
         glyph.style.left = (18f - width) / 2f;
-        glyph.style.top = (14f - height) / 2f;
+        glyph.style.top = (14f - height) / 2f + 1f;
         UiStyle.FixedSize(glyph.style, width, height);
         glyph.style.backgroundColor = Colors.HistorySubtitleText;
         UiStyle.Radius(glyph.style, 1.5f);
@@ -240,7 +240,7 @@ internal sealed partial class CollectionPanelView
                 }
                 var captured = option;
                 var chip = CreateTagFacetChipButton(() => _commands.ToggleKeyword(captured));
-                ApplyTagChipContent(chip, ResolveTagDisplay(captured));
+                ApplyTagChipContent(chip, ResolveTagDisplay(captured), TagIconSize(captured));
                 _keywordChips[captured] = chip;
                 _keywordChipOrder.Add(captured);
                 _keywordChipRow.Add(chip);
@@ -517,7 +517,16 @@ internal sealed partial class CollectionPanelView
         return chip;
     }
 
-    private static void ApplyTagChipContent(Button chip, NativeTagDisplay display)
+    private static float TagIconSize(CollectionKeywordFacetOption option) =>
+        option.Keyword == EHiddenTag.Lifesteal
+            ? Sizes.CollectionLifestealTagIconSize
+            : Sizes.TagChipIconSize;
+
+    private static void ApplyTagChipContent(
+        Button chip,
+        NativeTagDisplay display,
+        float iconSize = Sizes.TagChipIconSize
+    )
     {
         var label = chip.Q<Label>(TagChipLabelName);
         if (label != null)
@@ -527,6 +536,8 @@ internal sealed partial class CollectionPanelView
         var icon = chip.Q<VisualElement>(TagChipIconName);
         if (icon == null)
             return;
+
+        UiStyle.FixedSize(icon.style, iconSize, iconSize);
 
         var outcome = KeywordIconSpriteProvider.Resolve(display.IconName);
         if (outcome.IsDegraded)
