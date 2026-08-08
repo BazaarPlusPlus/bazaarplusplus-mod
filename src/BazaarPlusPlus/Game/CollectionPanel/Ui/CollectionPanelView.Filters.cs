@@ -1409,8 +1409,8 @@ internal sealed partial class CollectionPanelView
         RefreshChip(chip, selected);
         UiStyle.Border(
             chip.style,
-            Borders.Thin,
-            selected ? Colors.CollectionChipSelectedBorder : Colors.CollectionChipBorder
+            selected ? Borders.None : Borders.Thin,
+            selected ? Colors.Clear : Colors.CollectionChipBorder
         );
     }
 
