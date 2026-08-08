@@ -1956,7 +1956,7 @@ public class CoreLayeringTests
     }
 
     [Fact]
-    public void Collection_filters_share_one_scroll_view_below_the_fixed_control_deck()
+    public void Collection_pins_primary_card_and_scrolls_secondary_filters_in_one_scroll_view()
     {
         var source = File.ReadAllText(
             Path.Combine(
@@ -1973,12 +1973,27 @@ public class CoreLayeringTests
             "private static VisualElement CreateOperationRow"
         );
 
+        // The foundational hero/size/quality card is pinned on the rail between the control
+        // deck and the scroll viewport, so tab switches and scrolling never move it.
         Assert.Contains(
-            "_heroFilterSection = CreateFilterSection(\n            controlsScroll,",
+            "_heroFilterSection = CreateFilterSection(\n            rail,",
             operationRail
         );
         Assert.Contains(
             "_tierFilterSection = CreateFilterSection(\n            _heroFilterSection,",
+            operationRail
+        );
+        // Secondary filters and the disclaimer share the single scroll view below it.
+        Assert.Contains(
+            "_keywordFilterSection = CreateFilterSection(\n            controlsScroll,",
+            operationRail
+        );
+        Assert.Contains(
+            "_tagFilterSection = CreateFilterChipSection(\n            controlsScroll,",
+            operationRail
+        );
+        Assert.Contains(
+            "_sourceFilterSection = CreateFilterSection(\n            controlsScroll,",
             operationRail
         );
         Assert.Contains("controlsScroll.Add(_disclaimerLabel);", operationRail);

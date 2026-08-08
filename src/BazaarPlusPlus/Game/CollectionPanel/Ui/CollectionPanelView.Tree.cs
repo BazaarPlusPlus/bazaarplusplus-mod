@@ -134,34 +134,11 @@ internal sealed partial class CollectionPanelView
         _dayToggleButton = CreateDayToggleButton();
         _standardOperationControls.Add(_dayToggleButton);
 
-        var controlsViewport = new VisualElement();
-        controlsViewport.style.flexGrow = 1f;
-        controlsViewport.style.flexShrink = 1f;
-        controlsViewport.style.minHeight = 0f;
-        controlsViewport.style.position = Position.Relative;
-        controlsViewport.style.overflow = Overflow.Hidden;
-        rail.Add(controlsViewport);
-
-        var controlsScroll = new ScrollView(ScrollViewMode.Vertical);
-        controlsScroll.style.flexGrow = 1f;
-        controlsScroll.style.flexShrink = 1f;
-        controlsScroll.style.minHeight = 0f;
-        controlsScroll.horizontalScrollerVisibility = ScrollerVisibility.Hidden;
-        controlsScroll.verticalScrollerVisibility = ScrollerVisibility.Auto;
-        controlsScroll.mouseWheelScrollSize = CollectionGridConstants.MouseWheelScrollPoints;
-        controlsScroll.contentContainer.style.flexDirection = FlexDirection.Column;
-        controlsScroll.contentContainer.style.minHeight = 0f;
-        _controlsScrollView = controlsScroll;
-        _controlsDragScroller = new ScrollViewDragScroller(controlsScroll);
-        controlsViewport.Add(controlsScroll);
-
-        _controlsScrollShadow = CreateControlsScrollShadow();
-        controlsViewport.Add(_controlsScrollShadow);
-
-        // All filter cards, including the foundational hero/size/quality card, scroll below the
-        // fixed control deck above.
+        // The foundational hero/size/quality card is pinned between the control deck and the
+        // scrolling filter stack: switching tabs or scrolling secondary filters must not move
+        // the primary selectors.
         _heroFilterSection = CreateFilterSection(
-            controlsScroll,
+            rail,
             CollectionPanelText.HeroHeader(),
             UiSpacing.Xl,
             out _heroChipRow,
@@ -191,13 +168,39 @@ internal sealed partial class CollectionPanelView
         );
         tierSizeChipRow.style.flexWrap = Wrap.NoWrap;
         tierSizeChipRow.style.justifyContent = Justify.FlexStart;
-        _sizeChipRow = CreateCombinedFilterChipSegment();
+        // Quality leads the combined row: the size segment hides on the Skills tab, so putting
+        // it second keeps the quality chips anchored across tab switches.
         _tierChipRow = CreateCombinedFilterChipSegment();
-        tierSizeChipRow.Add(_sizeChipRow);
+        _sizeChipRow = CreateCombinedFilterChipSegment();
         tierSizeChipRow.Add(_tierChipRow);
-        _tierChipRow.style.marginLeft = UiSpacing.Sm;
+        tierSizeChipRow.Add(_sizeChipRow);
+        _sizeChipRow.style.marginLeft = UiSpacing.Sm;
         _tierChipRow.style.flexWrap = Wrap.NoWrap;
         _tierChipRow.style.justifyContent = Justify.FlexStart;
+
+        var controlsViewport = new VisualElement();
+        controlsViewport.style.flexGrow = 1f;
+        controlsViewport.style.flexShrink = 1f;
+        controlsViewport.style.minHeight = 0f;
+        controlsViewport.style.position = Position.Relative;
+        controlsViewport.style.overflow = Overflow.Hidden;
+        rail.Add(controlsViewport);
+
+        var controlsScroll = new ScrollView(ScrollViewMode.Vertical);
+        controlsScroll.style.flexGrow = 1f;
+        controlsScroll.style.flexShrink = 1f;
+        controlsScroll.style.minHeight = 0f;
+        controlsScroll.horizontalScrollerVisibility = ScrollerVisibility.Hidden;
+        controlsScroll.verticalScrollerVisibility = ScrollerVisibility.Auto;
+        controlsScroll.mouseWheelScrollSize = CollectionGridConstants.MouseWheelScrollPoints;
+        controlsScroll.contentContainer.style.flexDirection = FlexDirection.Column;
+        controlsScroll.contentContainer.style.minHeight = 0f;
+        _controlsScrollView = controlsScroll;
+        _controlsDragScroller = new ScrollViewDragScroller(controlsScroll);
+        controlsViewport.Add(controlsScroll);
+
+        _controlsScrollShadow = CreateControlsScrollShadow();
+        controlsViewport.Add(_controlsScrollShadow);
 
         // Keyword filter (EHiddenTag gameplay keywords). This is the common secondary filter for
         // Items and Skills, so keep it directly below Quality.
