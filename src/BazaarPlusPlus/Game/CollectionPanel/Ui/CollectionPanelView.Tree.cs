@@ -1002,11 +1002,10 @@ internal sealed partial class CollectionPanelView
         _gridViewport.style.flexShrink = 1f;
         _gridViewport.style.minHeight = 0f;
         _gridViewport.style.minWidth = 0f;
-        // Recessed "display case" base: darker than the surrounding panel so the slot grid and
-        // native card frames read as a lit shelf inside a frame.
-        _gridViewport.style.backgroundColor = Colors.CollectionGridCaseBackground;
+        // Match the operation rail's card shell so the catalog reads as two aligned panels.
+        _gridViewport.style.backgroundColor = Colors.CollectionFilterCardBackground;
         UiStyle.Radius(_gridViewport.style, Radii.Md);
-        UiStyle.Border(_gridViewport.style, Borders.Thin, Colors.HistoryListFrameBorder);
+        UiStyle.Border(_gridViewport.style, Borders.Thin, Colors.CollectionFilterCardBorder);
         _gridViewport.style.overflow = Overflow.Hidden;
         parent.Add(_gridViewport);
 
