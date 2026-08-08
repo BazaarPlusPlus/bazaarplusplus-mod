@@ -19,6 +19,24 @@ internal static class PeriodicEffectAttribution
     //    on a death-event frame, Regen after Health is already non-positive is not realized;
     // 3. split each measured result by the status stack currently owned by each source.
     // Tick formulas remain corpus diagnostics and never decide whether a typed adjustment is booked.
+    //
+    // Model invariants. These constrain what may be booked at all; they are not enforced by any
+    // test, because they are properties of the model rather than of one output:
+    // - Three ledgers stay coupled and their units stay distinct: status stock (per combatant ×
+    //   status × epoch), health impact (per combatant × damage type × frame), and shield (per
+    //   combatant × frame). Reconciling only one of them cannot establish Exact.
+    // - Poison debits Health only. Any Poison-attributed Shield consumption is an invariant
+    //   violation, not another supported pool. Burn may consume Shield, but consumed Shield points
+    //   and prevented Burn damage are not assumed numerically equal.
+    // - Only movement that changed live combat state is realized impact. Overheal, overkill, and
+    //   prevented damage are counterfactual and stay unbooked.
+    // - EPlayerHealthChangeType.Joy survives in the shared enum for schema compatibility. Enum
+    //   presence is not evidence that Joy is a current gameplay pool, so the model does not book it.
+    // - CombatImpactPeriodicProof is two-valued on purpose. A tick exposes only aggregate status
+    //   and pool movement, so once two resolved owners coexist, moving one unit between them
+    //   yields a second feasible allocation — no third "narrowed but not unique" class is
+    //   observable here. That is why the earlier Constrained member was removed rather than left
+    //   permanently empty, and why a gap of this kind is not answered with a constraint solver.
     // Initial Regen with no tick provenance may be redistributed only across item/skill sources
     // that the completed combat independently proves applied Regen through an execution or
     // CardStats. A static RegenApplyAmount describes capability, not observed contribution. The

@@ -1,41 +1,47 @@
 # BazaarPlusPlus Docs
 
-The code is the source of truth. Current implementation guidance lives in one architecture document plus compact decision records. Historical working documents live in git history, not in the active tree. This file is the single documentation map.
+The documentation inventory, and the rules for changing it. When to open each document is decided once, in `CLAUDE.md`'s header table — this file does not repeat those triggers.
 
-## Current Docs
+## Inventory
 
-- [MEMORY.md](MEMORY.md) — dense, agent-facing durable knowledge. **Load this first.**
-- [ARCHITECTURE.md](ARCHITECTURE.md) — living architecture and data-flow summary for the current code (the structure/overview layer).
-- [../CONTEXT.md](../CONTEXT.md) — project vocabulary (glossary only).
-- [../README.md](../README.md) — project entry point, quick start, build commands, and high-level feature list.
-- [agents/](agents/) — per-repo config for the engineering skills (issue tracker, triage labels, domain-doc consumer rules).
+- [MEMORY.md](MEMORY.md) — invariants, settled decisions, and traps that fail silently.
+- [ARCHITECTURE.md](ARCHITECTURE.md) — how the plugin is assembled and what seams are shared, with per-feature detail under [architecture/](architecture/).
+- [../CONTEXT.md](../CONTEXT.md) — the glossary.
+- [adr/](adr/) — decision records.
+- [contracts/](contracts/) — wire and payload formats that outlive any one implementation.
+- [agents/](agents/) — per-repo config for the engineering skills.
+- [../README.md](../README.md) — the human entry point: features, install, quick start.
 
-## Decision records (`adr/`)
+## Decision records
 
-ADRs retain only the decision, its load-bearing rationale, guardrails, and current code evidence. They may be corrected or compressed during consolidation when the code has drifted. Superseded or absorbable ADRs are collapsed into the surviving record (ADR-0005 lives on inside ADR-0006; ADR-0008 inside ADR-0007); retired files remain recoverable from git history and numbering is never reused.
+Every record below is accepted; each file's own `Status:` line is authoritative for amendments and absorptions. An ADR keeps the decision, its load-bearing rationale, guardrails, and current code evidence, and may be corrected or compressed when the code drifts. A superseded record is collapsed into the one that absorbed it (0005 lives inside 0006; 0008 inside 0007), and numbers are never reused.
 
-| Path | Topic | Status |
-|---|---|---|
-| [adr/0001](adr/0001-encounter-status-probe-not-timeline-tracker.md) | encounter status probe, not timeline | accepted |
-| [adr/0002](adr/0002-mountable-feature-registry.md) | mountable/feature registry | accepted |
-| [adr/0003](adr/0003-history-panel-preview-overlay.md) | HistoryPanel ScreenSpaceOverlay preview | accepted |
-| [adr/0004](adr/0004-preview-visibility-three-state-mode.md) | three-state preview visibility | accepted |
-| [adr/0006](adr/0006-bazaaragent-as-its-own-plugin.md) | BazaarAgent as its own plugin (absorbs 0005) | accepted |
-| [adr/0007](adr/0007-bazaaragent-external-replay-video-recording.md) | explicit replay exit: primitive endpoints + agent `Continue` action (absorbs 0008) | accepted |
-| [adr/0009](adr/0009-preserve-behavior-specific-boundaries.md) | rejected cosmetic unifications / preserved behavior boundaries | accepted |
-| [adr/0010](adr/0010-merged-destroy-collection-filter.md) | one Destroy chip covers the destroy-mechanic cluster | accepted |
-| [adr/0011](adr/0011-pure-decision-cores-for-timing-invariants.md) | timing invariants in pure decision cores, not MonoBehaviour glue | accepted |
+| Path | Topic |
+|---|---|
+| [adr/0001](adr/0001-encounter-status-probe-not-timeline-tracker.md) | encounter status probe, not timeline |
+| [adr/0002](adr/0002-mountable-feature-registry.md) | mountable/feature registry |
+| [adr/0003](adr/0003-history-panel-preview-overlay.md) | HistoryPanel ScreenSpaceOverlay preview |
+| [adr/0004](adr/0004-preview-visibility-three-state-mode.md) | three-state preview visibility |
+| [adr/0006](adr/0006-bazaaragent-as-its-own-plugin.md) | BazaarAgent as its own plugin (absorbs 0005) |
+| [adr/0007](adr/0007-bazaaragent-external-replay-video-recording.md) | explicit replay exit through the agent `Continue` action (absorbs 0008) |
+| [adr/0009](adr/0009-preserve-behavior-specific-boundaries.md) | rejected cosmetic unifications / preserved behavior boundaries |
+| [adr/0010](adr/0010-merged-destroy-collection-filter.md) | one Destroy chip covers the destroy-mechanic cluster |
+| [adr/0011](adr/0011-pure-decision-cores-for-timing-invariants.md) | timing invariants in pure decision cores, not MonoBehaviour glue |
+| [adr/0012](adr/0012-outbound-network-ownership.md) | outbound Mod API protocol and persistence owners |
+| [adr/0013](adr/0013-remote-data-and-release-boundaries.md) | runtime catalogs, release manifest, and build seed fetch are three lifecycles |
 
-## Future Work
+## Document lifecycle
 
-Task plans, feature requests, and bugs are tracked as **GitHub issues** (see [agents/issue-tracker.md](agents/issue-tracker.md)), not repo docs.
+Each layer owns one thing, and links rather than restating: `CLAUDE.md` owns process, `MEMORY.md` knowledge, `ARCHITECTURE.md` structure, `adr/` rationale, GitHub issues the work.
 
-`drafts/` is the write buffer for **knowledge documents only** — design records, root-cause analyses, and decision/option analyses produced mid-session. Task plans do not go there. Consolidation promotes durable outcomes into MEMORY/ADR/ARCHITECTURE, moves actionable work to GitHub Issues, and deletes the spent draft; the directory therefore exists only while unswept drafts are pending.
+**Work goes to GitHub issues, not to this tree.** Task plans, feature requests, bugs, acceptance checklists, implementation orders, and "pending confirmation" notes are issues. A document here describes how the system is, not what someone intends to do next.
+
+**`drafts/` is the write buffer for knowledge documents only** — design records, root-cause analyses, decision analyses produced mid-session. A consolidation run promotes each draft's durable outcomes into MEMORY, an ADR, or ARCHITECTURE, moves any remaining work to issues, and then deletes the draft. The directory therefore exists only while unswept drafts are pending. `tests/Architecture.Tests/DocsHygieneTests.cs` fails when a draft goes stale.
+
+**Edit policy.** `ARCHITECTURE.md`, `architecture/`, `contracts/`, and `adr/` may be corrected the moment the code drifts. `MEMORY.md` and this file are curated by consolidation runs, so new knowledge goes to `drafts/` first.
+
+**Budgets are in bytes, not lines.** `CLAUDE.md` and `MEMORY.md` carry dense one-line entries, so a line count says nothing about what they cost an agent. The enforced ceilings live in `tests/Architecture.Tests/DocsHygieneTests.cs`; keeping under them means merging entries, not appending. `MEMORY.md`'s Gotchas section is exempt — that section is the reason the file exists, and compressing it to hit a budget defeats the budget.
 
 ## Historical material
 
-Retired documents live only in git history. The last complete `docs/archive/` tree is recoverable at commit `82412f0c` (for example, `git show 82412f0c:docs/archive/<path>`). Historical claims must be rechecked against current code before use.
-
-## Agent Rules
-
-Agent rules and project-specific operating constraints live in [../CLAUDE.md](../CLAUDE.md). `AGENTS.md` is a symlink to that file.
+Retired documents live only in git history. The last complete `docs/archive/` tree is recoverable at commit `82412f0c` (`git show 82412f0c:docs/archive/<path>`). Recheck any historical claim against current code before acting on it.

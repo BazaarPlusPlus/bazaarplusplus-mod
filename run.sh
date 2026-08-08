@@ -485,19 +485,33 @@ usage() {
     cat <<EOF
 Usage:
   $0 build [--with-bazaaragent] [--fast] [-p:Name=Value ...]
+      Debug build; copies into BepInEx/plugins/ when the game is found.
   $0 publish [--with-bazaaragent] [-p:Name=Value ...]
+      Production build: fetch remote embedded data, run the feature-owned seed
+      gates, then Debug + Release with installer packaging.
   $0 fetch-data [-p:Name=Value ...]
+      Refresh the remote embedded seeds without building.
   $0 restore-locks
+      Rewrite the committed NuGet lock files for the six published assemblies.
+      Run after every Directory.Packages.props change; test projects get none.
   $0 restore-locked
+      Validate those restores in locked mode without rewriting the lock files.
   $0 test
+      Run every project under tests/, dispatching xUnit vs exe-runner per csproj.
   $0 format
   $0 format-check
+      Format, or fail on unformatted files, with the repo-pinned CSharpier.
   $0 decompile [DllName]
   $0 decompile-all
+      Decompile game DLLs into decompiled/ (default DLL: Assembly-CSharp).
   $0 decompile-ptr [DllName]
   $0 decompile-all-ptr
+      Same for the PTR client, into decompiled-vptr/.
   $0 snapshot-managed
+      Archive the installed Managed dir under game-libs/, so a later game
+      update can still be built against.
   $0 build-matrix
+      Build the source tree against every archived Managed snapshot.
 
 Options:
   --with-bazaaragent  Build and copy the optional BazaarAgent assemblies.

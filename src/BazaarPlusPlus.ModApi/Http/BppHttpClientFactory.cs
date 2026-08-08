@@ -7,6 +7,10 @@ public static class BppHttpClientFactory
 {
     private const string ProductName = "BazaarPlusPlus";
 
+    // Each consumer passes its own userAgentSuffix (BundleUpload, OnlineClient, ...). The backend
+    // groups its metrics and rate limits by that suffix, so keep the suffixes owner-specific:
+    // collapsing them into one shared token silently re-buckets server-side traffic.
+
     public static HttpClient Create(
         string productVersion,
         string? userAgentSuffix = null,

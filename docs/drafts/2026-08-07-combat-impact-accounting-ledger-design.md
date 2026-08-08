@@ -356,9 +356,9 @@ The current producer emits only `Exact` and `Proportional`; all `Constrained` em
 both v5/v6 committed corpus snapshots show zero constrained results. The implementation removes the
 dead `Constrained` enum member, bumps the periodic model version, and regenerates evidence rather
 than carrying an undefined proof bucket forward. This explicitly supersedes the unimplemented M1
-`Exact/Constrained/Unknown` taxonomy in
-`docs/drafts/2026-08-04-periodic-effect-attribution-goal.md`; consolidation must not leave both
-decisions active.
+`Exact/Constrained/Unknown` taxonomy, whose surviving rationale now lives in the model-invariants
+header of `src/BazaarPlusPlus/Game/PostCombatImpact/Data/PeriodicEffectAttribution.cs`;
+consolidation must not leave both decisions active.
 
 Residuals are combat-level facts keyed by combatant, periodic kind, and pool. They belong on
 `CombatImpactReport`, not on any source group. Source-group periodic totals are derived rollups over

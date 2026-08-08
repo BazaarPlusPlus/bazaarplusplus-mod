@@ -1,5 +1,5 @@
 // Guards the source-level premises of the online/PTR dual-version seams
-// (docs/drafts/2026-07-03-online-ptr-dual-version-compat.md). The decompiled trees are
+// (docs/ARCHITECTURE.md, "Game Build Channel And PTR Isolation"). The decompiled trees are
 // gitignored local artifacts, so this is a LOCAL-ONLY gate: a missing tree is skipped
 // with a notice, never a failure. Rerun after every `./run.sh decompile-all` /
 // `decompile-all-ptr` refresh — a failure here means a seam premise drifted.

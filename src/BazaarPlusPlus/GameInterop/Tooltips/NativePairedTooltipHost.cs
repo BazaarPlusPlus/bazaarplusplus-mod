@@ -132,6 +132,10 @@ internal sealed class NativePairedTooltipSession
                 Data.TooltipParentComponent?.HideAuxiliaryTooltipController();
         }
         RestorePreparedPrimaryGate();
+        // Whether a "Tooltip_Main" descendant exists under every tier and under both the Desktop
+        // and Mobile tooltip prefabs is unverified. When it is absent the gate stays null and the
+        // primary tooltip is simply left unconcealed — silently, by design, so a missing node
+        // degrades the paired presentation instead of throwing mid-hover.
         var target = FindDescendant(primary.CanvasContentRectTransform, "Tooltip_Main");
         if (target != null)
             _preparedPrimaryGate = CanvasGroupGate.Create(primary, target.gameObject);
@@ -156,6 +160,11 @@ internal sealed class NativePairedTooltipSession
         if (_activeAuxiliary != null || _contentRoot != null)
             Release(restoreNativeContent: false);
         RestorePreparedNativeHost();
+        // Capture is ordering-sensitive against the consuming feature's AssignTooltipFrame, which
+        // writes backgroundImage.sprite: this Prepare path captures BEFORE that call, while the
+        // Show path below captures AFTER it. The restored sprite therefore depends on which path
+        // ran. Keep both capture points where they are — swapping their relative order produces a
+        // wrong-tier auxiliary tooltip frame, which no test or compiler catches.
         _preparedNativeHost = NativeAuxiliaryHostState.Capture(auxiliary);
         // auxParent (Tooltip_Aux_Content in the Tooltip_Aux_P prefab) owns the COMPLETE visual
         // tree — Background, TitleText, BodyText and Divider are its children — so this gate is

@@ -41,13 +41,12 @@ BazaarPlusPlus 是一个面向《The Bazaar》的 BepInEx 5 模组：战斗 UI �
 ./run.sh build          # Debug 构建（识别到游戏目录时自动复制到 BepInEx/plugins/）
 ./run.sh test           # 全部测试
 ./run.sh publish        # 生产发布：刷新远端数据、种子门禁、安装器打包
-dotnet build src/BazaarPlusPlus/BazaarPlusPlus.csproj -p:ManagedPath=/path/to/TheBazaar_Data/Managed
 ```
 
+自动识别不到游戏目录时，用 `-p:ManagedPath=/path/to/TheBazaar_Data/Managed` 显式指定。运行 `./run.sh` 查看全部子命令及说明。
+
 - `voice-lines.json` 与 `tenwin_builds.json` 不存入仓库，构建时从 `src/BazaarPlusPlus/obj/remote-data/` 的共享副本嵌入；副本缺失时自动下载一次，也可用 `./run.sh fetch-data` 手动刷新。
-- 直接依赖版本集中在 `Directory.Packages.props`；改动后用 `./run.sh restore-locks` 刷新发布程序集的锁文件，`./run.sh restore-locked` 校验。
 - 普通 Release 只编译；只有 `./run.sh publish` 会写入相邻 installer 仓库并生成 `BepInEx.zip`。
-- 完整子命令清单（格式化、反编译、构建矩阵等）运行 `./run.sh` 查看。
 
 ## 数据与网络行为
 
@@ -71,7 +70,7 @@ dotnet build src/BazaarPlusPlus/BazaarPlusPlus.csproj -p:ManagedPath=/path/to/Th
 - [docs/README.md](docs/README.md)：文档索引与生命周期说明。
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)：当前实现的 living architecture（按主题组织，带代码证据）。
 - [docs/adr/](docs/adr/)：设计决策记录。
-- [GitHub Issues](https://github.com/cauyxy/bazaarplusplus-mod/issues)：后续工作、需求与 bug 追踪。
+- [GitHub Issues](https://github.com/BazaarPlusPlus/bazaarplusplus-mod/issues)：后续工作、需求与 bug 追踪。
 
 ## License
 

@@ -8,7 +8,7 @@ Expose current encounter state through the pull-based `IEncounterStateProbe`: ch
 
 ## Why
 
-A timeline needs fragile attribution for rerolls, interrupts, PVP combat, item transforms, and recovery gaps. The original proposal had no shipping consumer; current UI and agent consumers need only “what is true now.” A future choice timeline is tracked separately in [#33](https://github.com/cauyxy/bazaarplusplus-mod/issues/33) and must revisit this decision instead of overloading the live probe.
+A timeline needs fragile attribution for rerolls, interrupts, PVP combat, item transforms, and recovery gaps. The original proposal had no shipping consumer; current UI and agent consumers need only “what is true now.” A future choice timeline is tracked separately in [#33](https://github.com/BazaarPlusPlus/bazaarplusplus-mod/issues/33) and must revisit this decision instead of overloading the live probe.
 
 ## Guardrails
 
