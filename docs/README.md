@@ -4,11 +4,13 @@ The code is the source of truth. Current implementation guidance lives in one ar
 
 ## Current Docs
 
-- [MEMORY.md](MEMORY.md) — dense, agent-facing durable knowledge. **Load this first.**
-- [ARCHITECTURE.md](ARCHITECTURE.md) — living architecture and data-flow summary for the current code (the structure/overview layer).
+- [MEMORY.md](MEMORY.md) — durable knowledge: traps that fail silently, and domain invariants. **Load this first.**
+- [ARCHITECTURE.md](ARCHITECTURE.md) — how the plugin is assembled, and the seams shared across features.
+- [architecture/](architecture/) — per-feature detail, reached from the pointer table at the end of ARCHITECTURE.md.
 - [../CONTEXT.md](../CONTEXT.md) — project vocabulary (glossary only).
+- [contracts/](contracts/) — wire and payload formats that outlive any one implementation.
 - [../README.md](../README.md) — project entry point, quick start, build commands, and high-level feature list.
-- [agents/](agents/) — per-repo config for the engineering skills (issue tracker, triage labels, domain-doc consumer rules).
+- [agents/](agents/) — per-repo config for the engineering skills (issue tracker, domain-doc consumer rules).
 
 ## Decision records (`adr/`)
 
