@@ -55,7 +55,7 @@ internal static class Colors
     // Lift the RGB channels before applying the slightly stronger transparency so the composite
     // remains close to the former opaque #16181c card color while letting more of the panel
     // backdrop show through. Do not lower the old color's alpha directly: it would muddy it.
-    public static Color CollectionFilterCardBackground => FromRgb(24, 26, 30, 0.84f);
+    public static Color CollectionFilterCardBackground => FromRgb(26, 28, 32, 0.70f);
     public static Color CollectionFilterTitleText => FromRgb(232, 236, 242, 1f);
     public static Color CollectionChipBackground => FromRgb(28, 30, 34, 1f);
     public static Color CollectionChipBorder => FromRgb(63, 68, 73, 1f);
