@@ -18,6 +18,7 @@ internal sealed partial class CollectionPanelView
     private const string HeroChipGradientName = "bpp-collection-hero-chip-gradient";
     private const string HeroChipPortraitName = "bpp-collection-hero-chip-portrait";
     private const string HeroChipSelectionRingName = "bpp-collection-hero-chip-selection-ring";
+    private const string SizeChipIconName = "bpp-collection-size-chip-icon";
     private const string SourceChipPortraitName = "bpp-collection-source-chip-portrait";
 
     private static readonly CollectionPortraitFailureGate<
@@ -138,9 +139,12 @@ internal sealed partial class CollectionPanelView
         chip.style.flexDirection = FlexDirection.Row;
         chip.style.alignItems = Align.Center;
         chip.style.justifyContent = Justify.Center;
-        var icon = new VisualElement { pickingMode = PickingMode.Ignore };
+        var icon = new VisualElement { name = SizeChipIconName, pickingMode = PickingMode.Ignore };
         UiStyle.FixedSize(icon.style, 18f, 14f);
         icon.style.marginRight = UiSpacing.Xs;
+        icon.style.display = CollectionPanelText.IsChineseLanguage()
+            ? DisplayStyle.Flex
+            : DisplayStyle.None;
         icon.Add(CreateSizeGlyph(size));
         var label = new Label(CollectionPanelText.Size(size))
         {

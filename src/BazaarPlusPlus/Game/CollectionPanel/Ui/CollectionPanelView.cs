@@ -371,6 +371,11 @@ internal sealed partial class CollectionPanelView : IDisposable
         foreach (var pair in _sizeChips)
         {
             pair.Value.text = string.Empty;
+            var icon = pair.Value.Q<VisualElement>(SizeChipIconName);
+            if (icon != null)
+                icon.style.display = CollectionPanelText.IsChineseLanguage()
+                    ? DisplayStyle.Flex
+                    : DisplayStyle.None;
             var label = pair.Value.Q<Label>(SizeChipLabelName);
             if (label != null)
                 label.text = CollectionPanelText.Size(pair.Key);

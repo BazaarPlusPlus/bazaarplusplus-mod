@@ -210,6 +210,9 @@ internal static class CollectionPanelText
             _ => size.ToString(),
         };
 
+    internal static bool IsChineseLanguage() =>
+        LanguageCodeMatcher.IsChinese(L.CurrentLanguageCode);
+
     // Tag labels intentionally have no entry here: chips resolve through the game's native
     // typography (GameInterop.TagTypography.NativeTagTypography), never a mod-side dictionary.
 
