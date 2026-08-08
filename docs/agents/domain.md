@@ -23,4 +23,4 @@ If your output contradicts an existing ADR, surface it explicitly rather than si
 
 ## Repo-specific note
 
-This repo's broader documentation map lives in `docs/README.md`; durable-knowledge conventions (`docs/MEMORY.md`, `docs/drafts/`, consolidation runs) are described in `CLAUDE.md` under "Domain docs".
+The documentation inventory and the rules for changing it live in `docs/README.md`.
