@@ -149,17 +149,37 @@ internal sealed partial class CollectionPanelView
         if (_sizeChipRow == null)
             return;
 
+        var isChinese = CollectionPanelText.IsChineseLanguage();
         var chipWidth = CurrentSizeChipWidth();
-        var segmentWidth =
-            sizes.Count * chipWidth
-            + Mathf.Max(0, sizes.Count - 1) * Borders.Thin
-            + Borders.Thin * 2f;
-        UiStyle.FixedWidth(_sizeChipRow.style, segmentWidth);
-        _sizeChipRow.style.flexBasis = segmentWidth;
+        if (isChinese)
+        {
+            var segmentWidth =
+                sizes.Count * chipWidth
+                + Mathf.Max(0, sizes.Count - 1) * Borders.Thin
+                + Borders.Thin * 2f;
+            UiStyle.FixedWidth(_sizeChipRow.style, segmentWidth);
+            _sizeChipRow.style.flexBasis = segmentWidth;
+        }
+        else
+        {
+            _sizeChipRow.style.width = StyleKeyword.Auto;
+            _sizeChipRow.style.minWidth = 0f;
+            _sizeChipRow.style.maxWidth = StyleKeyword.Auto;
+            _sizeChipRow.style.flexBasis = StyleKeyword.Auto;
+        }
         var horizontalPadding = CurrentSizeChipHorizontalPadding();
         foreach (var chip in _sizeChips.Values)
         {
-            UiStyle.FixedWidth(chip.style, chipWidth);
+            if (isChinese)
+            {
+                UiStyle.FixedWidth(chip.style, chipWidth);
+            }
+            else
+            {
+                chip.style.width = StyleKeyword.Auto;
+                chip.style.minWidth = 0f;
+                chip.style.maxWidth = StyleKeyword.Auto;
+            }
             UiStyle.HorizontalPadding(chip.style, horizontalPadding);
         }
     }
@@ -176,7 +196,8 @@ internal sealed partial class CollectionPanelView
         var chip = CreateChipButton(string.Empty, onClick, contentWidth: true);
         UiStyle.HorizontalPadding(chip.style, CurrentSizeChipHorizontalPadding());
         // Custom content uses a deterministic width rather than Button.text measurement.
-        UiStyle.FixedWidth(chip.style, CurrentSizeChipWidth());
+        if (CollectionPanelText.IsChineseLanguage())
+            UiStyle.FixedWidth(chip.style, CurrentSizeChipWidth());
         chip.style.flexDirection = FlexDirection.Row;
         chip.style.alignItems = Align.Center;
         chip.style.justifyContent = Justify.Center;
@@ -956,8 +977,9 @@ internal sealed partial class CollectionPanelView
         };
         StretchPortraitToParent(gradient);
         gradient.style.display = DisplayStyle.None;
-        var themeColor = DarkenPortraitThemeColor(Colors.CollectionChipSelectedBorder);
+        var themeColor = Colors.CollectionChipSelectedBorder;
         var state = new HeroGradientVisualState(gradient, themeColor);
+        state.SetAppearance(1.08f, 0.98f);
         gradient.userData = state;
         gradient.generateVisualContent += context => DrawHeroGradient(context, gradient, state);
         return gradient;
