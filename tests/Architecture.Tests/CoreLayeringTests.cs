@@ -2033,7 +2033,7 @@ public class CoreLayeringTests
         Assert.DoesNotContain("rail.Add(CreateSearchField())", operationRail);
         Assert.Contains("_searchInputContainer = CreateSearchField();", operationRail);
         Assert.Contains("primaryControlsRow.Add(_searchInputContainer);", operationRail);
-        Assert.Contains("_searchInputContainer.Add(CreateSortButtonGroup());", operationRail);
+        Assert.Contains("primaryControlsRow.Add(CreateSortButtonGroup());", operationRail);
         Assert.Contains("_standardOperationControls", operationRail);
         Assert.Contains("_standardOperationControls.style.flexWrap = Wrap.NoWrap", operationRail);
         Assert.Contains(
