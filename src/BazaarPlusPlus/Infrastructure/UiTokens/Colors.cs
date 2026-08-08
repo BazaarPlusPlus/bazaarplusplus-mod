@@ -52,10 +52,10 @@ internal static class Colors
     // native settings backdrop: #101113 with the same ~0.902 alpha as its outer Overlay_P.
     public static Color CollectionPanelBackground => FromRgb(16, 17, 19, 0.902f);
 
-    // Slightly lift the RGB channels before applying alpha so the composite remains close to the
-    // former opaque #16181c card color while allowing a restrained amount of the panel backdrop
-    // to show through. Do not lower the old color's alpha directly: it would visibly muddy it.
-    public static Color CollectionFilterCardBackground => FromRgb(23, 25, 29, 0.90f);
+    // Lift the RGB channels before applying the slightly stronger transparency so the composite
+    // remains close to the former opaque #16181c card color while letting more of the panel
+    // backdrop show through. Do not lower the old color's alpha directly: it would muddy it.
+    public static Color CollectionFilterCardBackground => FromRgb(24, 26, 30, 0.84f);
     public static Color CollectionFilterTitleText => FromRgb(232, 236, 242, 1f);
     public static Color CollectionChipBackground => FromRgb(28, 30, 34, 1f);
     public static Color CollectionChipBorder => FromRgb(63, 68, 73, 1f);
