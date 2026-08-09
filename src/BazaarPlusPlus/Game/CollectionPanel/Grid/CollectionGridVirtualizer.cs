@@ -793,19 +793,14 @@ internal sealed class CollectionGridVirtualizer
         _failedBindGuids.Clear();
     }
 
-    // Derive the per-viewport base unit and display-case origin. The grid width is shared across
-    // tabs first, then the active tab's column count maps that envelope to a unit size; once the
-    // shared width clamps, any surplus width becomes centering margin rather than extra columns.
+    // Derive the per-viewport base unit and display-case origin. The active tab keeps its fixed
+    // column count and expands its unit width to fill the available display-case viewport.
     // originY is the fixed top padding. Marks realized cards for rescale on the next reposition.
     private void RecomputePixelization()
     {
         _scaleDirty = true;
         var columns = _layout.Columns;
-        var pixels = CollectionGridPixelization.ForViewport(
-            _viewportWidth,
-            columns,
-            _layout.MaxUnitWidth
-        );
+        var pixels = CollectionGridPixelization.ForViewport(_viewportWidth, columns);
         _unit = pixels.Unit;
         _originX = pixels.OriginX;
         _originY = pixels.OriginY;

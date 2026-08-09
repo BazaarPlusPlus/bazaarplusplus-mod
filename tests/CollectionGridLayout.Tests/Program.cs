@@ -191,13 +191,11 @@ AssertApprox(110f, skillLayout.ShelfPitch(100f, 10f), "Skill shelf pitch is 1 * 
 var wideViewport = 2600f;
 var itemPixels = CollectionGridPixelization.ForViewport(
     wideViewport,
-    CollectionGridConstants.ItemColumns,
-    CollectionGridConstants.ItemMaxUnitWidth
+    CollectionGridConstants.ItemColumns
 );
 var skillPixels = CollectionGridPixelization.ForViewport(
     wideViewport,
-    CollectionGridConstants.SkillColumns,
-    CollectionGridConstants.SkillMaxUnitWidth
+    CollectionGridConstants.SkillColumns
 );
 
 AssertApprox(

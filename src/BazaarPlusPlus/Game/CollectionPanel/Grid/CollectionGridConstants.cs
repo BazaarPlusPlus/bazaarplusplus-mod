@@ -22,17 +22,11 @@ internal static class CollectionGridConstants
 
     // Fixed gutter between cells (both axes) and inner padding of the display-case region, in
     // overlay pixels. The base unit (one column's width) is derived per-viewport so the grid
-    // fills the available width, then clamped to [Min, Max*]; any extra width is absorbed as
-    // centering margin rather than more columns. The per-tab max caps how large cells grow on
-    // very wide screens (Skills are allowed roughly twice the Item cap so icons read large).
-    // MinUnitWidth is only a degenerate floor: the columns are fixed, so on a narrow viewport
-    // the cells must shrink to stay inside the clip (there is no horizontal scroll) — keep it
-    // small enough that a real game window never clamps up and overflows the rightmost columns.
+    // fills the entire available width; the fixed column count stays unchanged on wide screens.
+    // MinUnitWidth is only a degenerate floor for an extremely narrow viewport.
     public const float GridGap = 14f;
     public const float GridOuterPadding = 18f;
     public const float MinUnitWidth = 24f;
-    public const float ItemMaxUnitWidth = 172f;
-    public const float SkillMaxUnitWidth = 272f;
 
     // Fraction of a cell kept as breathing room on every side so the native card sits inside
     // its slot (the slot background then reads as a frame around it) instead of touching edges.
@@ -107,6 +101,4 @@ internal static class CollectionGridConstants
     public static int ColumnsFor(ECardType type) =>
         type == ECardType.Skill ? SkillColumns : ItemColumns;
 
-    public static float MaxUnitWidthFor(ECardType type) =>
-        type == ECardType.Skill ? SkillMaxUnitWidth : ItemMaxUnitWidth;
 }
