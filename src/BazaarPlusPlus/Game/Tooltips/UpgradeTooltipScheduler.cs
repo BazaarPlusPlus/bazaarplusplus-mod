@@ -83,8 +83,11 @@ internal static class UpgradeTooltipScheduler
             {
                 if (
                     controller == null
-                    || controller.CardData != card
-                    || !IsUpgradePreviewActive(config, encounterState)
+                    || !ShouldRefreshUpgradePreview(
+                        controller.CardData == card,
+                        controller.IsCursorOverCard,
+                        IsUpgradePreviewActive(config, encounterState)
+                    )
                 )
                 {
                     yield break;
@@ -132,8 +135,11 @@ internal static class UpgradeTooltipScheduler
 
         if (
             controller == null
-            || controller.CardData != card
-            || !IsUpgradePreviewActive(config, encounterState)
+            || !ShouldRefreshUpgradePreview(
+                controller.CardData == card,
+                controller.IsCursorOverCard,
+                IsUpgradePreviewActive(config, encounterState)
+            )
         )
         {
             return false;
@@ -150,4 +156,10 @@ internal static class UpgradeTooltipScheduler
             TooltipPreviewMode.Normal
         );
     }
+
+    internal static bool ShouldRefreshUpgradePreview(
+        bool controllerStillOwnsCard,
+        bool isCursorOverCard,
+        bool previewActive
+    ) => controllerStillOwnsCard && isCursorOverCard && previewActive;
 }
