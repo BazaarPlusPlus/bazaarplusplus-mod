@@ -209,13 +209,7 @@ internal sealed class CollectionGridVirtualizer
                 if (_scaleDirty)
                 {
                     cell.BoundsCache.InvalidateOnScaleDirty();
-                    NativeCardCellFitter.ApplyScale(
-                        cell.CachedRect,
-                        cellRect,
-                        _gap,
-                        cell.BoundsCache
-                    );
-                    cell.HoverScale.SetBaseScale(cell.CachedRect.localScale.x);
+                    ApplyCardScale(cell, cellRect);
                 }
                 NativeCardCellFitter.Reposition(
                     cell.CachedRect,
@@ -503,8 +497,7 @@ internal sealed class CollectionGridVirtualizer
         // Fresh session: empty cache measures once here; scroll later reads the warm cache.
         cell.BoundsCache.InvalidateOnRebind();
         var cellRect = _layout.ContentRectFor(index, _unit, _gap, _originX, _originY);
-        NativeCardCellFitter.ApplyScale(rect, cellRect, _gap, cell.BoundsCache);
-        cell.HoverScale.SetBaseScale(rect.localScale.x);
+        ApplyCardScale(cell, cellRect);
         NativeCardCellFitter.Reposition(
             rect,
             cellRect,
@@ -577,14 +570,7 @@ internal sealed class CollectionGridVirtualizer
             var cellRect = _layout.ContentRectFor(cell.Index, _unit, _gap, _originX, _originY);
             // Show re-activates _cardImage / _frameContainer, so force a remeasure even if
             // adopt already cached bounds against an inactive subtree.
-            NativeCardCellFitter.ApplyScale(
-                cell.CachedRect,
-                cellRect,
-                _gap,
-                cell.BoundsCache,
-                forceMeasure: true
-            );
-            cell.HoverScale.SetBaseScale(cell.CachedRect.localScale.x);
+            ApplyCardScale(cell, cellRect, forceMeasure: true);
             NativeCardCellFitter.Reposition(
                 cell.CachedRect,
                 cellRect,
@@ -694,8 +680,7 @@ internal sealed class CollectionGridVirtualizer
             if (cell.CachedRect == null)
                 return;
             var cellRect = _layout.ContentRectFor(cell.Index, _unit, _gap, _originX, _originY);
-            NativeCardCellFitter.ApplyScale(cell.CachedRect, cellRect, _gap, cell.BoundsCache);
-            cell.HoverScale.SetBaseScale(cell.CachedRect.localScale.x);
+            ApplyCardScale(cell, cellRect);
             NativeCardCellFitter.Reposition(
                 cell.CachedRect,
                 cellRect,
@@ -775,8 +760,7 @@ internal sealed class CollectionGridVirtualizer
             BindArtLoadedHook(cell);
             _realized[newIndex] = cell;
             var cellRect = _layout.ContentRectFor(newIndex, _unit, _gap, _originX, _originY);
-            NativeCardCellFitter.ApplyScale(cell.CachedRect, cellRect, _gap, cell.BoundsCache);
-            cell.HoverScale.SetBaseScale(cell.CachedRect.localScale.x);
+            ApplyCardScale(cell, cellRect);
             NativeCardCellFitter.Reposition(
                 cell.CachedRect,
                 cellRect,
@@ -825,6 +809,28 @@ internal sealed class CollectionGridVirtualizer
         _unit = pixels.Unit;
         _originX = pixels.OriginX;
         _originY = pixels.OriginY;
+    }
+
+    private void ApplyCardScale(
+        RealizedCell cell,
+        CollectionGridRect cellRect,
+        bool forceMeasure = false
+    )
+    {
+        var horizontalScale =
+            cell.Vm.Type == ECardType.Item ? CollectionGridConstants.ItemCardWidthScale : 1f;
+        NativeCardCellFitter.ApplyScale(
+            cell.CachedRect,
+            cellRect,
+            _gap,
+            cell.BoundsCache,
+            forceMeasure,
+            horizontalScale
+        );
+        cell.HoverScale.SetBaseScale(
+            cell.CachedRect.localScale.x,
+            cell.CachedRect.localScale.y
+        );
     }
 
     private sealed class RealizedCell

@@ -30,7 +30,8 @@ internal static class NativeCardCellFitter
         CollectionGridRect cellRect,
         float gap,
         NativeCardCellBoundsCache boundsCache,
-        bool forceMeasure = false
+        bool forceMeasure = false,
+        float horizontalScale = 1f
     )
     {
         if (rect == null || boundsCache == null)
@@ -45,7 +46,7 @@ internal static class NativeCardCellFitter
             CollectionGridConstants.CellContentInset,
             ItemBoardSocketLayout.FrameHeightOverSocket
         );
-        rect.localScale = new Vector3(scale, scale, 1f);
+        rect.localScale = new Vector3(scale * Mathf.Max(0.01f, horizontalScale), scale, 1f);
     }
 
     // allowMeasure=false is the scroll path: never walk the measurement chain. Callers must

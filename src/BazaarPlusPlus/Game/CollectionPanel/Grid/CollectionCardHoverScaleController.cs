@@ -11,7 +11,8 @@ internal sealed class CollectionCardHoverScaleController : MonoBehaviour
 {
     private static Sprite? _shadowSprite;
 
-    private float _baseScale = 1f;
+    private float _baseScaleX = 1f;
+    private float _baseScaleY = 1f;
     private float _currentMultiplier = 1f;
     private float _targetMultiplier = 1f;
     private float _currentShadowAlpha;
@@ -20,9 +21,10 @@ internal sealed class CollectionCardHoverScaleController : MonoBehaviour
     private RectTransform? _shadowRect;
     private bool _needsTick;
 
-    internal void SetBaseScale(float baseScale)
+    internal void SetBaseScale(float baseScaleX, float baseScaleY)
     {
-        _baseScale = Mathf.Max(0.001f, baseScale);
+        _baseScaleX = Mathf.Max(0.001f, baseScaleX);
+        _baseScaleY = Mathf.Max(0.001f, baseScaleY);
         EnsureShadow();
         UpdateShadowLayout();
         ApplyScale();
@@ -89,8 +91,8 @@ internal sealed class CollectionCardHoverScaleController : MonoBehaviour
 
     private void ApplyScale() =>
         transform.localScale = new Vector3(
-            _baseScale * _currentMultiplier,
-            _baseScale * _currentMultiplier,
+            _baseScaleX * _currentMultiplier,
+            _baseScaleY * _currentMultiplier,
             1f
         );
 
