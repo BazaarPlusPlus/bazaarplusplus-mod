@@ -67,6 +67,14 @@ internal static class CollectionGridConstants
     // Animation tuning. All durations are characteristic times for an exponential lerp
     // (t = 1 - exp(-dt / tau)), so the visible motion finishes within ~3*tau seconds.
     public const float CardFadeInSeconds = 0.18f;
+    public const float CardHoverScale = 1.2f;
+    public const float CardHoverScaleInSeconds = 0.08f;
+    public const float CardHoverScaleOutSeconds = 0.1f;
+    public const float CardHoverShadowAlpha = 0.2f;
+    public const float CardHoverShadowInSeconds = 0.06f;
+    public const float CardHoverShadowOutSeconds = 0.1f;
+    public const float CardHoverShadowPadding = 10f;
+    public const float CardHoverShadowOffsetY = -5f;
 
     // Open is a presentation (deliberate); close is a dismissal (snappy). With out at 0.04
     // the close-fade visually settles in ~120ms, fast enough not to feel like the panel

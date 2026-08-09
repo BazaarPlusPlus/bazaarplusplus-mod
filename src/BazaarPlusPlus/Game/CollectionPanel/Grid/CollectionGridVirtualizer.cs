@@ -215,6 +215,7 @@ internal sealed class CollectionGridVirtualizer
                         _gap,
                         cell.BoundsCache
                     );
+                    cell.HoverScale.SetBaseScale(cell.CachedRect.localScale.x);
                 }
                 NativeCardCellFitter.Reposition(
                     cell.CachedRect,
@@ -302,7 +303,8 @@ internal sealed class CollectionGridVirtualizer
             return;
         }
 
-        if (idx != _hoverPollIndex)
+        var enteredNewCell = idx != _hoverPollIndex;
+        if (enteredNewCell)
         {
             DispatchHoverOut();
             _hoverPollIndex = idx;
@@ -319,6 +321,13 @@ internal sealed class CollectionGridVirtualizer
                 hoverRect.Height
             )
         );
+
+        if (_realized.TryGetValue(idx, out var realizedCell))
+        {
+            realizedCell.HoverScale.SetHovered(true);
+            if (enteredNewCell || !_hoverDispatched)
+                realizedCell.Session.Root.transform.SetAsLastSibling();
+        }
 
         // Already fired OnHover for this cell — nothing to do until the cursor leaves.
         if (_hoverDispatched)
@@ -353,14 +362,18 @@ internal sealed class CollectionGridVirtualizer
         // Hide the display-case highlight on every hover-out path (outside the viewport, in a
         // gutter, off the grid, or moving to a new cell).
         _slots?.SetHover(null);
-        if (_hoverPollIndex < 0 || !_hoverDispatched)
+        if (_hoverPollIndex < 0)
         {
             _hoverPollIndex = -1;
             _hoverDispatched = false;
             return;
         }
         if (_realized.TryGetValue(_hoverPollIndex, out var cell))
-            cell.HoverRelay?.TryInvokeHoverOut();
+        {
+            cell.HoverScale.SetHovered(false);
+            if (_hoverDispatched)
+                cell.HoverRelay?.TryInvokeHoverOut();
+        }
         _hoverPollIndex = -1;
         _hoverDispatched = false;
     }
@@ -471,13 +484,27 @@ internal sealed class CollectionGridVirtualizer
         if (!CollectionGridConstants.UsePolledHover)
             EnsureHitTarget(card);
 
-        var cell = new RealizedCell(index, vm, session, ++_perCellGeneration, hover, rect);
+        var hoverScale = card.GetComponent<CollectionCardHoverScaleController>();
+        if (hoverScale == null)
+            hoverScale = card.AddComponent<CollectionCardHoverScaleController>();
+        hoverScale.ResetImmediate();
+
+        var cell = new RealizedCell(
+            index,
+            vm,
+            session,
+            ++_perCellGeneration,
+            hover,
+            hoverScale,
+            rect
+        );
         _realized[index] = cell;
         BindArtLoadedHook(cell);
         // Fresh session: empty cache measures once here; scroll later reads the warm cache.
         cell.BoundsCache.InvalidateOnRebind();
         var cellRect = _layout.ContentRectFor(index, _unit, _gap, _originX, _originY);
         NativeCardCellFitter.ApplyScale(rect, cellRect, _gap, cell.BoundsCache);
+        cell.HoverScale.SetBaseScale(rect.localScale.x);
         NativeCardCellFitter.Reposition(
             rect,
             cellRect,
@@ -557,6 +584,7 @@ internal sealed class CollectionGridVirtualizer
                 cell.BoundsCache,
                 forceMeasure: true
             );
+            cell.HoverScale.SetBaseScale(cell.CachedRect.localScale.x);
             NativeCardCellFitter.Reposition(
                 cell.CachedRect,
                 cellRect,
@@ -612,9 +640,20 @@ internal sealed class CollectionGridVirtualizer
         }
     }
 
+    // Advance the collection-only hover scale after PollHover has updated the current target.
+    // Cards that are not transitioning return immediately from their controller.
+    public void TickHoverScale(float deltaSeconds)
+    {
+        if (deltaSeconds <= 0f)
+            return;
+        foreach (var pair in _realized)
+            pair.Value.HoverScale.Tick(deltaSeconds);
+    }
+
     private void RecycleCell(RealizedCell cell)
     {
         ClearArtLoadedHook(cell);
+        cell.HoverScale.ResetImmediate();
         cell.HoverRelay?.Clear();
         cell.Session.Dispose();
     }
@@ -656,6 +695,7 @@ internal sealed class CollectionGridVirtualizer
                 return;
             var cellRect = _layout.ContentRectFor(cell.Index, _unit, _gap, _originX, _originY);
             NativeCardCellFitter.ApplyScale(cell.CachedRect, cellRect, _gap, cell.BoundsCache);
+            cell.HoverScale.SetBaseScale(cell.CachedRect.localScale.x);
             NativeCardCellFitter.Reposition(
                 cell.CachedRect,
                 cellRect,
@@ -726,6 +766,7 @@ internal sealed class CollectionGridVirtualizer
                 continue;
             }
 
+            cell.HoverScale.ResetImmediate();
             cell.HoverRelay?.Clear();
             cell.HoverRelay?.Bind(cell.Session);
             cell.Index = newIndex;
@@ -735,6 +776,7 @@ internal sealed class CollectionGridVirtualizer
             _realized[newIndex] = cell;
             var cellRect = _layout.ContentRectFor(newIndex, _unit, _gap, _originX, _originY);
             NativeCardCellFitter.ApplyScale(cell.CachedRect, cellRect, _gap, cell.BoundsCache);
+            cell.HoverScale.SetBaseScale(cell.CachedRect.localScale.x);
             NativeCardCellFitter.Reposition(
                 cell.CachedRect,
                 cellRect,
@@ -793,6 +835,7 @@ internal sealed class CollectionGridVirtualizer
             INativeCardPreviewSession session,
             int generation,
             CollectionCardHoverRelay hoverRelay,
+            CollectionCardHoverScaleController hoverScale,
             RectTransform cachedRect
         )
         {
@@ -801,6 +844,7 @@ internal sealed class CollectionGridVirtualizer
             Session = session;
             Generation = generation;
             HoverRelay = hoverRelay;
+            HoverScale = hoverScale;
             CachedRect = cachedRect;
             BoundsCache = new NativeCardCellBoundsCache();
         }
@@ -810,6 +854,7 @@ internal sealed class CollectionGridVirtualizer
         public INativeCardPreviewSession Session { get; }
         public int Generation { get; }
         public CollectionCardHoverRelay HoverRelay { get; }
+        public CollectionCardHoverScaleController HoverScale { get; }
         public RectTransform CachedRect { get; }
         public NativeCardCellBoundsCache BoundsCache { get; }
         public bool IsShown { get; set; }

@@ -38,6 +38,11 @@ internal sealed class CollectionNativeCardPreviewOwner : INativeCardPreviewOwner
         marker.CacheOwner = _cacheSession;
         marker.PreviewOwner = this;
 
+        var hoverScale = context.Root.GetComponent<CollectionCardHoverScaleController>();
+        if (hoverScale == null)
+            hoverScale = context.Root.AddComponent<CollectionCardHoverScaleController>();
+        hoverScale.ResetImmediate();
+
         var canvasGroup = context.Root.GetComponent<CanvasGroup>();
         if (canvasGroup == null)
             canvasGroup = context.Root.AddComponent<CanvasGroup>();
@@ -58,6 +63,7 @@ internal sealed class CollectionNativeCardPreviewOwner : INativeCardPreviewOwner
 
     public void BeforeRelease(NativeCardPreviewOwnerContext context)
     {
+        context.Root.GetComponent<CollectionCardHoverScaleController>()?.ResetImmediate();
         var marker = context.Root.GetComponent<CollectionPanelOwnedMarker>();
         var cardPreview = context.Root.GetComponent<CardPreviewBase>();
         ReleaseOwnedState(marker, cardPreview, context.TooltipData ?? cardPreview?._tooltipData);

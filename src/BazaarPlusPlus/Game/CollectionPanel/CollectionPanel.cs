@@ -485,6 +485,7 @@ internal sealed class CollectionPanel : MonoBehaviour
                 TryCopyHoveredCardId();
             }
         }
+        _virtualizer?.TickHoverScale(dt);
     }
 
     private void TryCopyHoveredCardId()
