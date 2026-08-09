@@ -13,8 +13,8 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
 {
     private const string CloneName = "BPP_CurrentReplayRecordingButton";
 
-    // UICueTop is the game's upward-facing blue hexagonal Cue sequence.
-    private const string TopCueAssetGuid = "fb97e3f0c28fdd141acaad47cf1a653d";
+    // This is the blue hexagonal Cue sequence used by the main-menu Merchandise button.
+    private const string MerchandiseCueAssetGuid = "8f41781147786fa4cb695e5768582615";
     private const float DockButtonGap = BppSettingsDockPlacement.DefaultSiblingGap;
     private Button? _settingsButton;
     private Button? _nativeReplayButton;
@@ -24,7 +24,7 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
     private RectTransform? _cloneRect;
     private GameObject? _clone;
     private Image? _icon;
-    private UICueActivator? _cueActivator;
+    private CurrentReplayRecordingCueActivator? _cueActivator;
     private BppDockButtonSpriteId? _lastSpriteId;
     private readonly BppDockButtonScreenLayout _screenLayout = new();
     private readonly CurrentReplayRecordingUiLogState _uiLogState = new();
@@ -103,7 +103,7 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
         var layout = clone.GetComponent<LayoutElement>() ?? clone.AddComponent<LayoutElement>();
         layout.ignoreLayout = true;
 
-        _cueActivator = ConfigureTopCue(clone);
+        _cueActivator = ConfigureMerchandiseCue(clone);
         ApplyIcon(CurrentReplayRecordingPhase.Ready);
 
         CombatReplayRuntime.Instance?.PrepareCurrentReplayRecordingAvailability();
@@ -139,11 +139,12 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
         return nativeIcon;
     }
 
-    private static UICueActivator ConfigureTopCue(GameObject clone)
+    private static CurrentReplayRecordingCueActivator ConfigureMerchandiseCue(GameObject clone)
     {
         var cueActivator =
-            clone.GetComponent<UICueActivator>() ?? clone.AddComponent<UICueActivator>();
-        cueActivator._cuePopupRef = new AssetReferenceT<SequenceDataModel>(TopCueAssetGuid);
+            clone.GetComponent<CurrentReplayRecordingCueActivator>()
+            ?? clone.AddComponent<CurrentReplayRecordingCueActivator>();
+        cueActivator._cuePopupRef = new AssetReferenceT<SequenceDataModel>(MerchandiseCueAssetGuid);
         return cueActivator;
     }
 
@@ -285,4 +286,46 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
                 BppDockButtonSpriteId.ReplayRetry,
             _ => BppDockButtonSpriteId.ReplayExport,
         };
+}
+
+internal sealed class CurrentReplayRecordingCueActivator : UICueActivator
+{
+    private PositioningCondition.PositioningType? _originalPositioning;
+    private PositioningCondition.RepositionBehavior? _originalRepositioningBehavior;
+
+    public override void Show()
+    {
+        var positioning =
+            cuePopup?.GetConditionRequiredToActivate<DynamicTransformPositioningCondition>();
+        if (positioning != null)
+        {
+            _originalPositioning ??= positioning.Positioning;
+            _originalRepositioningBehavior ??= positioning.RepositioningBehavior;
+            positioning.Positioning = PositioningCondition.PositioningType.Top;
+            positioning.RepositioningBehavior = PositioningCondition.RepositionBehavior.Nudge;
+        }
+
+        base.Show();
+    }
+
+    public override void Hide()
+    {
+        base.Hide();
+
+        if (
+            _originalPositioning is not { } originalPositioning
+            || _originalRepositioningBehavior is not { } originalRepositioningBehavior
+        )
+            return;
+
+        var positioning =
+            cuePopup?.GetConditionRequiredToActivate<DynamicTransformPositioningCondition>();
+        if (positioning != null)
+        {
+            positioning.Positioning = originalPositioning;
+            positioning.RepositioningBehavior = originalRepositioningBehavior;
+        }
+        _originalPositioning = null;
+        _originalRepositioningBehavior = null;
+    }
 }
