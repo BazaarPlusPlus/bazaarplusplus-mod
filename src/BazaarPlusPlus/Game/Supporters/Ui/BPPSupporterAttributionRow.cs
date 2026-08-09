@@ -184,11 +184,26 @@ internal static class BPPSupporterAttributionRow
             hoverBackground,
             pressedBackground
         );
+        button.style.transitionProperty = new List<StylePropertyName>
+        {
+            new("background-color"),
+            new("border-left-color"),
+            new("border-top-color"),
+            new("border-right-color"),
+            new("border-bottom-color"),
+            new("left"),
+            new("scale"),
+        };
+        button.style.transitionDuration = new List<TimeValue>
+        {
+            new(120f, TimeUnit.Millisecond),
+        };
+        button.style.left = 0f;
         button.style.scale = new Scale(Vector3.one);
         button.RegisterCallback<MouseEnterEvent>(_ =>
         {
             button.style.left = -3f;
-            button.style.scale = new Scale(Vector3.one * 1.06f);
+            button.style.scale = new Scale(new Vector3(1.06f, 1f, 1f));
         }
         );
         button.RegisterCallback<MouseLeaveEvent>(_ =>

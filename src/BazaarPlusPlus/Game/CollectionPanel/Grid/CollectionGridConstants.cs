@@ -83,7 +83,7 @@ internal static class CollectionGridConstants
     public const float MouseWheelScrollPoints = 120f;
 
     // Unit width an item card occupies on the item grid. Skills never call this (always 1).
-    public const float ItemCardWidthScale = 0.95f;
+    public const float ItemCardWidthScale = 0.96f;
 
     public static int ItemWidthSpan(ECardSize size) =>
         size switch
