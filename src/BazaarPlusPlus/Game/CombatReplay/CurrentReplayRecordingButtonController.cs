@@ -217,7 +217,7 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
 
         _button.interactable = snapshot.CanReveal || (nativeActionsBound && snapshot.CanStart);
         if (_cueActivator != null)
-            _cueActivator.defaultValue = CurrentReplayRecordingText.CueLabel();
+            _cueActivator.defaultValue = CurrentReplayRecordingText.Tooltip(snapshot);
         ApplyIcon(snapshot.Phase);
     }
 
