@@ -302,7 +302,9 @@ internal sealed class CurrentReplayRecordingCueActivator : UICueActivator
             _originalPositioning ??= positioning.Positioning;
             _originalRepositioningBehavior ??= positioning.RepositioningBehavior;
             positioning.Positioning = PositioningCondition.PositioningType.Top;
-            positioning.RepositioningBehavior = PositioningCondition.RepositionBehavior.Nudge;
+            // The Cue prefab's padded root is wider than its visible frame. Nudge moves that
+            // entire root off-screen and counter-moves only the pointer, leaving a lone arrow.
+            positioning.RepositioningBehavior = PositioningCondition.RepositionBehavior.None;
         }
 
         base.Show();
