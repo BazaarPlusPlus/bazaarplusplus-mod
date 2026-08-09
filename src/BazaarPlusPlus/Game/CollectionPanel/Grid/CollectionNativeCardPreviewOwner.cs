@@ -23,6 +23,11 @@ internal sealed class CollectionNativeCardPreviewOwner : INativeCardPreviewOwner
 
     public int Layer => CollectionGridOverlay.DefaultLayer;
 
+    // The Collection display intentionally shows the game's premium/dynamic card-art path.
+    // This is an owner-scoped preview intent; it does not alter the player's equipped skins
+    // or the visual mode used by any other native preview consumer.
+    public bool UsePremiumVisuals => true;
+
     public Transform ResolveParent(NativeCardPreviewSubject subject) => _parent;
 
     public void PrepareWhileInactive(NativeCardPreviewOwnerContext context)

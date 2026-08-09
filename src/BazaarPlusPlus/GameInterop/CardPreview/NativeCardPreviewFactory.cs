@@ -200,6 +200,7 @@ internal sealed class NativeCardPreviewFactory
                 card,
                 template,
                 instance,
+                owner.UsePremiumVisuals,
                 token
             );
             if (setUpFailure != null)
