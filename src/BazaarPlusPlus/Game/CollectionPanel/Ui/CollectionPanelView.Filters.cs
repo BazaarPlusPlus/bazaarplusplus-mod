@@ -1416,13 +1416,60 @@ internal sealed partial class CollectionPanelView
         );
     }
 
-    private static void RefreshSortChip(Button chip, bool selected) =>
+    private static void RefreshSortChip(Button chip, bool selected)
+    {
+        UiStyle.FixedWidth(
+            chip.style,
+            selected ? CurrentSortActiveWidth() : CurrentSortInactiveWidth()
+        );
         StyleCollectionGroupChip(
             chip,
             selected ? Colors.CollectionChipSelectedBackground : Colors.CollectionChipBackground,
             selected ? Colors.CollectionChipSelectedText : Colors.CollectionChipText,
             selected
         );
+        var icon = chip.Q<VisualElement>(SortButtonIconName);
+        if (icon != null)
+            icon.style.display = selected ? DisplayStyle.Flex : DisplayStyle.None;
+    }
+
+    private void ApplySortGroupLayout(CollectionSortPriority priority)
+    {
+        if (_sortQualityButton?.parent is not VisualElement group)
+            return;
+
+        var qualityWidth =
+            priority == CollectionSortPriority.Quality
+                ? CurrentSortActiveWidth()
+                : CurrentSortInactiveWidth();
+        var sizeWidth =
+            priority == CollectionSortPriority.Size
+                ? CurrentSortActiveWidth()
+                : CurrentSortInactiveWidth();
+        UiStyle.FixedWidth(group.style, qualityWidth + sizeWidth);
+        var divider = group.Q<VisualElement>(FacetChoiceDividerName);
+        if (divider != null)
+            divider.style.left = qualityWidth;
+    }
+
+    private static void SetSortButtonText(Button button, string text)
+    {
+        var label = button.Q<Label>(SortButtonLabelName);
+        if (label != null)
+            label.text = text;
+        else
+            button.text = text;
+    }
+
+    private static float CurrentSortActiveWidth() =>
+        CollectionPanelText.IsChineseLanguage()
+            ? Sizes.CollectionSortActiveWidth
+            : Sizes.CollectionSortEnglishActiveWidth;
+
+    private static float CurrentSortInactiveWidth() =>
+        CollectionPanelText.IsChineseLanguage()
+            ? Sizes.CollectionSortInactiveWidth
+            : Sizes.CollectionSortEnglishInactiveWidth;
 
     private static void StyleCollectionGroupChip(
         Button chip,
@@ -1541,12 +1588,38 @@ internal sealed partial class CollectionPanelView
         if (_dayToggleValue != null)
             _dayToggleValue.text =
                 day?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "—";
+        ApplyDayToggleLayout(CollectionPanelText.IsChineseLanguage());
         StyleCollectionChip(
             _dayToggleButton,
             active ? Colors.CollectionChipSelectedBackground : Colors.CollectionChipBackground,
             active ? Colors.CollectionChipSelectedText : Colors.CollectionChipText,
             active
         );
+    }
+
+    private void ApplyDayToggleLayout(bool isChinese)
+    {
+        if (_dayToggleContent == null || _dayToggleCaption == null || _dayToggleValue == null)
+            return;
+
+        _dayToggleContent.style.flexDirection = FlexDirection.Column;
+        _dayToggleContent.style.alignItems = Align.Center;
+        _dayToggleContent.style.justifyContent = Justify.Center;
+        _dayToggleContent.style.left = 0f;
+        _dayToggleCaption.style.fontSize = Sizes.FontTiny;
+        _dayToggleCaption.style.marginBottom = isChinese ? -3f : -2f;
+        _dayToggleCaption.style.marginRight = 0f;
+        _dayToggleCaption.style.width = StyleKeyword.Auto;
+        _dayToggleCaption.style.height = StyleKeyword.Auto;
+        _dayToggleCaption.style.whiteSpace = WhiteSpace.NoWrap;
+        _dayToggleCaption.style.unityTextAlign = TextAnchor.MiddleCenter;
+        _dayToggleCaption.style.flexShrink = 0f;
+        _dayToggleValue.style.fontSize = isChinese
+            ? Sizes.FontButton + 1
+            : Sizes.FontButton;
+        _dayToggleValue.style.height = StyleKeyword.Auto;
+        _dayToggleValue.style.unityTextAlign = TextAnchor.MiddleCenter;
+        _dayToggleValue.style.flexShrink = 0f;
     }
 
     private void RefreshHeroChip(EHero hero, Button chip, bool selected)
