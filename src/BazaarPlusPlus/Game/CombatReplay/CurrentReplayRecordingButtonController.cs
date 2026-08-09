@@ -1,10 +1,10 @@
 #nullable enable
-using System.Collections;
 using BazaarPlusPlus.Game.CollectionPanel;
 using BazaarPlusPlus.Game.Settings;
-using TheBazaar;
+using TheBazaar.Cues;
+using TheBazaar.SequenceFramework;
 using UnityEngine;
-using UnityEngine.EventSystems;
+using UnityEngine.AddressableAssets;
 using UnityEngine.UI;
 
 namespace BazaarPlusPlus.Game.CombatReplay;
@@ -12,6 +12,9 @@ namespace BazaarPlusPlus.Game.CombatReplay;
 internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
 {
     private const string CloneName = "BPP_CurrentReplayRecordingButton";
+
+    // UICueTop is the game's upward-facing blue hexagonal Cue sequence.
+    private const string TopCueAssetGuid = "fb97e3f0c28fdd141acaad47cf1a653d";
     private const float DockButtonGap = BppSettingsDockPlacement.DefaultSiblingGap;
     private Button? _settingsButton;
     private Button? _nativeReplayButton;
@@ -21,15 +24,10 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
     private RectTransform? _cloneRect;
     private GameObject? _clone;
     private Image? _icon;
+    private UICueActivator? _cueActivator;
     private BppDockButtonSpriteId? _lastSpriteId;
-    private Coroutine? _tooltipPositionCoroutine;
-    private bool _tooltipHovered;
-    private readonly WaitForEndOfFrame _tooltipEndOfFrame = new();
-    private readonly Vector3[] _buttonWorldCorners = new Vector3[4];
-    private readonly Vector3[] _tooltipWorldCorners = new Vector3[4];
     private readonly BppDockButtonScreenLayout _screenLayout = new();
     private readonly CurrentReplayRecordingUiLogState _uiLogState = new();
-    private readonly CurrentReplayRecordingTooltipStyle _tooltipStyle = new();
     private bool _layoutAvailable;
     private CurrentReplayRecordingUiLayoutReasonCode _layoutReasonCode;
 
@@ -105,10 +103,7 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
         var layout = clone.GetComponent<LayoutElement>() ?? clone.AddComponent<LayoutElement>();
         layout.ignoreLayout = true;
 
-        var relay = clone.GetComponent<CurrentReplayRecordingButtonHoverRelay>();
-        if (relay == null)
-            relay = clone.AddComponent<CurrentReplayRecordingButtonHoverRelay>();
-        relay.Bind(this);
+        _cueActivator = ConfigureTopCue(clone);
         ApplyIcon(CurrentReplayRecordingPhase.Ready);
 
         CombatReplayRuntime.Instance?.PrepareCurrentReplayRecordingAvailability();
@@ -124,7 +119,7 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
 
     private void OnDisable()
     {
-        HideTooltip();
+        _cueActivator?.Hide();
     }
 
     private static Image? StripNativeBehavior(GameObject clone)
@@ -142,6 +137,14 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
                 DestroyImmediate(nested);
 
         return nativeIcon;
+    }
+
+    private static UICueActivator ConfigureTopCue(GameObject clone)
+    {
+        var cueActivator =
+            clone.GetComponent<UICueActivator>() ?? clone.AddComponent<UICueActivator>();
+        cueActivator._cuePopupRef = new AssetReferenceT<SequenceDataModel>(TopCueAssetGuid);
+        return cueActivator;
     }
 
     private void SyncLayout()
@@ -206,9 +209,14 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
             _icon != null && _icon.sprite != null
         );
         if (!visible)
+        {
+            _cueActivator?.Hide();
             return;
+        }
 
         _button.interactable = snapshot.CanReveal || (nativeActionsBound && snapshot.CanStart);
+        if (_cueActivator != null)
+            _cueActivator.defaultValue = CurrentReplayRecordingText.CueLabel();
         ApplyIcon(snapshot.Phase);
     }
 
@@ -246,82 +254,8 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
         Refresh();
     }
 
-    internal void ShowTooltip()
-    {
-        var snapshot = GetDisplaySnapshot();
-        if (!snapshot.Visible || _cloneRect == null)
-            return;
-
-        _tooltipHovered = true;
-        if (_tooltipPositionCoroutine != null)
-            StopCoroutine(_tooltipPositionCoroutine);
-        Data.TooltipParentComponent?.ShowAuxiliaryTooltipController(
-            _cloneRect,
-            Vector3.zero,
-            CurrentReplayRecordingText.Tooltip(snapshot)
-        );
-        _tooltipPositionCoroutine = StartCoroutine(PositionTooltipBesideButton());
-    }
-
     private static CurrentReplayRecordingSnapshot GetDisplaySnapshot() =>
         CombatReplayRuntime.Instance?.GetCurrentReplayRecordingSnapshot() ?? default;
-
-    internal void HideTooltip()
-    {
-        _tooltipHovered = false;
-        if (_tooltipPositionCoroutine != null)
-        {
-            StopCoroutine(_tooltipPositionCoroutine);
-            _tooltipPositionCoroutine = null;
-        }
-        _tooltipStyle.Restore();
-        Data.TooltipParentComponent?.HideAuxiliaryTooltipController();
-    }
-
-    private IEnumerator PositionTooltipBesideButton()
-    {
-        while (_tooltipHovered)
-        {
-            yield return _tooltipEndOfFrame;
-            if (!_tooltipHovered || _cloneRect == null)
-                break;
-
-            var tooltipParent = Data.TooltipParentComponent;
-            var tooltip = tooltipParent?.AuxiliaryTooltipController;
-            if (
-                tooltip == null
-                || tooltipParent == null
-                || !tooltipParent.IsAuxiliaryTooltipDisplayed
-            )
-                continue;
-
-            _tooltipStyle.Apply(tooltip);
-            if (tooltip._coroutine != null)
-                continue;
-
-            tooltip.PositionOverUI(_cloneRect);
-            var tooltipRect = tooltip.PositioningRectTransform;
-            LayoutRebuilder.ForceRebuildLayoutImmediate(tooltipRect);
-            _cloneRect.GetWorldCorners(_buttonWorldCorners);
-            var tooltipBoundsRect = tooltip._contentForWorldBounds ?? tooltipRect;
-            tooltipBoundsRect.GetWorldCorners(_tooltipWorldCorners);
-
-            var buttonCenterX = (_buttonWorldCorners[1].x + _buttonWorldCorners[2].x) * 0.5f;
-            var buttonTop = Mathf.Max(_buttonWorldCorners[1].y, _buttonWorldCorners[2].y);
-            var tooltipCenterX = (_tooltipWorldCorners[0].x + _tooltipWorldCorners[3].x) * 0.5f;
-            var tooltipBottom = Mathf.Min(_tooltipWorldCorners[0].y, _tooltipWorldCorners[3].y);
-            var buttonHeight = Mathf.Abs(_buttonWorldCorners[1].y - _buttonWorldCorners[0].y);
-            var gap = Mathf.Max(buttonHeight * 0.12f, 8f);
-            tooltipRect.position += new Vector3(
-                buttonCenterX - tooltipCenterX,
-                buttonTop - tooltipBottom + gap,
-                0f
-            );
-            tooltip.KeepTooltipWithinBounds();
-        }
-
-        _tooltipPositionCoroutine = null;
-    }
 
     private void ApplyIcon(CurrentReplayRecordingPhase phase)
     {
@@ -351,18 +285,4 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
                 BppDockButtonSpriteId.ReplayRetry,
             _ => BppDockButtonSpriteId.ReplayExport,
         };
-}
-
-internal sealed class CurrentReplayRecordingButtonHoverRelay
-    : MonoBehaviour,
-        IPointerEnterHandler,
-        IPointerExitHandler
-{
-    private CurrentReplayRecordingButtonController? _owner;
-
-    internal void Bind(CurrentReplayRecordingButtonController owner) => _owner = owner;
-
-    public void OnPointerEnter(PointerEventData eventData) => _owner?.ShowTooltip();
-
-    public void OnPointerExit(PointerEventData eventData) => _owner?.HideTooltip();
 }
