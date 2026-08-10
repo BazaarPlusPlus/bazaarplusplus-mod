@@ -2504,16 +2504,25 @@ public class CoreLayeringTests
         Assert.Contains("BppDockButtonVisuals.Apply(", controllerSource);
         Assert.Contains("fallbackFrame.color = new Color(1f, 1f, 1f, 0f)", controllerSource);
         Assert.Contains("_icon != null && _icon.sprite != null", controllerSource);
-        Assert.Contains("tooltip.PositionOverUI(_cloneRect)", controllerSource);
-        Assert.Contains("tooltip._coroutine != null", controllerSource);
-        Assert.Contains("tooltip.KeepTooltipWithinBounds()", controllerSource);
-        Assert.Contains("GetWorldCorners(_buttonWorldCorners)", controllerSource);
-        Assert.Contains("tooltip._contentForWorldBounds ?? tooltipRect", controllerSource);
-        Assert.Contains("buttonTop - tooltipBottom + gap", controllerSource);
-        Assert.Contains("while (_tooltipHovered)", controllerSource);
-        Assert.DoesNotContain("const int maxFrames", controllerSource);
-        Assert.DoesNotContain("_cloneRect.TransformVector(", controllerSource);
-        Assert.DoesNotContain("_cloneRect.position + Vector3.up", controllerSource);
+        Assert.Contains("CurrentReplayRecordingCueActivator : UICueActivator", controllerSource);
+        Assert.Contains(
+            "new AssetReferenceT<SequenceDataModel>(MerchandiseCueAssetGuid)",
+            controllerSource
+        );
+        Assert.Contains(
+            "_cueActivator.defaultValue = CurrentReplayRecordingText.Tooltip(snapshot)",
+            controllerSource
+        );
+        Assert.Contains("PositioningCondition.PositioningType.Top", controllerSource);
+        Assert.Contains("PositioningCondition.RepositionBehavior.None", controllerSource);
+        Assert.Contains("positioning.Positioning = originalPositioning;", controllerSource);
+        Assert.Contains(
+            "positioning.RepositioningBehavior = originalRepositioningBehavior;",
+            controllerSource
+        );
+        Assert.DoesNotContain("Data.TooltipParentComponent", controllerSource);
+        Assert.DoesNotContain("AuxiliaryTooltipController", controllerSource);
+        Assert.DoesNotContain("PositionOverUI", controllerSource);
         Assert.Contains("CurrentReplayRecordingUiLogState", controllerSource);
         Assert.Contains("BindNativeActions(", controllerSource);
         Assert.Contains("nativeRecapButton.onClick.Invoke", controllerSource);
@@ -2658,6 +2667,21 @@ public class CoreLayeringTests
             );
             Assert.Contains($"BazaarPlusPlus.Resources.DockButtons.{iconName}", projectSource);
         }
+    }
+
+    [Fact]
+    public void Music_note_overlay_follows_the_native_new_day_transition_lifecycle()
+    {
+        var mainSource = MainSourceRoot(RepoRoot());
+        var overlaySource = File.ReadAllText(
+            Path.Combine(mainSource, "Game", "MusicNotes", "MusicNoteSocketOverlay.cs")
+        );
+
+        Assert.Contains("MusicNoteOverlayVisibilityPolicy.ShouldShow(", overlaySource);
+        Assert.Contains(
+            "isNewDayTransitionActive: Data.NewDayTransitionController?.IsActive == true",
+            overlaySource
+        );
     }
 
     [Fact]
