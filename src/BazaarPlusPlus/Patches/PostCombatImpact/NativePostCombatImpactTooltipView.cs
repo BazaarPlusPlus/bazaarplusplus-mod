@@ -319,6 +319,9 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         return true;
     }
 
+    public bool TryConcealVisibleEmptyNativeAuxiliary(AuxiliaryTooltipController controller) =>
+        _session.TryConcealVisibleEmptyNativeAuxiliary(controller);
+
     /// <summary>
     /// Releases this feature's own resources during <see cref="NativePairedTooltipSession.Release"/>.
     /// </summary>
@@ -735,17 +738,24 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
             headingRoot = CreateVertical("ImpactGroupHeading", groupRoot, 0f);
             AddLayout(headingRoot.gameObject, preferredHeight: -1f, flexibleWidth: 1f);
         }
+        var changeValue = group.AuthoritativeMetric
+            is { Basis: CombatImpactAuthoritativeBasis.TotalAmount } total
+            ? total.Value
+            : group.ObservedValue;
         BuildGroupHeader(
             textTemplate,
             headingRoot,
             group.Kind,
             group.NativeAttributeKey,
             group.Surface,
-            group.AuthoritativeMetric is { Basis: CombatImpactAuthoritativeBasis.TotalAmount } total
-                ? total.Value
-                : group.ObservedValue,
+            changeValue,
             group.HasMixedValueDirections,
-            CombatImpactMetricFormatter.Group(group, IsChinese(), CriticalMarker()),
+            CombatImpactMetricFormatter.Group(
+                group,
+                IsChinese(),
+                CriticalMarker(),
+                EffectMarker(group.Kind, group.NativeAttributeKey)
+            ),
             CombatImpactMetricFormatter.PeriodicImpact(
                 group,
                 IsChinese(),
@@ -1491,6 +1501,9 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
     private static string? DamageMarker() => KeywordMarker("DamageAmount");
 
     private static string? ShieldMarker() => KeywordMarker("ShieldApplyAmount");
+
+    private static string? EffectMarker(CombatImpactKind kind, string nativeAttributeKey) =>
+        KeywordMarker(CombatImpactEffectIconKey.Resolve(kind, nativeAttributeKey));
 
     private static string? KeywordMarker(string key)
     {

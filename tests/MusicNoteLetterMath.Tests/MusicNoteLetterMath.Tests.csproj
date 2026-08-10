@@ -32,5 +32,9 @@
       Include="..\..\src\BazaarPlusPlus\Game\MusicNotes\MusicNoteBoardPlacement.cs"
       Link="MusicNoteBoardPlacement.cs"
     />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\MusicNotes\MusicNoteOverlayVisibilityPolicy.cs"
+      Link="MusicNoteOverlayVisibilityPolicy.cs"
+    />
   </ItemGroup>
 </Project>

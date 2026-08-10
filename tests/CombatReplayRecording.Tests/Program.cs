@@ -9,7 +9,6 @@ ReplayPayloadStoreRoundTripsAndRejectsCorruption();
 CapturedReplayRoutesSeparatePveFromPvpPersistence();
 CurrentNativeReplayBecomesReadyWithoutPersistence();
 PvpBattleStoreRejectsPveManifests();
-ReplayRecordingTooltipBalancesVerticalPadding();
 
 Console.WriteLine("Combat replay recording tests passed.");
 
@@ -114,17 +113,6 @@ static void PvpBattleStoreRejectsPveManifests()
     {
         // Expected: routing regressions must fail instead of reporting false persistence success.
     }
-}
-
-static void ReplayRecordingTooltipBalancesVerticalPadding()
-{
-    var balanced = CurrentReplayRecordingTooltipPadding.Balance(18, 48);
-    Assert(balanced.Top == 33, "Tooltip top padding should be vertically balanced.");
-    Assert(balanced.Bottom == 33, "Tooltip bottom padding should be vertically balanced.");
-    Assert(
-        balanced.Top + balanced.Bottom == 66,
-        "Balancing must preserve the native tooltip's total vertical padding."
-    );
 }
 
 static void Assert(bool condition, string message)

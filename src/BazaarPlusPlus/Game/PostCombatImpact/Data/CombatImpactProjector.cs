@@ -112,6 +112,7 @@ internal static class CombatImpactProjector
                     Surface = resolved.Surface,
                     OccurrenceBasis = CombatImpactOccurrenceBasis.ExplicitExecution,
                     CriticalCount = resolved.CriticalCount,
+                    CriticalOutcomeCount = resolved.CriticalOutcomeCount,
                     CriticalValue = resolved.CriticalValue,
                     NonCriticalValue = resolved.NonCriticalValue,
                     AlternateNonCriticalValue = resolved.AlternateNonCriticalValue,
@@ -125,6 +126,7 @@ internal static class CombatImpactProjector
             );
         }
 
+        AddLifestealEvents(simulation, entities, executions, events);
         AddCardActionCostEvents(simulation, entities, events);
         AddAuraAttributeEvents(simulation, entities, events, diagnostics);
 
@@ -252,7 +254,8 @@ internal static class CombatImpactProjector
             events,
             diagnostics
         );
-        RecoverDroppedAppliedEffectCriticals(events, authoritative);
+        AttachNativeActivationCriticalCounts(events);
+        RecoverAmbiguousDamageCriticals(events, authoritative);
 
         var canonicalEvents = CanonicalizeEvents(events, transformLineage, entities);
         var canonicalUseCounts = CanonicalizeUseCounts(useCounts, transformLineage, entities);
@@ -650,11 +653,14 @@ internal static class CombatImpactProjector
                         out var alternateNonCriticalValue
                     )
                 )
+                {
                     resolved = resolved with
                     {
                         NonCriticalValue = nonCriticalValue,
                         AlternateNonCriticalValue = alternateNonCriticalValue,
                     };
+                    resolved = ResolveConfiguredStatusCriticalOutcome(item.ActionType, resolved);
+                }
                 projections.Add(
                     new ProjectedExecution(
                         attributedSourceId,
@@ -672,6 +678,140 @@ internal static class CombatImpactProjector
             ReconcileCardAttributeTimeline(frame, cardAttributes, usePreviousValue: false);
         }
         return projections;
+    }
+
+    private static void AddLifestealEvents(
+        CombatSim simulation,
+        IReadOnlyDictionary<string, CombatImpactEntity> entities,
+        IReadOnlyList<ProjectedExecution> executions,
+        ICollection<CombatImpactEvent> events
+    )
+    {
+        var cardAttributes = CreateCardAttributeTimeline(entities);
+        var executionsByFrame = executions
+            .GroupBy(execution => execution.FrameIndex)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyList<ProjectedExecution>)group.ToArray()
+            );
+        for (var frameIndex = 0; frameIndex < simulation.Frames.Count; frameIndex++)
+        {
+            var frame = simulation.Frames[frameIndex];
+            var frameExecutions = executionsByFrame.GetValueOrDefault(frameIndex) ?? [];
+            ReconcileCardAttributeTimeline(frame, cardAttributes, usePreviousValue: true);
+            AddLifestealEvents(
+                ECombatantId.Player,
+                frame.PlayerUpdates,
+                frameIndex,
+                entities,
+                cardAttributes,
+                frameExecutions,
+                events
+            );
+            AddLifestealEvents(
+                ECombatantId.Opponent,
+                frame.OpponentUpdates,
+                frameIndex,
+                entities,
+                cardAttributes,
+                frameExecutions,
+                events
+            );
+            ReconcileCardAttributeTimeline(frame, cardAttributes, usePreviousValue: false);
+        }
+    }
+
+    private static void AddLifestealEvents(
+        ECombatantId combatant,
+        CombatSimPlayerUpdate? update,
+        int frameIndex,
+        IReadOnlyDictionary<string, CombatImpactEntity> entities,
+        IReadOnlyDictionary<string, Dictionary<ECardAttributeType, int>> cardAttributes,
+        IReadOnlyList<ProjectedExecution> frameExecutions,
+        ICollection<CombatImpactEvent> events
+    )
+    {
+        var realizedHealing = ResolveUnrecordedHealthGain(update);
+        if (realizedHealing <= 0)
+            return;
+
+        var opposingCombatant =
+            combatant == ECombatantId.Player ? ECombatantId.Opponent : ECombatantId.Player;
+        var candidates = frameExecutions
+            .Where(execution =>
+                execution.ActionType == EActionCommandType.PlayerDamage
+                && execution.SourceId != null
+                && execution.TargetId == PlayerId(opposingCombatant)
+                && execution.Resolved.Value is > 0
+                && entities.TryGetValue(execution.SourceId, out var source)
+                && source.TypeLabel == "Item"
+                && source.CombatantId == combatant
+                && cardAttributes.TryGetValue(execution.SourceId, out var attributes)
+                && attributes.GetValueOrDefault(ECardAttributeType.Lifesteal) > 0
+            )
+            .GroupBy(execution => execution.SourceId!, StringComparer.Ordinal)
+            .Select(group => new LifestealCandidate(
+                group.Key,
+                SaturatingInt(group.Sum(execution => (long)execution.Resolved.Value!.Value)),
+                group.First()
+            ))
+            .Where(candidate => candidate.Damage > 0)
+            .ToArray();
+        if (candidates.Length == 0)
+            return;
+
+        var totalDamage = SaturatingInt(candidates.Sum(candidate => (long)candidate.Damage));
+        if (candidates.Length > 1 && realizedHealing != totalDamage)
+            return;
+
+        foreach (var candidate in candidates)
+        {
+            var amount =
+                candidates.Length == 1
+                    ? Math.Min(realizedHealing, candidate.Damage)
+                    : candidate.Damage;
+            if (amount <= 0)
+                continue;
+
+            var provenance = ResolveTriggerProvenance(candidate.Execution, entities);
+            events.Add(
+                new CombatImpactEvent(
+                    CombatImpactKind.Healing,
+                    candidate.SourceId,
+                    PlayerId(combatant),
+                    amount,
+                    CombatImpactValueUnit.Amount,
+                    CombatImpactAggregator.NativeKey(CombatImpactKind.Healing),
+                    false,
+                    CombatImpactValueBasis.NetFrameDelta
+                )
+                {
+                    OccurrenceBasis = CombatImpactOccurrenceBasis.ReconstructedTransition,
+                    RawDirectSourceId = candidate.Execution.DirectSourceId,
+                    TriggerSourceId = candidate.Execution.TriggerSourceId,
+                    TriggerFrameIndex = frameIndex,
+                    ActivitySourceResolution = provenance.SourceResolution,
+                    TriggerScope = provenance.Scope,
+                }
+            );
+        }
+    }
+
+    private static int ResolveUnrecordedHealthGain(CombatSimPlayerUpdate? update)
+    {
+        if (
+            update == null
+            || !update.Attributes.TryGetValue(EPlayerAttributeType.Health, out var health)
+        )
+            return 0;
+
+        var recordedHealthMovement = update
+            .HealthAdjustments.Where(adjustment =>
+                adjustment.AttributeChanged == EPlayerHealthChangeType.Health
+            )
+            .Sum(adjustment => (long)adjustment.Amount);
+        var residual = (long)health.Delta - recordedHealthMovement;
+        return residual > 0 ? SaturatingInt(residual) : 0;
     }
 
     private static void AddCardActionCostEvents(
@@ -845,7 +985,7 @@ internal static class CombatImpactProjector
             alternateValue = null;
             var sourceInstance = InstanceId.TryParse(sourceId);
             if (
-                action == EActionCommandType.PlayerDamage
+                HasCriticalConfiguredAmount(action)
                 && frame.CardUpdates.TryGetValue(sourceInstance, out var update)
                 && update.Attributes.TryGetValue(attribute.Value, out var attributeUpdate)
                 && attributeUpdate.CurrentValue > 0
@@ -860,75 +1000,105 @@ internal static class CombatImpactProjector
         return false;
     }
 
-    private static void RecoverDroppedAppliedEffectCriticals(
-        IList<CombatImpactEvent> events,
-        IReadOnlyDictionary<string, IReadOnlyList<CombatImpactAuthoritativeMetric>> authoritative
+    private static bool HasCriticalConfiguredAmount(EActionCommandType action) =>
+        action
+            is EActionCommandType.PlayerDamage
+                or EActionCommandType.PlayerBurnApply
+                or EActionCommandType.PlayerPoisonApply
+                or EActionCommandType.PlayerRegenApply;
+
+    private static ResolvedImpactValue ResolveConfiguredStatusCriticalOutcome(
+        EActionCommandType action,
+        ResolvedImpactValue resolved
     )
     {
-        var candidates = events
-            .Select((item, index) => new IndexedImpactEvent(index, item))
-            .Where(item => IsRecoverableAppliedEffect(item.Event))
-            .GroupBy(item => new CriticalRecoveryKey(
-                item.Event.SourceId,
-                item.Event.Kind,
-                item.Event.NativeAttributeKey ?? string.Empty
-            ));
-
-        foreach (var group in candidates)
-        {
-            var indexedEvents = group.ToArray();
-            if (
-                group.Key.Kind == CombatImpactKind.DirectDamage
-                && !indexedEvents.Any(item => item.Event.HasCriticalAdjustmentCandidate)
-            )
-                continue;
-            if (
-                indexedEvents.Any(item =>
-                    item.Event.IsCritical
-                    || item.Event.CriticalCount > 0
-                    || item.Event.NonCriticalValue is not > 0
-                ) || !authoritative.TryGetValue(group.Key.SourceId, out var sourceMetrics)
-            )
-                continue;
-
-            var metric = sourceMetrics.SingleOrDefault(item =>
-                item.Basis == CombatImpactAuthoritativeBasis.TotalAmount
-                && item.Kind == group.Key.Kind
-                && string.Equals(
-                    item.NativeAttributeKey,
-                    group.Key.NativeAttributeKey,
-                    StringComparison.Ordinal
+        if (
+            action
+                is not (
+                    EActionCommandType.PlayerBurnApply
+                    or EActionCommandType.PlayerPoisonApply
+                    or EActionCommandType.PlayerRegenApply
                 )
-            );
-            if (metric == null)
+            || resolved.Basis != CombatImpactValueBasis.NetFrameDelta
+            || resolved.Value is not > 0
+            || resolved.NonCriticalValue is not > 0
+        )
+            return resolved;
+
+        var observed = resolved.Value.Value;
+        var matchesNonCritical = observed == resolved.NonCriticalValue.Value;
+        var matchesCritical = (long)observed == (long)resolved.NonCriticalValue.Value * 2L;
+        if (resolved.AlternateNonCriticalValue is > 0 and var alternate)
+        {
+            matchesNonCritical |= observed == alternate;
+            matchesCritical |= (long)observed == (long)alternate * 2L;
+        }
+
+        // A same-frame amount change can make one delta both an old-value critical and a
+        // new-value non-critical. Keep that execution unknown instead of choosing an outcome.
+        if (matchesCritical == matchesNonCritical)
+            return resolved;
+
+        return resolved with
+        {
+            IsCritical = matchesCritical,
+            CriticalCount = matchesCritical ? 1 : 0,
+            CriticalOutcomeCount = 1,
+            CriticalValue = matchesCritical ? observed : null,
+        };
+    }
+
+    private static void AttachNativeActivationCriticalCounts(IList<CombatImpactEvent> events)
+    {
+        var damageByActivation = events
+            .Where(IsDirectDamageAppliedEffect)
+            .Where(item => item.TriggerFrameIndex.HasValue)
+            .GroupBy(item => new NativeActivationKey(
+                item.TriggerFrameIndex!.Value,
+                item.RawDirectSourceId,
+                item.TriggerSourceId
+            ))
+            .ToDictionary(group => group.Key, group => group.ToArray());
+
+        for (var index = 0; index < events.Count; index++)
+        {
+            var item = events[index];
+            if (
+                !CanReceiveNativeActivationCriticality(item)
+                || !item.TriggerFrameIndex.HasValue
+                || (
+                    string.IsNullOrWhiteSpace(item.RawDirectSourceId)
+                    && string.IsNullOrWhiteSpace(item.TriggerSourceId)
+                )
+            )
                 continue;
 
-            var recovery = ResolveUniqueCriticalRecovery(
-                indexedEvents.Select(item => item.Event).ToArray(),
-                metric.Value
+            var key = new NativeActivationKey(
+                item.TriggerFrameIndex.Value,
+                item.RawDirectSourceId,
+                item.TriggerSourceId
             );
-            if (recovery is not { CriticalCount: > 0 })
+            if (
+                !damageByActivation.TryGetValue(key, out var damageEvents)
+                || damageEvents.Length != 1
+                || damageEvents[0].CriticalOutcomeCount != 1
+            )
                 continue;
 
-            var first = indexedEvents[0];
-            events[first.Index] = first.Event with
+            events[index] = item with
             {
-                CriticalCount = recovery.Value.CriticalCount,
-                CriticalValue = recovery.Value.CriticalValue,
+                IsCritical = false,
+                CriticalCount = damageEvents[0].CriticalCount > 0 ? 1 : 0,
+                CriticalOutcomeCount = 1,
+                CriticalValue = null,
             };
         }
     }
 
-    private static bool IsRecoverableAppliedEffect(CombatImpactEvent item) =>
+    private static bool CanReceiveNativeActivationCriticality(CombatImpactEvent item) =>
         item.Surface == CombatImpactEventSurface.AppliedEffect
         && (
-            item.Kind == CombatImpactKind.DirectDamage
-                && string.Equals(
-                    item.NativeAttributeKey,
-                    CombatImpactAggregator.NativeKey(CombatImpactKind.DirectDamage),
-                    StringComparison.Ordinal
-                )
-            || item.Kind == CombatImpactKind.Burn
+            item.Kind == CombatImpactKind.Burn
                 && string.Equals(
                     item.NativeAttributeKey,
                     CombatImpactAggregator.NativeKey(CombatImpactKind.Burn),
@@ -947,6 +1117,74 @@ internal static class CombatImpactProjector
                     StringComparison.Ordinal
                 )
         );
+
+    private static bool IsDirectDamageAppliedEffect(CombatImpactEvent item) =>
+        item.Surface == CombatImpactEventSurface.AppliedEffect
+        && item.Kind == CombatImpactKind.DirectDamage
+        && string.Equals(
+            item.NativeAttributeKey,
+            CombatImpactAggregator.NativeKey(CombatImpactKind.DirectDamage),
+            StringComparison.Ordinal
+        );
+
+    private static void RecoverAmbiguousDamageCriticals(
+        IList<CombatImpactEvent> events,
+        IReadOnlyDictionary<string, IReadOnlyList<CombatImpactAuthoritativeMetric>> authoritative
+    )
+    {
+        var candidates = events
+            .Select((item, index) => new IndexedImpactEvent(index, item))
+            .Where(item => IsDirectDamageAppliedEffect(item.Event))
+            .GroupBy(item => new DamageCriticalRecoveryKey(
+                item.Event.SourceId,
+                item.Event.NativeAttributeKey ?? string.Empty
+            ));
+
+        foreach (var group in candidates)
+        {
+            var indexedEvents = group.ToArray();
+            if (!indexedEvents.Any(item => item.Event.HasCriticalAdjustmentCandidate))
+                continue;
+            if (
+                indexedEvents.Any(item =>
+                    item.Event.IsCritical
+                    || item.Event.CriticalCount > 0
+                    || item.Event.NonCriticalValue is not > 0
+                ) || !authoritative.TryGetValue(group.Key.SourceId, out var sourceMetrics)
+            )
+                continue;
+
+            var metric = sourceMetrics.SingleOrDefault(item =>
+                item.Basis == CombatImpactAuthoritativeBasis.TotalAmount
+                && item.Kind == CombatImpactKind.DirectDamage
+                && string.Equals(
+                    item.NativeAttributeKey,
+                    group.Key.NativeAttributeKey,
+                    StringComparison.Ordinal
+                )
+            );
+            if (metric == null)
+                continue;
+
+            var recovery = ResolveUniqueCriticalRecovery(
+                indexedEvents.Select(item => item.Event).ToArray(),
+                metric.Value
+            );
+            if (recovery is not { CriticalCount: > 0 })
+                continue;
+
+            foreach (var indexedEvent in indexedEvents)
+                events[indexedEvent.Index] = indexedEvent.Event with { CriticalOutcomeCount = 0 };
+
+            var first = indexedEvents[0];
+            events[first.Index] = events[first.Index] with
+            {
+                CriticalCount = recovery.Value.CriticalCount,
+                CriticalOutcomeCount = indexedEvents.Length,
+                CriticalValue = recovery.Value.CriticalValue,
+            };
+        }
+    }
 
     private static bool HasCriticalHealthAdjustment(
         CombatSimFrame frame,
@@ -2409,6 +2647,7 @@ internal static class CombatImpactProjector
         )
         {
             CriticalCount = isCritical ? 1 : 0,
+            CriticalOutcomeCount = 1,
             CriticalValue = isCritical ? value : null,
             HasCriticalAdjustmentCandidate = isCritical,
         };
@@ -2514,6 +2753,7 @@ internal static class CombatImpactProjector
         )
         {
             CriticalCount = matches.Any(adjustment => adjustment.IsCrit) ? 1 : 0,
+            CriticalOutcomeCount = 1,
             CriticalValue = SaturatingInt(
                 matches
                     .Where(adjustment => adjustment.IsCrit)
@@ -2701,6 +2941,9 @@ internal static class CombatImpactProjector
 
         internal int CriticalCount { get; init; }
 
+        /// <summary>Number of critical/non-critical outcomes resolved for this execution.</summary>
+        internal int CriticalOutcomeCount { get; init; }
+
         internal int? CriticalValue { get; init; }
 
         internal int? NonCriticalValue { get; init; }
@@ -2761,6 +3004,12 @@ internal static class CombatImpactProjector
         internal bool PrerequisiteSkillSource { get; init; }
     }
 
+    private readonly record struct LifestealCandidate(
+        string SourceId,
+        int Damage,
+        ProjectedExecution Execution
+    );
+
     private readonly record struct PrerequisiteSkillSourceResolution(
         CombatImpactEntity? Implementation,
         CombatImpactEntity? Skill,
@@ -2784,9 +3033,14 @@ internal static class CombatImpactProjector
 
     private readonly record struct IndexedImpactEvent(int Index, CombatImpactEvent Event);
 
-    private readonly record struct CriticalRecoveryKey(
+    private readonly record struct NativeActivationKey(
+        int FrameIndex,
+        string? RawDirectSourceId,
+        string? TriggerSourceId
+    );
+
+    private readonly record struct DamageCriticalRecoveryKey(
         string SourceId,
-        CombatImpactKind Kind,
         string NativeAttributeKey
     );
 

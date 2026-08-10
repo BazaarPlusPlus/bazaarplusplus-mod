@@ -277,6 +277,12 @@ internal sealed record CombatImpactEvent(
 
     internal int CriticalCount { get; init; }
 
+    /// <summary>
+    /// Number of known critical/non-critical outcomes represented by this event. Exact aggregate
+    /// recovery may store several outcomes on one event when their individual identities are lost.
+    /// </summary>
+    internal int CriticalOutcomeCount { get; init; }
+
     internal int? CriticalValue { get; init; }
 
     internal int? NonCriticalValue { get; init; }
@@ -396,6 +402,9 @@ internal sealed record CombatImpactGroup(
 
     internal int CriticalCount { get; init; }
 
+    /// <summary>Number of applications whose critical/non-critical outcome is known.</summary>
+    internal int CriticalOutcomeCount { get; init; }
+
     internal int? CriticalObservedValue { get; init; }
 
     internal bool HasMixedValueDirections { get; init; }
@@ -487,6 +496,9 @@ internal sealed record CombatImpactIncomingGroup(
         CombatImpactOccurrenceBasis.ReconstructedTransition;
 
     internal int CriticalCount { get; init; }
+
+    /// <summary>Number of applications whose critical/non-critical outcome is known.</summary>
+    internal int CriticalOutcomeCount { get; init; }
 
     internal int? CriticalObservedValue { get; init; }
 

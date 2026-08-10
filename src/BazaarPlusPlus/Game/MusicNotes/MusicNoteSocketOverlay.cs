@@ -14,9 +14,10 @@ namespace BazaarPlusPlus.Game.MusicNotes;
 
 /// <summary>
 /// Key-activated badge overlay for the music-note board mechanic: while the shared preview
-/// action (HoldUpgradePreview, default Shift) is active outside combat/recap/replay, every
-/// unlocked player socket shows the note letter it holds — or, via the anchor rule, the letter
-/// it would become — under the socket. Placed notes render as a chip tinted with the letter's
+/// action (HoldUpgradePreview, default Shift) is active while the board is usable outside
+/// combat/recap/replay/new-day transitions, every unlocked player socket shows the note letter it
+/// holds — or, via the anchor rule, the letter it would become — under the socket. Placed notes
+/// render as a chip tinted with the letter's
 /// category accent color; implied letters render as dim neutral chips; a note whose occupying
 /// item passes its occupancy gate glows in its category color over a more saturated plate.
 /// While an item card is hovered, chips split three ways against that card: gold outer glow
@@ -173,15 +174,17 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
 
         try
         {
-            // Same gates the enchant-preview tooltip uses, plus saved-replay playback: the
-            // overlay is a board-management aid only.
-            if (Data.IsInCombat)
-                return false;
-            if (AppState.CurrentState is ReplayState)
-                return false;
-            if (Singleton<BoardManager>.Instance?.IsRecapViewOpen == true)
-                return false;
-            return Data.Run?.Player != null;
+            // Keep the Toggle latch independent from contextual visibility. In particular, the
+            // native new-day animation covers the board without clearing its data; hiding only
+            // this overlay lets it return automatically when the board becomes visible again.
+            return MusicNoteOverlayVisibilityPolicy.ShouldShow(
+                activationActive: true,
+                hasPlayer: Data.Run?.Player != null,
+                isInCombat: Data.IsInCombat,
+                isReplay: AppState.CurrentState is ReplayState,
+                isRecapOpen: Singleton<BoardManager>.Instance?.IsRecapViewOpen == true,
+                isNewDayTransitionActive: Data.NewDayTransitionController?.IsActive == true
+            );
         }
         catch
         {

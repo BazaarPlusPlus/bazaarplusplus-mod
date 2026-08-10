@@ -10,51 +10,32 @@ internal static class CurrentReplayRecordingText
         var text = snapshot.Phase switch
         {
             CurrentReplayRecordingPhase.AwaitingBattlePersistence => T(
-                "Saving battle data…",
-                "正在保存战斗数据…",
-                "正在儲存戰鬥資料…"
+                "Saving",
+                "正在保存",
+                "正在儲存"
             ),
             CurrentReplayRecordingPhase.Preparing => T(
-                "Preparing video recorder…",
-                "正在准备视频录制…",
-                "正在準備影片錄製…"
+                "Preparing recording",
+                "正在准备录制",
+                "正在準備錄製"
             ),
-            CurrentReplayRecordingPhase.Ready => T(
-                "Record and export battle video",
-                "录制并导出战斗视频",
-                "錄製並匯出戰鬥影片"
-            ),
+            CurrentReplayRecordingPhase.Ready => T("Record video", "录制视频", "錄製影片"),
             CurrentReplayRecordingPhase.Armed => T(
-                "Starting recording…",
-                "正在开始录制…",
-                "正在開始錄製…"
+                "Starting recording",
+                "正在开始录制",
+                "正在開始錄製"
             ),
-            CurrentReplayRecordingPhase.Recording => T(
-                "Recording battle video",
-                "正在录制战斗视频",
-                "正在錄製戰鬥影片"
+            CurrentReplayRecordingPhase.Recording => T("Recording", "正在录制", "正在錄製"),
+            CurrentReplayRecordingPhase.Finalizing => T("Exporting", "正在导出", "正在匯出"),
+            CurrentReplayRecordingPhase.Succeeded or CurrentReplayRecordingPhase.Degraded => T(
+                "Open recording",
+                "打开录像",
+                "開啟錄影"
             ),
-            CurrentReplayRecordingPhase.Finalizing => T(
-                "Exporting video…",
-                "正在导出视频…",
-                "正在匯出影片…"
-            ),
-            CurrentReplayRecordingPhase.Succeeded => T(
-                "Show recorded video in file manager",
-                "在文件管理器中显示录像",
-                "在檔案管理器中顯示錄影"
-            ),
-            CurrentReplayRecordingPhase.Degraded => T(
-                "Show recorded video in file manager (completed with warnings)",
-                "在文件管理器中显示录像（存在警告）",
-                "在檔案管理器中顯示錄影（存在警告）"
-            ),
-            CurrentReplayRecordingPhase.Failed => T(
-                snapshot.CanStart ? "Recording unavailable — click to retry" : "Recording failed",
-                snapshot.CanStart ? "录制不可用，点击重试" : "录像失败",
-                snapshot.CanStart ? "錄製不可用，點擊重試" : "錄影失敗"
-            ),
-            _ => T("Video recording unavailable", "视频录制不可用", "影片錄製不可用"),
+            CurrentReplayRecordingPhase.Failed => snapshot.CanStart
+                ? T("Recording unavailable", "录制不可用", "錄製不可用")
+                : T("Recording failed", "录像失败", "錄影失敗"),
+            _ => T("Recording unavailable", "录制不可用", "錄製不可用"),
         };
 
         return string.IsNullOrWhiteSpace(snapshot.Reason) ? text : $"{text}\n{snapshot.Reason}";

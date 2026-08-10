@@ -5,6 +5,7 @@ namespace PostCombatImpact.Tests;
 
 public sealed class CombatImpactMetricFormatterTests
 {
+    private const string BurnIcon = "<sprite name=Burn>";
     private const string CritIcon = "<sprite name=Crit>";
 
     private static readonly CombatImpactEntity Target = new("target", "Target", "Item", null, 0);
@@ -16,6 +17,12 @@ public sealed class CombatImpactMetricFormatterTests
     [InlineData(950, (int)CombatImpactValueUnit.Milliseconds, false, true, "0.95s")]
     [InlineData(20, (int)CombatImpactValueUnit.PercentagePoints, true, false, "+20%")]
     [InlineData(-10, (int)CombatImpactValueUnit.Amount, true, false, "-10")]
+    [InlineData(999_999, (int)CombatImpactValueUnit.Amount, false, false, "999,999")]
+    [InlineData(1_000_000, (int)CombatImpactValueUnit.Amount, false, false, "1M")]
+    [InlineData(12_345_678, (int)CombatImpactValueUnit.Amount, true, false, "+12.35M")]
+    [InlineData(-12_345_678, (int)CombatImpactValueUnit.Amount, true, false, "-12.35M")]
+    [InlineData(int.MaxValue, (int)CombatImpactValueUnit.Amount, false, false, "2.15B")]
+    [InlineData(int.MinValue, (int)CombatImpactValueUnit.Amount, false, false, "-2.15B")]
     public void Values_use_product_sign_duration_and_precision_rules(
         int value,
         int unitValue,
@@ -164,7 +171,7 @@ public sealed class CombatImpactMetricFormatterTests
     }
 
     [Fact]
-    public void Critical_counts_use_the_native_icon_inside_the_event_count()
+    public void Critical_counts_stay_in_parentheses_without_a_rate()
     {
         var appliedRegen = new CombatImpactGroup(
             CombatImpactKind.AttributeChange,
@@ -185,6 +192,7 @@ public sealed class CombatImpactMetricFormatterTests
         )
         {
             CriticalCount = 1,
+            CriticalOutcomeCount = 2,
             CriticalObservedValue = 8,
         };
         var damage = Group(
@@ -194,26 +202,71 @@ public sealed class CombatImpactMetricFormatterTests
             CombatImpactValueUnit.Amount
         ) with
         {
-            CriticalCount = 4,
+            CriticalCount = 5,
+            CriticalOutcomeCount = 8,
             CriticalObservedValue = 640,
         };
 
         Assert.Equal(
-            "×2 (1<sprite name=Crit>) · 12 total",
-            CombatImpactMetricFormatter.Group(appliedRegen, chinese: false, CritIcon)
+            "×2 (<sprite name=Crit>1) · 12 total",
+            CombatImpactMetricFormatter.Group(appliedRegen, false, CritIcon)
         );
         Assert.Equal(
-            "×2（1<sprite name=Crit>） · 总计 12",
-            CombatImpactMetricFormatter.Group(appliedRegen, chinese: true, CritIcon)
+            "×2（<sprite name=Crit>1） · 总计 12",
+            CombatImpactMetricFormatter.Group(appliedRegen, true, CritIcon)
         );
         Assert.Equal(
-            "×8 (4<sprite name=Crit>) · 640",
-            CombatImpactMetricFormatter.Group(damage, chinese: false, CritIcon)
+            "×8 (<sprite name=Crit>5) · 640",
+            CombatImpactMetricFormatter.Group(damage, false, CritIcon)
         );
-        Assert.Equal(
-            "×8（4<sprite name=Crit>） · 640",
-            CombatImpactMetricFormatter.Group(damage, chinese: true, CritIcon)
+
+        var incoming = new CombatImpactIncomingGroup(
+            CombatImpactKind.DirectDamage,
+            "Damage",
+            8,
+            640,
+            CombatImpactValueUnit.Amount,
+            CombatImpactCoverage.Exact,
+            []
+        )
+        {
+            CriticalCount = 5,
+            CriticalOutcomeCount = 8,
+        };
+        var incomingText = CombatImpactMetricFormatter.IncomingGroup(incoming, false, CritIcon);
+        Assert.Equal("×8 (<sprite name=Crit>5) · 640", incomingText);
+        Assert.DoesNotContain("%", incomingText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Authoritative_totals_use_the_effect_icon_when_available()
+    {
+        var burn = new CombatImpactGroup(
+            CombatImpactKind.Burn,
+            "BurnApplyAmount",
+            2,
+            18,
+            CombatImpactValueUnit.Amount,
+            CombatImpactCoverage.Exact,
+            new CombatImpactAuthoritativeMetric(
+                CombatImpactKind.Burn,
+                "BurnApplyAmount",
+                18,
+                CombatImpactValueUnit.Amount,
+                CombatImpactAuthoritativeBasis.TotalAmount
+            ),
+            0,
+            []
         );
+
+        var formatted = CombatImpactMetricFormatter.Group(
+            burn,
+            chinese: false,
+            totalMarker: BurnIcon
+        );
+
+        Assert.Equal("×2 · <sprite name=Burn>18", formatted);
+        Assert.DoesNotContain("total", formatted, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

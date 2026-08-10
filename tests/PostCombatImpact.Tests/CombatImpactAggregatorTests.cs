@@ -247,6 +247,7 @@ public sealed class CombatImpactAggregatorTests
         var group = Assert.Single(source.Groups);
         Assert.Equal(1, source.TotalCount);
         Assert.Equal(1, group.CriticalCount);
+        Assert.Equal(1, group.CriticalOutcomeCount);
         Assert.Equal(160, group.CriticalObservedValue);
         var target = Assert.Single(group.Targets);
         Assert.Equal("Bread Knife", target.Entity.Name);
@@ -257,6 +258,7 @@ public sealed class CombatImpactAggregatorTests
         var incoming = Assert.Single(received.Groups);
         Assert.Equal(1, incoming.Count);
         Assert.Equal(1, incoming.CriticalCount);
+        Assert.Equal(1, incoming.CriticalOutcomeCount);
         Assert.Equal(160, incoming.CriticalObservedValue);
         var incomingSource = Assert.Single(incoming.Sources);
         Assert.Equal("Fairies", incomingSource.Entity.Name);
