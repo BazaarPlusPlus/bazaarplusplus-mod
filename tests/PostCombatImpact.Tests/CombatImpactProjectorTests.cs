@@ -1222,6 +1222,7 @@ public sealed class CombatImpactProjectorTests
         Assert.Equal(7_620, damage.ObservedValue);
         Assert.Equal(7_620, damage.AuthoritativeMetric?.Value);
         Assert.Equal(2, damage.CriticalCount);
+        Assert.Equal(3, damage.CriticalOutcomeCount);
         Assert.Equal(6_096, damage.CriticalObservedValue);
     }
 
@@ -1558,6 +1559,7 @@ public sealed class CombatImpactProjectorTests
         Assert.Equal(15, damage.Count);
         Assert.Equal(420, damage.AuthoritativeMetric?.Value);
         Assert.Equal(3, damage.CriticalCount);
+        Assert.Equal(15, damage.CriticalOutcomeCount);
         Assert.Equal(200, damage.CriticalObservedValue);
     }
 
@@ -1811,8 +1813,10 @@ public sealed class CombatImpactProjectorTests
         var burn = Assert.Single(source.Groups, group => group.Kind == CombatImpactKind.Burn);
 
         Assert.Equal(2, damage.CriticalCount);
+        Assert.Equal(3, damage.CriticalOutcomeCount);
         Assert.Equal(3_168, damage.CriticalObservedValue);
         Assert.Equal(2, burn.CriticalCount);
+        Assert.Equal(3, burn.CriticalOutcomeCount);
         Assert.Null(burn.CriticalObservedValue);
         Assert.Equal(371, burn.AuthoritativeMetric?.Value);
     }
@@ -1889,6 +1893,7 @@ public sealed class CombatImpactProjectorTests
 
         Assert.Equal(2, burn.Count);
         Assert.Equal(0, burn.CriticalCount);
+        Assert.Equal(2, burn.CriticalOutcomeCount);
         Assert.Null(burn.CriticalObservedValue);
     }
 
@@ -1956,6 +1961,7 @@ public sealed class CombatImpactProjectorTests
         );
 
         Assert.Equal(0, burn.CriticalCount);
+        Assert.Equal(0, burn.CriticalOutcomeCount);
         Assert.Null(burn.CriticalObservedValue);
     }
 

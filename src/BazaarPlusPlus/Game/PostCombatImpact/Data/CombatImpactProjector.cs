@@ -112,6 +112,7 @@ internal static class CombatImpactProjector
                     Surface = resolved.Surface,
                     OccurrenceBasis = CombatImpactOccurrenceBasis.ExplicitExecution,
                     CriticalCount = resolved.CriticalCount,
+                    CriticalOutcomeCount = resolved.CriticalOutcomeCount,
                     CriticalValue = resolved.CriticalValue,
                     NonCriticalValue = resolved.NonCriticalValue,
                     AlternateNonCriticalValue = resolved.AlternateNonCriticalValue,
@@ -1015,6 +1016,7 @@ internal static class CombatImpactProjector
                 !CanReceiveNativeActivationCriticality(item)
                 || item.IsCritical
                 || item.CriticalCount > 0
+                || item.CriticalOutcomeCount > 0
                 || !item.TriggerFrameIndex.HasValue
                 || (
                     string.IsNullOrWhiteSpace(item.RawDirectSourceId)
@@ -1031,12 +1033,15 @@ internal static class CombatImpactProjector
             if (
                 !damageByActivation.TryGetValue(key, out var damageEvents)
                 || damageEvents.Length != 1
-                || !damageEvents[0].IsCritical
-                || !damageEvents[0].HasCriticalAdjustmentCandidate
+                || damageEvents[0].CriticalOutcomeCount != 1
             )
                 continue;
 
-            events[index] = item with { CriticalCount = 1 };
+            events[index] = item with
+            {
+                CriticalCount = damageEvents[0].CriticalCount > 0 ? 1 : 0,
+                CriticalOutcomeCount = 1,
+            };
         }
     }
 
@@ -1118,10 +1123,14 @@ internal static class CombatImpactProjector
             if (recovery is not { CriticalCount: > 0 })
                 continue;
 
+            foreach (var indexedEvent in indexedEvents)
+                events[indexedEvent.Index] = indexedEvent.Event with { CriticalOutcomeCount = 0 };
+
             var first = indexedEvents[0];
-            events[first.Index] = first.Event with
+            events[first.Index] = events[first.Index] with
             {
                 CriticalCount = recovery.Value.CriticalCount,
+                CriticalOutcomeCount = indexedEvents.Length,
                 CriticalValue = recovery.Value.CriticalValue,
             };
         }
@@ -2588,6 +2597,7 @@ internal static class CombatImpactProjector
         )
         {
             CriticalCount = isCritical ? 1 : 0,
+            CriticalOutcomeCount = 1,
             CriticalValue = isCritical ? value : null,
             HasCriticalAdjustmentCandidate = isCritical,
         };
@@ -2693,6 +2703,7 @@ internal static class CombatImpactProjector
         )
         {
             CriticalCount = matches.Any(adjustment => adjustment.IsCrit) ? 1 : 0,
+            CriticalOutcomeCount = 1,
             CriticalValue = SaturatingInt(
                 matches
                     .Where(adjustment => adjustment.IsCrit)
@@ -2879,6 +2890,9 @@ internal static class CombatImpactProjector
             CombatImpactEventSurface.AppliedEffect;
 
         internal int CriticalCount { get; init; }
+
+        /// <summary>Number of critical/non-critical outcomes resolved for this execution.</summary>
+        internal int CriticalOutcomeCount { get; init; }
 
         internal int? CriticalValue { get; init; }
 

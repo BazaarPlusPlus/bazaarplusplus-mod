@@ -146,6 +146,7 @@ internal static class CombatImpactAggregator
             Surface = key.Surface,
             OccurrenceBasis = BuildOccurrenceBasis(events),
             CriticalCount = critical.Count,
+            CriticalOutcomeCount = critical.OutcomeCount,
             CriticalObservedValue = critical.Observed.Value,
             HasMixedValueDirections = hasMixedValueDirections,
             TriggerSources = triggerLedger.Sources,
@@ -226,6 +227,7 @@ internal static class CombatImpactAggregator
             Surface = key.Surface,
             OccurrenceBasis = BuildOccurrenceBasis(events),
             CriticalCount = critical.Count,
+            CriticalOutcomeCount = critical.OutcomeCount,
             CriticalObservedValue = critical.Observed.Value,
             HasMixedValueDirections = HasMixedValueDirections(events),
             UnresolvedSourceCount = unresolvedSourceCount,
@@ -243,9 +245,15 @@ internal static class CombatImpactAggregator
             : item.IsCritical ? 1
             : 0
         );
+        var criticalOutcomeCount = events.Sum(item =>
+            item.CriticalOutcomeCount > 0 ? item.CriticalOutcomeCount
+            : item.IsCritical ? 1
+            : 0
+        );
         if (criticalCount == 0)
             return new CriticalAggregate(
                 0,
+                criticalOutcomeCount,
                 new ObservedAggregate(
                     null,
                     events.FirstOrDefault()?.Unit ?? CombatImpactValueUnit.Amount,
@@ -266,6 +274,7 @@ internal static class CombatImpactAggregator
             : null;
         return new CriticalAggregate(
             criticalCount,
+            criticalOutcomeCount,
             new ObservedAggregate(
                 value,
                 units.Length == 1 ? units[0] : CombatImpactValueUnit.Amount,
@@ -651,7 +660,11 @@ internal static class CombatImpactAggregator
         bool AllKnownValuesExact = false
     );
 
-    private readonly record struct CriticalAggregate(int Count, ObservedAggregate Observed);
+    private readonly record struct CriticalAggregate(
+        int Count,
+        int OutcomeCount,
+        ObservedAggregate Observed
+    );
 
     private readonly record struct TriggerLedger(
         IReadOnlyList<CombatImpactTriggerSource> Sources,

@@ -164,7 +164,7 @@ public sealed class CombatImpactMetricFormatterTests
     }
 
     [Fact]
-    public void Critical_counts_use_the_native_icon_inside_the_event_count()
+    public void Critical_counts_include_actual_rate_only_when_every_outcome_is_known()
     {
         var appliedRegen = new CombatImpactGroup(
             CombatImpactKind.AttributeChange,
@@ -185,6 +185,7 @@ public sealed class CombatImpactMetricFormatterTests
         )
         {
             CriticalCount = 1,
+            CriticalOutcomeCount = 2,
             CriticalObservedValue = 8,
         };
         var damage = Group(
@@ -194,25 +195,38 @@ public sealed class CombatImpactMetricFormatterTests
             CombatImpactValueUnit.Amount
         ) with
         {
-            CriticalCount = 4,
+            CriticalCount = 5,
+            CriticalOutcomeCount = 8,
             CriticalObservedValue = 640,
         };
 
         Assert.Equal(
-            "×2 (1<sprite name=Crit>) · 12 total",
+            "×2 (1<sprite name=Crit> · 50%) · 12 total",
             CombatImpactMetricFormatter.Group(appliedRegen, chinese: false, CritIcon)
         );
         Assert.Equal(
-            "×2（1<sprite name=Crit>） · 总计 12",
+            "×2（1<sprite name=Crit> · 50%） · 总计 12",
             CombatImpactMetricFormatter.Group(appliedRegen, chinese: true, CritIcon)
         );
         Assert.Equal(
-            "×8 (4<sprite name=Crit>) · 640",
+            "×8 (5<sprite name=Crit> · 62.5%) · 640",
             CombatImpactMetricFormatter.Group(damage, chinese: false, CritIcon)
         );
         Assert.Equal(
-            "×8（4<sprite name=Crit>） · 640",
+            "×8（5<sprite name=Crit> · 62.5%） · 640",
             CombatImpactMetricFormatter.Group(damage, chinese: true, CritIcon)
+        );
+
+        Assert.Equal(
+            "×8 (5<sprite name=Crit>) · 640",
+            CombatImpactMetricFormatter.Group(
+                damage with
+                {
+                    CriticalOutcomeCount = 5,
+                },
+                chinese: false,
+                CritIcon
+            )
         );
     }
 

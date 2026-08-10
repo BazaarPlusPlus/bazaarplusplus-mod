@@ -60,7 +60,15 @@ internal static class CombatImpactMetricFormatter
     {
         var parts = new List<string>();
         if (group.Count > 0 && ShouldShowCount(group.Kind, group.Surface, group.OccurrenceBasis))
-            parts.Add(Count(group.Count, group.CriticalCount, chinese, criticalMarker));
+            parts.Add(
+                Count(
+                    group.Count,
+                    group.CriticalCount,
+                    group.CriticalOutcomeCount,
+                    chinese,
+                    criticalMarker
+                )
+            );
 
         var authoritative = group.AuthoritativeMetric;
         if (authoritative?.Basis == CombatImpactAuthoritativeBasis.TotalAmount)
@@ -170,7 +178,15 @@ internal static class CombatImpactMetricFormatter
     {
         var parts = new List<string>();
         if (group.Count > 0 && ShouldShowCount(group.Kind, group.Surface, group.OccurrenceBasis))
-            parts.Add(Count(group.Count, group.CriticalCount, chinese, criticalMarker));
+            parts.Add(
+                Count(
+                    group.Count,
+                    group.CriticalCount,
+                    group.CriticalOutcomeCount,
+                    chinese,
+                    criticalMarker
+                )
+            );
         if (group.ObservedValue.HasValue)
         {
             var value = Value(
@@ -219,15 +235,27 @@ internal static class CombatImpactMetricFormatter
                     or "RageRemoveAmount"
         );
 
-    private static string Count(int count, int criticalCount, bool chinese, string? criticalMarker)
+    private static string Count(
+        int count,
+        int criticalCount,
+        int criticalOutcomeCount,
+        bool chinese,
+        string? criticalMarker
+    )
     {
         var baseCount = $"×{count}";
         if (criticalCount <= 0 || string.IsNullOrWhiteSpace(criticalMarker))
             return baseCount;
-        return chinese
-            ? $"{baseCount}（{criticalCount}{criticalMarker}）"
-            : $"{baseCount} ({criticalCount}{criticalMarker})";
+
+        var critical = $"{criticalCount}{criticalMarker}";
+        if (criticalOutcomeCount == count && criticalCount <= count)
+            critical = $"{critical} · {CriticalRate(criticalCount, count)}";
+
+        return chinese ? $"{baseCount}（{critical}）" : $"{baseCount} ({critical})";
     }
+
+    private static string CriticalRate(int criticalCount, int count) =>
+        $"{((decimal)criticalCount * 100m / count).ToString("0.#", CultureInfo.InvariantCulture)}%";
 
     internal static string IncomingSource(
         CombatImpactIncomingGroup group,
