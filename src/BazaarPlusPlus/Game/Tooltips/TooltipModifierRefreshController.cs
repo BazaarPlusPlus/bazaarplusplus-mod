@@ -125,6 +125,12 @@ internal sealed class TooltipModifierRefreshController : MonoBehaviour
         if (!TryResolveRefreshTarget(tooltipParent, out var target))
             return;
 
+        // A primary tooltip can remain addressable briefly after native hover-out. Toggle mode
+        // stays active across that window, so refreshing it would re-enter upgrade preview after
+        // the native hide path already cleared the card and leave the fusion visual latched.
+        if (!target.Controller.IsCursorOverCard)
+            return;
+
         var tooltipController = tooltipParent.GetCardTooltipController(target.Card);
         if (tooltipController == null)
             return;
@@ -198,7 +204,7 @@ internal sealed class TooltipModifierRefreshController : MonoBehaviour
             if (controller?.CardData is not ItemCard itemCard)
                 continue;
 
-            if (!controller.IsCursorOverCard && !controller.IsHovering)
+            if (!controller.IsCursorOverCard)
                 continue;
 
             if (tooltipParent.GetCardTooltipController(itemCard) == null)

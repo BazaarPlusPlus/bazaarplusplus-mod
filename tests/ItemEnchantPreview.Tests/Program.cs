@@ -40,6 +40,39 @@ Assert(
     "An unchanged mode must not replay the preview transition."
 );
 
+Assert(
+    UpgradeTooltipScheduler.ShouldRefreshUpgradePreview(
+        controllerStillOwnsCard: true,
+        isCursorOverCard: true,
+        previewActive: true
+    ),
+    "An active upgrade preview should refresh while the cursor still owns the same card."
+);
+Assert(
+    !UpgradeTooltipScheduler.ShouldRefreshUpgradePreview(
+        controllerStillOwnsCard: true,
+        isCursorOverCard: false,
+        previewActive: true
+    ),
+    "Toggle mode must not refresh a tooltip after the cursor has left the card."
+);
+Assert(
+    !UpgradeTooltipScheduler.ShouldRefreshUpgradePreview(
+        controllerStillOwnsCard: false,
+        isCursorOverCard: true,
+        previewActive: true
+    ),
+    "A recycled controller must not refresh the card that originally scheduled the coroutine."
+);
+Assert(
+    !UpgradeTooltipScheduler.ShouldRefreshUpgradePreview(
+        controllerStillOwnsCard: true,
+        isCursorOverCard: true,
+        previewActive: false
+    ),
+    "A disabled upgrade preview must stop a pending hover refresh."
+);
+
 var candidates = ItemEnchantPreviewCandidateSelector.SelectCandidates(
     currentEnchantment: EEnchantmentType.Heavy,
     allEnchantments: [EEnchantmentType.Heavy, EEnchantmentType.Icy, EEnchantmentType.Turbo]
