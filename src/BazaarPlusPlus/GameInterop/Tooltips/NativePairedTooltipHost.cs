@@ -210,7 +210,7 @@ internal sealed class NativePairedTooltipSession
         // concealment the native fade cannot rewrite (the serialized CanvasGroup set to zero here
         // is re-raised whenever the native fade-in is still in flight), and every visual child —
         // Background, TitleText, BodyText, Divider — lives under auxParent. The gate is handed
-        // back by the next PrepareAuxiliary reuse, by ReleasePrepared when a foreign show takes
+        // back by the next PrepareAuxiliary reuse, by ReleaseForNativeShow when a foreign show takes
         // the controller, or it dies with the despawned controller.
         ConcealNativeAuxiliary(auxiliary);
         if (ReferenceEquals(_activeAuxiliary, auxiliary))
@@ -693,9 +693,11 @@ internal sealed class NativePairedTooltipSession
     /// <para>
     /// <b>Release is two-phase, not once-only.</b> With
     /// <paramref name="restoreNativeContent"/> = false the presentation is dropped but the native
-    /// host snapshot is deliberately kept, so a later call with true still has something to hand
-    /// back. That second pass is what restores the native auxiliary tooltip's header, body and
-    /// divider; making this idempotent leaves the game's own auxiliary tooltip permanently blank.
+    /// host snapshot and auxiliary gate are deliberately kept, so a later call with true still has
+    /// something to hand back. Holding the gate also prevents the native fade from exposing an
+    /// empty background shell after custom content is destroyed. That second pass is what restores
+    /// the native auxiliary tooltip's header, body and divider; making this idempotent leaves the
+    /// game's own auxiliary tooltip permanently blank.
     /// </para>
     /// <para>
     /// The ordering is load-bearing: stop the fade and bump the generation <i>first</i>, then let
@@ -730,7 +732,10 @@ internal sealed class NativePairedTooltipSession
             Object.Destroy(_nativeBackgroundRoot);
         }
         RestorePreparedNativeHost(restoreNativeContent);
-        RestorePreparedAuxiliaryGate();
+        if (restoreNativeContent)
+            RestorePreparedAuxiliaryGate();
+        else
+            _preparedAuxiliaryGate?.SetAlpha(0f);
         RestorePreparedPrimaryGate();
         if (_activePrimary != null)
             _activePrimary.SetLockedFlag(false);

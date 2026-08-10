@@ -51,6 +51,9 @@ Candidate 3 is confirmed by the 2026-08-10 runtime log and the decompiled native
 - `NativePairedTooltipHost.cs:169-173` documents the prefab boundary already established from the
   native asset: `auxParent` owns Background, TitleText, BodyText, and Divider below the animated
   native CanvasGroup. Its own CanvasGroup is therefore the stable concealment seam.
+- The teardown path restored that stable gate even when `restoreNativeContent=false`, immediately
+  after destroying paired content. This reopened the shell while the native fade could still raise
+  its own CanvasGroup.
 
 The repeated empty frame is not a second marker type or a missed native `Show`. It is a late native
 fade exposing the pooled background during a frame in which neither native text nor paired content
@@ -58,15 +61,20 @@ is renderable, followed by an observation-only audit.
 
 ## Chosen recovery
 
-When the frame audit sees the exact invalid state, the view now closes a CanvasGroup gate on
-`auxParent`. A matching held gate is reused, so recovery does not introduce a restore/recreate
-flash. The gate remains closed through any late native fade and is restored by the existing native
-show handoff, or faded open by the current paired presentation once its content is ready. This
-avoids cancelling and re-requesting a valid hover that is still settling.
+Teardown without native-content restoration now keeps the existing `auxParent` CanvasGroup gate
+closed while paired content is removed. The next native show handoff restores it, or the next paired
+presentation reuses it and fades it open once content is ready. This prevents the known race at its
+source.
 
-Deterministic coverage pins both sides of the lifecycle: the controller must invoke concealment and
-verify that the frame is no longer visible, while the shared host must gate `auxParent` and leave the
-new gate held after creation.
+The frame audit remains a fallback for any other ordering that reaches the exact invalid state. It
+closes the same gate below the native fade, without cancelling and re-requesting a valid hover that
+is still settling. A matching held gate is reused, so recovery does not introduce a
+restore/recreate flash.
+
+Deterministic coverage pins all three lifecycle edges: teardown must retain a closed gate, the
+native show handoff must restore it, and the controller audit must still conceal and verify an empty
+visible frame. The shared host must always gate `auxParent` and leave a newly created recovery gate
+held after creation.
 
 ## Automated verification results
 

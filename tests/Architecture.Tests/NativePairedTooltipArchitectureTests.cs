@@ -183,7 +183,7 @@ public sealed class NativePairedTooltipArchitectureTests
             StringComparison.Ordinal
         );
         // The auxParent gate is the only concealment the native fade cannot rewrite; the stale
-        // cancel path must hand it back via reuse/ReleasePrepared/despawn, never restore it here.
+        // cancel path must hand it back via reuse/ReleaseForNativeShow/despawn, never restore it here.
         Assert.DoesNotContain("RestorePreparedAuxiliaryGate", method, StringComparison.Ordinal);
         Assert.True(
             method.IndexOf("ConcealNativeAuxiliary(auxiliary);", StringComparison.Ordinal)
@@ -191,6 +191,50 @@ public sealed class NativePairedTooltipArchitectureTests
                     "RestorePreparedNativeHost(restoreContentVisibility: false);",
                     StringComparison.Ordinal
                 )
+        );
+    }
+
+    [Fact]
+    public void Release_without_native_content_keeps_auxiliary_gate_closed_until_handoff()
+    {
+        var host = File.ReadAllText(
+            Path.Combine(
+                MainSourceRoot(RepoRoot()),
+                "GameInterop",
+                "Tooltips",
+                "NativePairedTooltipHost.cs"
+            )
+        );
+        var releaseStart = host.IndexOf("internal bool Release(bool", StringComparison.Ordinal);
+        var releaseEnd = host.IndexOf(
+            "private void RestorePreparedNativeHost(",
+            releaseStart,
+            StringComparison.Ordinal
+        );
+
+        Assert.True(releaseStart >= 0 && releaseEnd > releaseStart);
+        var release = host[releaseStart..releaseEnd];
+        Assert.Matches(
+            @"if\s*\(restoreNativeContent\)\s*RestorePreparedAuxiliaryGate\(\);\s*else\s*_preparedAuxiliaryGate\?\.SetAlpha\(0f\);",
+            release
+        );
+
+        var handoffStart = host.IndexOf(
+            "internal bool ReleaseForNativeShow",
+            StringComparison.Ordinal
+        );
+        var handoffEnd = host.IndexOf(
+            "internal bool TryConcealVisibleEmptyNativeAuxiliary",
+            handoffStart,
+            StringComparison.Ordinal
+        );
+
+        Assert.True(handoffStart >= 0 && handoffEnd > handoffStart);
+        var handoff = host[handoffStart..handoffEnd];
+        Assert.Contains(
+            "RestorePreparedAuxiliaryGate(expectedController: controller);",
+            handoff,
+            StringComparison.Ordinal
         );
     }
 
@@ -412,12 +456,12 @@ public sealed class NativePairedTooltipArchitectureTests
         var reportUnusable = open.IndexOf("return false;", nullGateCheck, StringComparison.Ordinal);
         Assert.True(
             conceal > nullGateCheck && rollback > conceal && reportUnusable > rollback,
-            "a failed open must conceal the native auxiliary before Release restores the gates"
+            "a failed open without a live gate must conceal the native auxiliary before Release"
         );
 
         // Every rollback branch in TryOpen (gate death, missing background, background clone)
-        // must conceal immediately before Release: Release restores the gates to their visible
-        // originals, which would otherwise expose the header-only native shell.
+        // must conceal the controller root immediately before Release. When a gate exists Release
+        // also holds it closed against the native fade; gate-death has only the root concealment.
         var concealThenRelease =
             "ConcealNativeAuxiliary(auxiliary);\n            Release(restoreNativeContent: false);";
         var pairCount = 0;
