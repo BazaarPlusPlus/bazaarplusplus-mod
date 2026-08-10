@@ -1070,7 +1070,7 @@ public sealed class PeriodicEffectAttributionTests
         Assert.Equal("×1 · 10 total", CombatImpactMetricFormatter.Group(group, chinese: false));
         Assert.Equal("×1 · 总计 10", CombatImpactMetricFormatter.Group(group, chinese: true));
         Assert.Equal(
-            $"7 {DamageIcon} · 2 {ShieldIcon}",
+            $"{DamageIcon}7 · {ShieldIcon}2",
             CombatImpactMetricFormatter.PeriodicImpact(
                 group,
                 chinese: false,
@@ -1079,7 +1079,7 @@ public sealed class PeriodicEffectAttributionTests
             )
         );
         Assert.Equal(
-            $"7 {DamageIcon} · 2 {ShieldIcon}",
+            $"{DamageIcon}7 · {ShieldIcon}2",
             CombatImpactMetricFormatter.PeriodicImpact(
                 group,
                 chinese: true,

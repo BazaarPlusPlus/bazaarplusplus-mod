@@ -1617,7 +1617,7 @@ public sealed class CombatImpactProjectorTests
     }
 
     [Fact]
-    public void Does_not_infer_crit_count_for_player_effects_missing_native_markers()
+    public void Resolves_exact_status_crit_outcomes_from_unique_application_amounts()
     {
         var cases = new[]
         {
@@ -1681,13 +1681,14 @@ public sealed class CombatImpactProjectorTests
 
             Assert.Equal(expectedKind, group.Kind);
             Assert.Equal(2, group.Count);
-            Assert.Equal(0, group.CriticalCount);
-            Assert.Null(group.CriticalObservedValue);
+            Assert.Equal(1, group.CriticalCount);
+            Assert.Equal(2, group.CriticalOutcomeCount);
+            Assert.Equal(8, group.CriticalObservedValue);
         }
     }
 
     [Fact]
-    public void Does_not_infer_dynamic_burn_crits_from_historical_apply_values()
+    public void Resolves_only_dynamic_burn_crits_supported_by_each_application()
     {
         var simulation = new CombatSim();
         simulation.Frames.Clear();
@@ -1731,7 +1732,46 @@ public sealed class CombatImpactProjectorTests
         Assert.Equal(10, burn.Count);
         Assert.Equal(145, burn.ObservedValue);
         Assert.Equal(147, burn.AuthoritativeMetric?.Value);
+        Assert.Equal(8, burn.CriticalCount);
+        Assert.Equal(8, burn.CriticalOutcomeCount);
+        Assert.Equal(130, burn.CriticalObservedValue);
+    }
+
+    [Fact]
+    public void Keeps_same_frame_status_amount_change_ambiguous()
+    {
+        var simulation = new CombatSim();
+        simulation.Frames.Clear();
+        var frame = PlayerEffectFrame(
+            EActionCommandType.PlayerBurnApply,
+            EPlayerAttributeType.Burn,
+            0,
+            8
+        );
+        SetSourceAttributeUpdate(frame, ECardAttributeType.BurnApplyAmount, 4, 8);
+        simulation.Frames.Add(frame);
+        simulation.CardStats["source"] = new Dictionary<ECardStats, int>
+        {
+            [ECardStats.BurnAdded] = 8,
+        };
+
+        var burn = Assert.Single(
+            Assert
+                .Single(
+                    CombatImpactProjector
+                        .Project(
+                            simulation,
+                            EntitiesWithSourceAttribute(ECardAttributeType.BurnApplyAmount, 4)
+                        )
+                        .Sources
+                )
+                .Groups
+        );
+
+        Assert.Equal(1, burn.Count);
+        Assert.Equal(8, burn.ObservedValue);
         Assert.Equal(0, burn.CriticalCount);
+        Assert.Equal(0, burn.CriticalOutcomeCount);
         Assert.Null(burn.CriticalObservedValue);
     }
 
@@ -1949,10 +1989,7 @@ public sealed class CombatImpactProjectorTests
                     CombatImpactProjector
                         .Project(
                             simulation,
-                            EntitiesWithSourceAttributes(
-                                (ECardAttributeType.DamageAmount, 10),
-                                (ECardAttributeType.BurnApplyAmount, 4)
-                            )
+                            EntitiesWithSourceAttribute(ECardAttributeType.DamageAmount, 10)
                         )
                         .Sources
                 )
@@ -2000,6 +2037,7 @@ public sealed class CombatImpactProjectorTests
         );
 
         Assert.Equal(0, burn.CriticalCount);
+        Assert.Equal(3, burn.CriticalOutcomeCount);
         Assert.Null(burn.CriticalObservedValue);
     }
 

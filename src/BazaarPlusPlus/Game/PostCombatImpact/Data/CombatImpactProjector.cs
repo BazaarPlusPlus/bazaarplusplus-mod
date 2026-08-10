@@ -653,11 +653,14 @@ internal static class CombatImpactProjector
                         out var alternateNonCriticalValue
                     )
                 )
+                {
                     resolved = resolved with
                     {
                         NonCriticalValue = nonCriticalValue,
                         AlternateNonCriticalValue = alternateNonCriticalValue,
                     };
+                    resolved = ResolveConfiguredStatusCriticalOutcome(item.ActionType, resolved);
+                }
                 projections.Add(
                     new ProjectedExecution(
                         attributedSourceId,
@@ -982,7 +985,7 @@ internal static class CombatImpactProjector
             alternateValue = null;
             var sourceInstance = InstanceId.TryParse(sourceId);
             if (
-                action == EActionCommandType.PlayerDamage
+                HasCriticalConfiguredAmount(action)
                 && frame.CardUpdates.TryGetValue(sourceInstance, out var update)
                 && update.Attributes.TryGetValue(attribute.Value, out var attributeUpdate)
                 && attributeUpdate.CurrentValue > 0
@@ -995,6 +998,54 @@ internal static class CombatImpactProjector
         value = 0;
         alternateValue = null;
         return false;
+    }
+
+    private static bool HasCriticalConfiguredAmount(EActionCommandType action) =>
+        action
+            is EActionCommandType.PlayerDamage
+                or EActionCommandType.PlayerBurnApply
+                or EActionCommandType.PlayerPoisonApply
+                or EActionCommandType.PlayerRegenApply;
+
+    private static ResolvedImpactValue ResolveConfiguredStatusCriticalOutcome(
+        EActionCommandType action,
+        ResolvedImpactValue resolved
+    )
+    {
+        if (
+            action
+                is not (
+                    EActionCommandType.PlayerBurnApply
+                    or EActionCommandType.PlayerPoisonApply
+                    or EActionCommandType.PlayerRegenApply
+                )
+            || resolved.Basis != CombatImpactValueBasis.NetFrameDelta
+            || resolved.Value is not > 0
+            || resolved.NonCriticalValue is not > 0
+        )
+            return resolved;
+
+        var observed = resolved.Value.Value;
+        var matchesNonCritical = observed == resolved.NonCriticalValue.Value;
+        var matchesCritical = (long)observed == (long)resolved.NonCriticalValue.Value * 2L;
+        if (resolved.AlternateNonCriticalValue is > 0 and var alternate)
+        {
+            matchesNonCritical |= observed == alternate;
+            matchesCritical |= (long)observed == (long)alternate * 2L;
+        }
+
+        // A same-frame amount change can make one delta both an old-value critical and a
+        // new-value non-critical. Keep that execution unknown instead of choosing an outcome.
+        if (matchesCritical == matchesNonCritical)
+            return resolved;
+
+        return resolved with
+        {
+            IsCritical = matchesCritical,
+            CriticalCount = matchesCritical ? 1 : 0,
+            CriticalOutcomeCount = 1,
+            CriticalValue = matchesCritical ? observed : null,
+        };
     }
 
     private static void AttachNativeActivationCriticalCounts(IList<CombatImpactEvent> events)
@@ -1014,9 +1065,6 @@ internal static class CombatImpactProjector
             var item = events[index];
             if (
                 !CanReceiveNativeActivationCriticality(item)
-                || item.IsCritical
-                || item.CriticalCount > 0
-                || item.CriticalOutcomeCount > 0
                 || !item.TriggerFrameIndex.HasValue
                 || (
                     string.IsNullOrWhiteSpace(item.RawDirectSourceId)
@@ -1039,8 +1087,10 @@ internal static class CombatImpactProjector
 
             events[index] = item with
             {
+                IsCritical = false,
                 CriticalCount = damageEvents[0].CriticalCount > 0 ? 1 : 0,
                 CriticalOutcomeCount = 1,
+                CriticalValue = null,
             };
         }
     }

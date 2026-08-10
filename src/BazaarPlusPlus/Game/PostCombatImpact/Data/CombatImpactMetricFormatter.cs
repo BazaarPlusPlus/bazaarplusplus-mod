@@ -5,6 +5,9 @@ namespace BazaarPlusPlus.Game.PostCombatImpact.Data;
 
 internal static class CombatImpactMetricFormatter
 {
+    private const long Billion = 1_000_000_000;
+    private const long Million = 1_000_000;
+
     internal static string CausedSummary(CombatImpactSource source, bool chinese)
     {
         var isSkill = string.Equals(
@@ -55,20 +58,13 @@ internal static class CombatImpactMetricFormatter
     internal static string Group(
         CombatImpactGroup group,
         bool chinese,
-        string? criticalMarker = null
+        string? criticalMarker = null,
+        string? totalMarker = null
     )
     {
         var parts = new List<string>();
         if (group.Count > 0 && ShouldShowCount(group.Kind, group.Surface, group.OccurrenceBasis))
-            parts.Add(
-                Count(
-                    group.Count,
-                    group.CriticalCount,
-                    group.CriticalOutcomeCount,
-                    chinese,
-                    criticalMarker
-                )
-            );
+            parts.Add(Count(group.Count, group.CriticalCount, chinese, criticalMarker));
 
         var authoritative = group.AuthoritativeMetric;
         if (authoritative?.Basis == CombatImpactAuthoritativeBasis.TotalAmount)
@@ -79,7 +75,13 @@ internal static class CombatImpactMetricFormatter
                 showSign: ShouldShowSign(group),
                 chinese
             );
-            parts.Add(chinese ? $"总计 {value}" : $"{value} total");
+            parts.Add(
+                string.IsNullOrWhiteSpace(totalMarker)
+                    ? chinese
+                        ? $"总计 {value}"
+                        : $"{value} total"
+                    : $"{totalMarker}{value}"
+            );
         }
         else
         {
@@ -137,7 +139,7 @@ internal static class CombatImpactMetricFormatter
                         ? chinese
                             ? $"伤害 {amount}"
                             : $"{amount} dmg"
-                        : $"{amount} {damageMarker}"
+                        : $"{damageMarker}{amount}"
             );
         }
 
@@ -149,7 +151,7 @@ internal static class CombatImpactMetricFormatter
                     ? chinese
                         ? $"耗盾 {amount}"
                         : $"{amount} shield consumed"
-                    : $"{amount} {shieldMarker}"
+                    : $"{shieldMarker}{amount}"
             );
         }
 
@@ -178,15 +180,7 @@ internal static class CombatImpactMetricFormatter
     {
         var parts = new List<string>();
         if (group.Count > 0 && ShouldShowCount(group.Kind, group.Surface, group.OccurrenceBasis))
-            parts.Add(
-                Count(
-                    group.Count,
-                    group.CriticalCount,
-                    group.CriticalOutcomeCount,
-                    chinese,
-                    criticalMarker
-                )
-            );
+            parts.Add(Count(group.Count, group.CriticalCount, chinese, criticalMarker));
         if (group.ObservedValue.HasValue)
         {
             var value = Value(
@@ -235,27 +229,15 @@ internal static class CombatImpactMetricFormatter
                     or "RageRemoveAmount"
         );
 
-    private static string Count(
-        int count,
-        int criticalCount,
-        int criticalOutcomeCount,
-        bool chinese,
-        string? criticalMarker
-    )
+    private static string Count(int count, int criticalCount, bool chinese, string? criticalMarker)
     {
         var baseCount = $"×{count}";
         if (criticalCount <= 0 || string.IsNullOrWhiteSpace(criticalMarker))
             return baseCount;
 
-        var critical = $"{criticalCount}{criticalMarker}";
-        if (criticalOutcomeCount == count && criticalCount <= count)
-            critical = $"{critical} · {CriticalRate(criticalCount, count)}";
-
+        var critical = $"{criticalMarker}{criticalCount}";
         return chinese ? $"{baseCount}（{critical}）" : $"{baseCount} ({critical})";
     }
-
-    private static string CriticalRate(int criticalCount, int count) =>
-        $"{((decimal)criticalCount * 100m / count).ToString("0.#", CultureInfo.InvariantCulture)}%";
 
     internal static string IncomingSource(
         CombatImpactIncomingGroup group,
@@ -303,9 +285,17 @@ internal static class CombatImpactMetricFormatter
             ? value.ToString("0", CultureInfo.InvariantCulture)
             : value.ToString("0.00", CultureInfo.InvariantCulture);
 
-    private static string Integer(int value) => value.ToString("N0", CultureInfo.InvariantCulture);
+    private static string Integer(long value)
+    {
+        if (value is <= -Billion or >= Billion)
+            return ScaledInteger(value, Billion, "B");
+        if (value is <= -Million or >= Million)
+            return ScaledInteger(value, Million, "M");
+        return value.ToString("N0", CultureInfo.InvariantCulture);
+    }
 
-    private static string Integer(long value) => value.ToString("N0", CultureInfo.InvariantCulture);
+    private static string ScaledInteger(long value, long scale, string suffix) =>
+        $"{((decimal)value / scale).ToString("0.##", CultureInfo.InvariantCulture)}{suffix}";
 
     private static string PeriodicAmount(int value) => Integer(value);
 }
