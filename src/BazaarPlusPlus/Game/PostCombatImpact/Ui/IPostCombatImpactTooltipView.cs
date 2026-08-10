@@ -55,4 +55,6 @@ internal interface IPostCombatImpactTooltipView : IDisposable
     bool OnNativeAuxiliaryTooltipShowing(AuxiliaryTooltipController controller);
 
     bool OnNativeAuxiliaryTooltipHiding(AuxiliaryTooltipController controller);
+
+    bool TryConcealVisibleEmptyNativeAuxiliary(AuxiliaryTooltipController controller);
 }

@@ -319,6 +319,9 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         return true;
     }
 
+    public bool TryConcealVisibleEmptyNativeAuxiliary(AuxiliaryTooltipController controller) =>
+        _session.TryConcealVisibleEmptyNativeAuxiliary(controller);
+
     /// <summary>
     /// Releases this feature's own resources during <see cref="NativePairedTooltipSession.Release"/>.
     /// </summary>

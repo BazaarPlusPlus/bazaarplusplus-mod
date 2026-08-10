@@ -294,6 +294,61 @@ public sealed class NativePairedTooltipArchitectureTests
         );
     }
 
+    [Fact]
+    public void Visible_empty_native_auxiliary_is_concealed_below_the_native_fade()
+    {
+        var sourceRoot = MainSourceRoot(RepoRoot());
+        var controller = File.ReadAllText(
+            Path.Combine(sourceRoot, "Game", "PostCombatImpact", "PostCombatImpactController.cs")
+        );
+        var host = File.ReadAllText(
+            Path.Combine(sourceRoot, "GameInterop", "Tooltips", "NativePairedTooltipHost.cs")
+        );
+
+        var auditStart = controller.IndexOf(
+            "private void AuditVisibleNativeAuxiliaryTooltip()",
+            StringComparison.Ordinal
+        );
+        var auditEnd = controller.IndexOf(
+            "private static NativeAuxiliaryTooltipState CaptureNativeAuxiliaryState",
+            auditStart,
+            StringComparison.Ordinal
+        );
+        Assert.True(auditStart >= 0 && auditEnd > auditStart);
+        var audit = controller[auditStart..auditEnd];
+        Assert.Contains("TryConcealVisibleEmptyNativeAuxiliary(controller)", audit);
+        Assert.Contains("!CaptureNativeAuxiliaryState(controller).FrameVisible", audit);
+
+        var recoveryStart = host.IndexOf(
+            "internal bool TryConcealVisibleEmptyNativeAuxiliary",
+            StringComparison.Ordinal
+        );
+        var recoveryEnd = host.IndexOf(
+            "// ── Open / content",
+            recoveryStart,
+            StringComparison.Ordinal
+        );
+        Assert.True(recoveryStart >= 0 && recoveryEnd > recoveryStart);
+        var recovery = host[recoveryStart..recoveryEnd];
+        Assert.Contains("_preparedAuxiliaryGate.SetAlpha(0f);", recovery);
+        Assert.Contains("auxiliary.auxParent.gameObject", recovery);
+        Assert.DoesNotContain("tooltipCanvasGroup.alpha = 0f", recovery);
+        var restoreGate = recovery.IndexOf(
+            "RestorePreparedAuxiliaryGate();",
+            StringComparison.Ordinal
+        );
+        var createGate = recovery.IndexOf(
+            "_preparedAuxiliaryGate = CanvasGroupGate.Create(",
+            StringComparison.Ordinal
+        );
+        Assert.True(restoreGate >= 0 && createGate > restoreGate);
+        Assert.DoesNotContain(
+            "RestorePreparedAuxiliaryGate();",
+            recovery[(createGate + 1)..],
+            StringComparison.Ordinal
+        );
+    }
+
     /// <summary>
     /// AddComponent on a controller whose Destroy is already pending hands back a dead reference
     /// while every other liveness check still passes that frame. Gate creation must fail soft and

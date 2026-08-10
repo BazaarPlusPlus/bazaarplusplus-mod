@@ -925,11 +925,13 @@ internal sealed class PostCombatImpactController : MonoBehaviour
             return;
 
         _visibleEmptyAuxiliaryLogged = true;
+        var concealmentApplied = _view?.TryConcealVisibleEmptyNativeAuxiliary(controller) == true;
+        var recovered = concealmentApplied && !CaptureNativeAuxiliaryState(controller).FrameVisible;
         LogNativeAuxiliaryAnomaly(
             NativeAuxiliaryTooltipAnomalyCategory.VisibleWithoutText,
             NativeAuxiliaryTooltipAnomalyPhase.FrameAudit,
             state,
-            recovered: false
+            recovered
         );
     }
 

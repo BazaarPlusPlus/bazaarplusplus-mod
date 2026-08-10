@@ -238,6 +238,39 @@ internal sealed class NativePairedTooltipSession
         return displacedActivePresentation;
     }
 
+    /// <summary>
+    /// Conceals a native auxiliary frame that is visible without native or paired content.
+    /// </summary>
+    /// <remarks>
+    /// The native fade-in owns <see cref="BaseTooltipController.tooltipCanvasGroup"/> and can
+    /// raise its alpha after a direct concealment. The gate therefore lives on auxParent, below
+    /// that animated group and above the complete visual tree, and remains closed until either the
+    /// current paired presentation reveals or the next native show restores it.
+    /// </remarks>
+    internal bool TryConcealVisibleEmptyNativeAuxiliary(AuxiliaryTooltipController auxiliary)
+    {
+        if (auxiliary == null || auxiliary.auxParent == null)
+            return false;
+
+        if (
+            _preparedAuxiliaryGate != null
+            && ReferenceEquals(_preparedAuxiliaryGate.Controller, auxiliary)
+        )
+        {
+            _preparedAuxiliaryGate.SetAlpha(0f);
+            return _preparedAuxiliaryGate.Alpha <= NativePairedTooltipMetrics.Epsilon;
+        }
+
+        RestorePreparedAuxiliaryGate();
+        _preparedAuxiliaryGate = CanvasGroupGate.Create(
+            auxiliary,
+            auxiliary.auxParent.gameObject,
+            forceNonInteractive: true
+        );
+        return _preparedAuxiliaryGate != null
+            && _preparedAuxiliaryGate.Alpha <= NativePairedTooltipMetrics.Epsilon;
+    }
+
     // ── Open / content ─────────────────────────────────────────────────────────────────────
 
     /// <summary>
