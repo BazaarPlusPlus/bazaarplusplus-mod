@@ -1614,83 +1614,78 @@ public sealed class CombatImpactProjectorTests
         }
     }
 
-    [Theory]
-    [InlineData(
-        EActionCommandType.PlayerBurnApply,
-        EPlayerAttributeType.Burn,
-        ECardAttributeType.BurnApplyAmount,
-        ECardStats.BurnAdded
-    )]
-    [InlineData(
-        EActionCommandType.PlayerPoisonApply,
-        EPlayerAttributeType.Poison,
-        ECardAttributeType.PoisonApplyAmount,
-        ECardStats.PoisonAdded
-    )]
-    [InlineData(
-        EActionCommandType.PlayerRegenApply,
-        EPlayerAttributeType.HealthRegen,
-        ECardAttributeType.RegenApplyAmount,
-        ECardStats.RegenAdded
-    )]
-    public void Recovers_crit_count_for_crit_capable_player_effects_missing_native_markers(
-        EActionCommandType action,
-        EPlayerAttributeType playerAttribute,
-        ECardAttributeType sourceAttribute,
-        ECardStats statistic
-    )
+    [Fact]
+    public void Does_not_infer_crit_count_for_player_effects_missing_native_markers()
     {
-        var simulation = new CombatSim();
-        simulation.Frames.Clear();
-        var previous = 0;
-        foreach (var appliedValue in new[] { 4, 8 })
+        var cases = new[]
         {
-            var frame = new CombatSimFrame();
-            frame.Events.Add(Executed("source", action, Player(ECombatantId.Player)));
-            frame.PlayerUpdates = new CombatSimPlayerUpdate
+            (
+                EActionCommandType.PlayerBurnApply,
+                EPlayerAttributeType.Burn,
+                ECardAttributeType.BurnApplyAmount,
+                ECardStats.BurnAdded,
+                CombatImpactKind.Burn
+            ),
+            (
+                EActionCommandType.PlayerPoisonApply,
+                EPlayerAttributeType.Poison,
+                ECardAttributeType.PoisonApplyAmount,
+                ECardStats.PoisonAdded,
+                CombatImpactKind.Poison
+            ),
+            (
+                EActionCommandType.PlayerRegenApply,
+                EPlayerAttributeType.HealthRegen,
+                ECardAttributeType.RegenApplyAmount,
+                ECardStats.RegenAdded,
+                CombatImpactKind.AttributeChange
+            ),
+        };
+        foreach (var (action, playerAttribute, sourceAttribute, statistic, expectedKind) in cases)
+        {
+            var simulation = new CombatSim();
+            simulation.Frames.Clear();
+            var previous = 0;
+            foreach (var appliedValue in new[] { 4, 8 })
             {
-                Attributes =
+                var frame = new CombatSimFrame();
+                frame.Events.Add(Executed("source", action, Player(ECombatantId.Player)));
+                frame.PlayerUpdates = new CombatSimPlayerUpdate
                 {
-                    [playerAttribute] = new CombatSimPlayerAttributeUpdate
+                    Attributes =
                     {
-                        AttributeType = playerAttribute,
-                        PreviousValue = previous,
-                        CurrentValue = previous + appliedValue,
+                        [playerAttribute] = new CombatSimPlayerAttributeUpdate
+                        {
+                            AttributeType = playerAttribute,
+                            PreviousValue = previous,
+                            CurrentValue = previous + appliedValue,
+                        },
                     },
-                },
-            };
-            simulation.Frames.Add(frame);
-            previous += appliedValue;
+                };
+                simulation.Frames.Add(frame);
+                previous += appliedValue;
+            }
+            simulation.CardStats["source"] = new Dictionary<ECardStats, int> { [statistic] = 12 };
+
+            var group = Assert.Single(
+                Assert
+                    .Single(
+                        CombatImpactProjector
+                            .Project(simulation, EntitiesWithSourceAttribute(sourceAttribute, 4))
+                            .Sources
+                    )
+                    .Groups
+            );
+
+            Assert.Equal(expectedKind, group.Kind);
+            Assert.Equal(2, group.Count);
+            Assert.Equal(0, group.CriticalCount);
+            Assert.Null(group.CriticalObservedValue);
         }
-        simulation.CardStats["source"] = new Dictionary<ECardStats, int> { [statistic] = 12 };
-
-        var group = Assert.Single(
-            Assert
-                .Single(
-                    CombatImpactProjector
-                        .Project(simulation, EntitiesWithSourceAttribute(sourceAttribute, 4))
-                        .Sources
-                )
-                .Groups
-        );
-
-        Assert.Equal(
-            action switch
-            {
-                EActionCommandType.PlayerBurnApply => CombatImpactKind.Burn,
-                EActionCommandType.PlayerPoisonApply => CombatImpactKind.Poison,
-                EActionCommandType.PlayerRegenApply => CombatImpactKind.AttributeChange,
-                _ => throw new ArgumentOutOfRangeException(nameof(action), action, null),
-            },
-            group.Kind
-        );
-        Assert.Equal(2, group.Count);
-        Assert.Equal(1, group.CriticalCount);
-        Assert.Equal(8, group.CriticalObservedValue);
     }
 
     [Fact]
-    public void Recovers_dynamic_zarlic_burn_crits_from_historical_apply_values()
+    public void Does_not_infer_dynamic_burn_crits_from_historical_apply_values()
     {
         var simulation = new CombatSim();
         simulation.Frames.Clear();
@@ -1734,8 +1729,234 @@ public sealed class CombatImpactProjectorTests
         Assert.Equal(10, burn.Count);
         Assert.Equal(145, burn.ObservedValue);
         Assert.Equal(147, burn.AuthoritativeMetric?.Value);
-        Assert.Equal(9, burn.CriticalCount);
-        Assert.Equal(142, burn.CriticalObservedValue);
+        Assert.Equal(0, burn.CriticalCount);
+        Assert.Null(burn.CriticalObservedValue);
+    }
+
+    [Fact]
+    public void Carries_native_activation_crits_from_damage_to_burn_without_inferring_magnitude()
+    {
+        var simulation = new CombatSim();
+        simulation.Frames.Clear();
+        var previousBurn = 0;
+        var damageValues = new[] { 1_016, 528, 2_152 };
+        var burnValues = new[] { 102, 53, 216 };
+        var critical = new[] { true, false, true };
+        for (var index = 0; index < damageValues.Length; index++)
+        {
+            var frame = new CombatSimFrame
+            {
+                OpponentUpdates = new CombatSimPlayerUpdate
+                {
+                    Attributes =
+                    {
+                        [EPlayerAttributeType.Burn] = new CombatSimPlayerAttributeUpdate
+                        {
+                            AttributeType = EPlayerAttributeType.Burn,
+                            PreviousValue = previousBurn,
+                            CurrentValue = previousBurn + burnValues[index],
+                        },
+                    },
+                    HealthAdjustments =
+                    {
+                        DamageAdjustment(
+                            EPlayerHealthChangeType.Health,
+                            -damageValues[index],
+                            critical[index]
+                        ),
+                    },
+                },
+            };
+            frame.Events.Add(
+                Executed(
+                    "source",
+                    EActionCommandType.PlayerDamage,
+                    Player(ECombatantId.Opponent),
+                    triggerSource: "source"
+                )
+            );
+            frame.Events.Add(
+                Executed(
+                    "source",
+                    EActionCommandType.PlayerBurnApply,
+                    Player(ECombatantId.Opponent),
+                    triggerSource: "source"
+                )
+            );
+            simulation.Frames.Add(frame);
+            previousBurn += burnValues[index];
+        }
+        simulation.CardStats["source"] = new Dictionary<ECardStats, int>
+        {
+            [ECardStats.DamageDone] = damageValues.Sum(),
+            [ECardStats.BurnAdded] = burnValues.Sum(),
+            [ECardStats.UseCount] = 3,
+        };
+
+        var source = Assert.Single(
+            CombatImpactProjector
+                .Project(
+                    simulation,
+                    EntitiesWithSourceAttributes(
+                        (ECardAttributeType.DamageAmount, 254),
+                        (ECardAttributeType.BurnApplyAmount, 51)
+                    )
+                )
+                .Sources
+        );
+        var damage = Assert.Single(
+            source.Groups,
+            group => group.Kind == CombatImpactKind.DirectDamage
+        );
+        var burn = Assert.Single(source.Groups, group => group.Kind == CombatImpactKind.Burn);
+
+        Assert.Equal(2, damage.CriticalCount);
+        Assert.Equal(3_168, damage.CriticalObservedValue);
+        Assert.Equal(2, burn.CriticalCount);
+        Assert.Null(burn.CriticalObservedValue);
+        Assert.Equal(371, burn.AuthoritativeMetric?.Value);
+    }
+
+    [Fact]
+    public void Does_not_treat_same_frame_noncritical_damage_as_burn_critical_evidence()
+    {
+        var simulation = new CombatSim();
+        simulation.Frames.Clear();
+        var previousBurn = 0;
+        foreach (var burnValue in new[] { 4, 8 })
+        {
+            var frame = new CombatSimFrame
+            {
+                OpponentUpdates = new CombatSimPlayerUpdate
+                {
+                    Attributes =
+                    {
+                        [EPlayerAttributeType.Burn] = new CombatSimPlayerAttributeUpdate
+                        {
+                            AttributeType = EPlayerAttributeType.Burn,
+                            PreviousValue = previousBurn,
+                            CurrentValue = previousBurn + burnValue,
+                        },
+                    },
+                    HealthAdjustments =
+                    {
+                        DamageAdjustment(EPlayerHealthChangeType.Health, -20, isCritical: false),
+                    },
+                },
+            };
+            frame.Events.Add(
+                Executed(
+                    "source",
+                    EActionCommandType.PlayerDamage,
+                    Player(ECombatantId.Opponent),
+                    triggerSource: "source"
+                )
+            );
+            frame.Events.Add(
+                Executed(
+                    "source",
+                    EActionCommandType.PlayerBurnApply,
+                    Player(ECombatantId.Opponent),
+                    triggerSource: "source"
+                )
+            );
+            simulation.Frames.Add(frame);
+            previousBurn += burnValue;
+        }
+        simulation.CardStats["source"] = new Dictionary<ECardStats, int>
+        {
+            [ECardStats.DamageDone] = 40,
+            [ECardStats.BurnAdded] = 12,
+            [ECardStats.UseCount] = 2,
+        };
+
+        var burn = Assert.Single(
+            Assert
+                .Single(
+                    CombatImpactProjector
+                        .Project(
+                            simulation,
+                            EntitiesWithSourceAttributes(
+                                (ECardAttributeType.DamageAmount, 10),
+                                (ECardAttributeType.BurnApplyAmount, 4)
+                            )
+                        )
+                        .Sources
+                )
+                .Groups,
+            group => group.Kind == CombatImpactKind.Burn
+        );
+
+        Assert.Equal(2, burn.Count);
+        Assert.Equal(0, burn.CriticalCount);
+        Assert.Null(burn.CriticalObservedValue);
+    }
+
+    [Fact]
+    public void Does_not_carry_criticality_between_different_same_frame_activations()
+    {
+        var simulation = new CombatSim();
+        simulation
+            .Frames[0]
+            .Events.Add(
+                Executed(
+                    "source",
+                    EActionCommandType.PlayerDamage,
+                    Player(ECombatantId.Opponent),
+                    triggerSource: "damage-trigger"
+                )
+            );
+        simulation
+            .Frames[0]
+            .Events.Add(
+                Executed(
+                    "source",
+                    EActionCommandType.PlayerBurnApply,
+                    Player(ECombatantId.Opponent),
+                    triggerSource: "burn-trigger"
+                )
+            );
+        simulation.Frames[0].OpponentUpdates = new CombatSimPlayerUpdate
+        {
+            Attributes =
+            {
+                [EPlayerAttributeType.Burn] = new CombatSimPlayerAttributeUpdate
+                {
+                    AttributeType = EPlayerAttributeType.Burn,
+                    PreviousValue = 0,
+                    CurrentValue = 8,
+                },
+            },
+            HealthAdjustments =
+            {
+                DamageAdjustment(EPlayerHealthChangeType.Health, -20, isCritical: true),
+            },
+        };
+        simulation.CardStats["source"] = new Dictionary<ECardStats, int>
+        {
+            [ECardStats.DamageDone] = 20,
+            [ECardStats.BurnAdded] = 8,
+        };
+
+        var burn = Assert.Single(
+            Assert
+                .Single(
+                    CombatImpactProjector
+                        .Project(
+                            simulation,
+                            EntitiesWithSourceAttributes(
+                                (ECardAttributeType.DamageAmount, 10),
+                                (ECardAttributeType.BurnApplyAmount, 4)
+                            )
+                        )
+                        .Sources
+                )
+                .Groups,
+            group => group.Kind == CombatImpactKind.Burn
+        );
+
+        Assert.Equal(0, burn.CriticalCount);
+        Assert.Null(burn.CriticalObservedValue);
     }
 
     [Fact]
@@ -3002,6 +3223,199 @@ public sealed class CombatImpactProjectorTests
         Assert.Equal(
             expectedValue.HasValue ? CombatImpactCoverage.Exact : CombatImpactCoverage.None,
             group.ObservedCoverage
+        );
+    }
+
+    [Fact]
+    public void Reconstructs_lifesteal_from_unrecorded_health_gain_on_the_damage_frame()
+    {
+        var simulation = new CombatSim();
+        simulation
+            .Frames[0]
+            .Events.Add(
+                Executed("stinger", EActionCommandType.PlayerDamage, Player(ECombatantId.Opponent))
+            );
+        simulation.Frames[0].OpponentUpdates = Damage(-46);
+        simulation.Frames[0].PlayerUpdates = new CombatSimPlayerUpdate
+        {
+            Attributes =
+            {
+                [EPlayerAttributeType.Health] = new CombatSimPlayerAttributeUpdate
+                {
+                    AttributeType = EPlayerAttributeType.Health,
+                    PreviousValue = 665,
+                    CurrentValue = 706,
+                },
+            },
+            HealthAdjustments =
+            {
+                new CombatSimPlayerHealthAdjustment
+                {
+                    DamageType = EDamageType.Burn,
+                    AttributeChanged = EPlayerHealthChangeType.Health,
+                    Amount = -5,
+                },
+            },
+        };
+        var secondFrame = new CombatSimFrame
+        {
+            OpponentUpdates = Damage(-78),
+            PlayerUpdates = new CombatSimPlayerUpdate
+            {
+                Attributes =
+                {
+                    [EPlayerAttributeType.Health] = new CombatSimPlayerAttributeUpdate
+                    {
+                        AttributeType = EPlayerAttributeType.Health,
+                        PreviousValue = 239,
+                        CurrentValue = 303,
+                    },
+                },
+                HealthAdjustments =
+                {
+                    new CombatSimPlayerHealthAdjustment
+                    {
+                        DamageType = EDamageType.Burn,
+                        AttributeChanged = EPlayerHealthChangeType.Health,
+                        Amount = -14,
+                    },
+                },
+            },
+        };
+        secondFrame.Events.Add(
+            Executed("stinger", EActionCommandType.PlayerDamage, Player(ECombatantId.Opponent))
+        );
+        simulation.Frames.Add(secondFrame);
+        var entities = Entities().ToDictionary(item => item.Key, item => item.Value);
+        entities["stinger"] = new CombatImpactEntity(
+            "stinger",
+            "Stinger",
+            "Item",
+            null,
+            5,
+            Attributes: new Dictionary<ECardAttributeType, int>
+            {
+                [ECardAttributeType.Lifesteal] = 1,
+            },
+            CombatantId: ECombatantId.Player
+        );
+
+        var source = Assert.Single(
+            CombatImpactProjector.Project(simulation, entities).Sources,
+            candidate => candidate.Entity.Id == "stinger"
+        );
+        var healing = Assert.Single(source.Groups, group => group.Kind == CombatImpactKind.Healing);
+
+        Assert.Equal(2, healing.Count);
+        Assert.Equal(124, healing.ObservedValue);
+        Assert.Equal(CombatImpactOccurrenceBasis.ReconstructedTransition, healing.OccurrenceBasis);
+        Assert.Equal(
+            CombatImpactProjector.PlayerId(ECombatantId.Player),
+            Assert.Single(healing.Targets).Entity.Id
+        );
+    }
+
+    [Fact]
+    public void Lifesteal_counts_only_realized_healing_when_the_damage_overheals()
+    {
+        var simulation = new CombatSim();
+        simulation
+            .Frames[0]
+            .Events.Add(
+                Executed("stinger", EActionCommandType.PlayerDamage, Player(ECombatantId.Opponent))
+            );
+        simulation.Frames[0].OpponentUpdates = Damage(-78);
+        simulation.Frames[0].PlayerUpdates = new CombatSimPlayerUpdate
+        {
+            Attributes =
+            {
+                [EPlayerAttributeType.Health] = new CombatSimPlayerAttributeUpdate
+                {
+                    AttributeType = EPlayerAttributeType.Health,
+                    PreviousValue = 730,
+                    CurrentValue = 750,
+                },
+            },
+        };
+        var entities = Entities().ToDictionary(item => item.Key, item => item.Value);
+        entities["stinger"] = new CombatImpactEntity(
+            "stinger",
+            "Stinger",
+            "Item",
+            null,
+            5,
+            Attributes: new Dictionary<ECardAttributeType, int>
+            {
+                [ECardAttributeType.Lifesteal] = 1,
+            },
+            CombatantId: ECombatantId.Player
+        );
+
+        var source = Assert.Single(
+            CombatImpactProjector.Project(simulation, entities).Sources,
+            candidate => candidate.Entity.Id == "stinger"
+        );
+        var healing = Assert.Single(source.Groups, group => group.Kind == CombatImpactKind.Healing);
+
+        Assert.Equal(20, healing.ObservedValue);
+    }
+
+    [Fact]
+    public void Does_not_guess_lifesteal_ownership_when_multiple_sources_are_overheal_ambiguous()
+    {
+        var simulation = new CombatSim();
+        simulation
+            .Frames[0]
+            .Events.Add(
+                Executed("first", EActionCommandType.PlayerDamage, Player(ECombatantId.Opponent))
+            );
+        simulation
+            .Frames[0]
+            .Events.Add(
+                Executed("second", EActionCommandType.PlayerDamage, Player(ECombatantId.Opponent))
+            );
+        simulation.Frames[0].OpponentUpdates = new CombatSimPlayerUpdate
+        {
+            HealthAdjustments =
+            {
+                DamageAdjustment(EPlayerHealthChangeType.Health, -30, isCritical: false),
+                DamageAdjustment(EPlayerHealthChangeType.Health, -20, isCritical: false),
+            },
+        };
+        simulation.Frames[0].PlayerUpdates = new CombatSimPlayerUpdate
+        {
+            Attributes =
+            {
+                [EPlayerAttributeType.Health] = new CombatSimPlayerAttributeUpdate
+                {
+                    AttributeType = EPlayerAttributeType.Health,
+                    PreviousValue = 710,
+                    CurrentValue = 750,
+                },
+            },
+        };
+        var entities = Entities().ToDictionary(item => item.Key, item => item.Value);
+        foreach (var (id, order) in new[] { ("first", 5), ("second", 6) })
+        {
+            entities[id] = new CombatImpactEntity(
+                id,
+                id,
+                "Item",
+                null,
+                order,
+                Attributes: new Dictionary<ECardAttributeType, int>
+                {
+                    [ECardAttributeType.Lifesteal] = 1,
+                },
+                CombatantId: ECombatantId.Player
+            );
+        }
+
+        var report = CombatImpactProjector.Project(simulation, entities);
+
+        Assert.DoesNotContain(
+            report.Sources.SelectMany(source => source.Groups),
+            group => group.Kind == CombatImpactKind.Healing
         );
     }
 
@@ -4414,12 +4828,16 @@ public sealed class CombatImpactProjectorTests
     private static IReadOnlyDictionary<string, CombatImpactEntity> EntitiesWithSourceAttribute(
         ECardAttributeType attribute,
         int value
+    ) => EntitiesWithSourceAttributes((attribute, value));
+
+    private static IReadOnlyDictionary<string, CombatImpactEntity> EntitiesWithSourceAttributes(
+        params (ECardAttributeType Attribute, int Value)[] attributes
     )
     {
         var entities = Entities().ToDictionary(item => item.Key, item => item.Value);
         entities["source"] = entities["source"] with
         {
-            Attributes = new Dictionary<ECardAttributeType, int> { [attribute] = value },
+            Attributes = attributes.ToDictionary(item => item.Attribute, item => item.Value),
         };
         return entities;
     }
