@@ -39,8 +39,9 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
     private const float TriggerSummaryFontScale = 0.64f;
     private const float GroupLabelFontScale = 1f;
     private const float GroupMetricFontScale = 1f;
-    private const float GroupSecondaryMetricFontScale = 0.62f;
-    private const float GroupStackedMetricMinFontScale = 0.68f;
+    private const float GroupSecondaryMetricFontScale = 0.8f;
+    private const float GroupStackedMetricMinFontScale = 0.78f;
+    private const float GroupStackedMetricPreferredHeight = 56f;
     private const float GroupStackedMetricOpticalOffset = 2f;
     private const float GroupIconColumnPreferredWidth = 34f;
     private const float TargetNameFontScale = 0.875f;
@@ -868,6 +869,9 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         float preferredHeight = 48f
     )
     {
+        var hasSecondaryMetric = !string.IsNullOrWhiteSpace(secondaryMetricText);
+        if (hasSecondaryMetric)
+            preferredHeight = Mathf.Max(preferredHeight, GroupStackedMetricPreferredHeight);
         var header = CreateHorizontal(
             "ImpactGroupHeader",
             parent,
@@ -911,7 +915,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         // Group titles are controlled product labels and must stay literal even when the row is
         // constrained; unlike generic cloned text, they never opt into ellipsis.
         labelText.overflowMode = TextOverflowModes.Overflow;
-        if (string.IsNullOrWhiteSpace(secondaryMetricText))
+        if (!hasSecondaryMetric)
         {
             var metric = CloneText(
                 textTemplate,
