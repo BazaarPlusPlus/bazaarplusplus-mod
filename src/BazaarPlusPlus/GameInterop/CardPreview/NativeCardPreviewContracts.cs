@@ -46,6 +46,7 @@ internal enum NativeCardPreviewSlotFitResult
 internal interface INativeCardPreviewOwner
 {
     int Layer { get; }
+    bool UsePremiumVisuals { get; }
     Transform? ResolveParent(NativeCardPreviewSubject subject);
     void PrepareWhileInactive(NativeCardPreviewOwnerContext context);
     void OnAcquired(NativeCardPreviewOwnerContext context);

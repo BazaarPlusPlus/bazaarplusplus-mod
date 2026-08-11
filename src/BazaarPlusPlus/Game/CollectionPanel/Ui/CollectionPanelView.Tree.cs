@@ -443,6 +443,38 @@ internal sealed partial class CollectionPanelView
         painter.Stroke();
     }
 
+    private static void DrawSortIcon(MeshGenerationContext context, VisualElement icon)
+    {
+        var rect = icon.contentRect;
+        if (rect.width <= 0f || rect.height <= 0f)
+            return;
+
+        var painter = context.painter2D;
+        painter.lineWidth = Mathf.Max(1.2f, rect.width * 0.1f);
+        painter.lineCap = LineCap.Round;
+        painter.strokeColor = icon.resolvedStyle.color;
+
+        var left = rect.xMin + rect.width * 0.12f;
+        var fullWidth = rect.width * 0.76f;
+        var firstY = rect.yMin + rect.height * 0.25f;
+        var secondY = rect.center.y;
+        var thirdY = rect.yMax - rect.height * 0.25f;
+        painter.BeginPath();
+        painter.MoveTo(new Vector2(left, firstY));
+        painter.LineTo(new Vector2(left + fullWidth, firstY));
+        painter.Stroke();
+
+        painter.BeginPath();
+        painter.MoveTo(new Vector2(left, secondY));
+        painter.LineTo(new Vector2(left + fullWidth * 0.76f, secondY));
+        painter.Stroke();
+
+        painter.BeginPath();
+        painter.MoveTo(new Vector2(left, thirdY));
+        painter.LineTo(new Vector2(left + fullWidth * 0.52f, thirdY));
+        painter.Stroke();
+    }
+
     private VisualElement CreateSearchField()
     {
         var container = new VisualElement();
@@ -599,23 +631,25 @@ internal sealed partial class CollectionPanelView
         group.style.flexShrink = 0f;
         group.style.height = Sizes.CollectionSearchRowHeight;
         group.style.overflow = Overflow.Hidden;
-        UiStyle.FixedWidth(group.style, Sizes.CollectionSortButtonWidth * 2f);
+        UiStyle.FixedWidth(group.style, CurrentSortActiveWidth() + CurrentSortInactiveWidth());
         UiStyle.Radius(group.style, Radii.CollectionChip);
         UiStyle.Border(group.style, Borders.Thin, Colors.CollectionChipBorder);
         group.style.marginLeft = UiSpacing.Sm;
         group.style.marginTop = UiSpacing.Md;
 
         _sortQualityButton = CreateInlineSortButton(
+            SortQualityButtonName,
             CollectionPanelText.SortQuality(),
             () => _commands.SetSortPriority(CollectionSortPriority.Quality)
         );
         _sortSizeButton = CreateInlineSortButton(
+            SortSizeButtonName,
             CollectionPanelText.SortSize(),
             () => _commands.SetSortPriority(CollectionSortPriority.Size)
         );
         group.Add(_sortQualityButton);
         group.Add(_sortSizeButton);
-        group.Add(CreateFacetChoiceDivider(Sizes.CollectionSortButtonWidth));
+        group.Add(CreateFacetChoiceDivider(CurrentSortActiveWidth()));
         return group;
     }
 
@@ -662,15 +696,49 @@ internal sealed partial class CollectionPanelView
         }
     }
 
-    private static Button CreateInlineSortButton(string text, Action onClick)
+    private static Button CreateInlineSortButton(string name, string text, Action onClick)
     {
         var button = CreateButton(
-            text,
+            string.Empty,
             onClick,
-            Sizes.CollectionSortButtonWidth,
-            Sizes.CollectionSearchRowHeight
+            CurrentSortInactiveWidth(),
+            Sizes.CollectionSearchRowHeight,
+            fixedWidth: false
         );
+        button.name = name;
         button.style.flexShrink = 0f;
+        button.style.flexDirection = FlexDirection.Row;
+        button.style.justifyContent = Justify.Center;
+        button.style.alignItems = Align.Center;
+        UiStyle.HorizontalPadding(button.style, UiSpacing.Xxs);
+
+        var icon = new VisualElement
+        {
+            name = SortButtonIconName,
+            pickingMode = PickingMode.Ignore,
+        };
+        UiStyle.FixedSize(icon.style, Sizes.CollectionSortIconSize, Sizes.CollectionSortIconSize);
+        icon.style.display = DisplayStyle.None;
+        icon.style.flexShrink = 0f;
+        icon.style.marginRight = UiSpacing.Xxs;
+        icon.style.color = Colors.CollectionChipSelectedText;
+        icon.generateVisualContent += context => DrawSortIcon(context, icon);
+        button.Add(icon);
+
+        var label = new Label(text)
+        {
+            name = SortButtonLabelName,
+            pickingMode = PickingMode.Ignore,
+        };
+        label.style.fontSize = Sizes.CollectionTagFontSize;
+        label.style.flexShrink = 1f;
+        label.style.minWidth = 0f;
+        label.style.whiteSpace = WhiteSpace.NoWrap;
+        label.style.overflow = Overflow.Hidden;
+        label.style.unityTextAlign = TextAnchor.MiddleCenter;
+        label.style.color = Colors.CollectionChipText;
+        button.Add(label);
+
         StyleCollectionGroupChip(
             button,
             Colors.CollectionChipBackground,
@@ -987,6 +1055,7 @@ internal sealed partial class CollectionPanelView
         content.style.alignItems = Align.Center;
         content.style.justifyContent = Justify.Center;
         content.style.flexGrow = 1f;
+        _dayToggleContent = content;
         var caption = new Label(CollectionPanelText.DayCaption())
         {
             pickingMode = PickingMode.Ignore,

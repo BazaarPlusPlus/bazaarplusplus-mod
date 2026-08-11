@@ -1563,6 +1563,8 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
 
         public int Layer { get; }
 
+        public bool UsePremiumVisuals => false;
+
         internal void Register(NativeCardPreviewSubject subject, RectTransform parent) =>
             _parents[subject] = parent;
 

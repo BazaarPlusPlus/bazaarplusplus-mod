@@ -135,6 +135,50 @@ public sealed class NativeCardPreviewArchitectureTests
     }
 
     [Fact]
+    public void Premium_visual_intent_is_enabled_only_for_collection_previews()
+    {
+        var sourceRoot = MainSourceRoot(RepoRoot());
+        var collectionOwner = File.ReadAllText(
+            Path.Combine(
+                sourceRoot,
+                "Game",
+                "CollectionPanel",
+                "Grid",
+                "CollectionNativeCardPreviewOwner.cs"
+            )
+        );
+        var itemBoardSurface = File.ReadAllText(
+            Path.Combine(
+                sourceRoot,
+                "GameInterop",
+                "ItemBoardPreview",
+                "ItemBoardPreviewSurface.cs"
+            )
+        );
+        var postCombatPreview = File.ReadAllText(
+            Path.Combine(
+                sourceRoot,
+                "Patches",
+                "PostCombatImpact",
+                "NativePostCombatImpactTooltipView.cs"
+            )
+        );
+        var factory = File.ReadAllText(
+            Path.Combine(sourceRoot, "GameInterop", "CardPreview", "NativeCardPreviewFactory.cs")
+        );
+        var runtime = File.ReadAllText(
+            Path.Combine(sourceRoot, "GameInterop", "CardPreview", "NativeCardPreviewRuntime.cs")
+        );
+
+        Assert.Contains("public bool UsePremiumVisuals => true;", collectionOwner);
+        Assert.Contains("public bool UsePremiumVisuals => false;", itemBoardSurface);
+        Assert.Contains("public bool UsePremiumVisuals => false;", postCombatPreview);
+        Assert.Contains("owner.UsePremiumVisuals", factory);
+        Assert.Contains("usePremiumVisuals", runtime);
+        Assert.DoesNotContain("template, false, instance", runtime);
+    }
+
+    [Fact]
     public void Same_card_modifier_refresh_keeps_the_native_tooltip_host_alive()
     {
         var sourceRoot = MainSourceRoot(RepoRoot());

@@ -150,6 +150,11 @@ internal static class BPPSupporterAttributionRow
         NativeGameTypography.PanelScope typography
     )
     {
+        var background = Colors.WithAlpha(Colors.ButtonSelectedBackground, 0.16f);
+        var hoverBackground = Colors.WithAlpha(Colors.ButtonSelectedBackground, 0.3f);
+        var pressedBackground = Colors.WithAlpha(Colors.ButtonSelectedBackground, 0.24f);
+        var border = Colors.WithAlpha(Colors.OutcomeGoldBorder, 0.58f);
+        var hoverBorder = Colors.WithAlpha(Colors.OutcomeGoldBorder, 0.9f);
         var button = new Button(OpenSupportPage) { text = $"{SponsorIcon} {text}" };
         typography.Apply(button);
         button.tooltip = BPPSupporterLinks.ResolveSponsorUrl(GetLanguageCode());
@@ -165,14 +170,47 @@ internal static class BPPSupporterAttributionRow
         button.style.unityTextAlign = TextAnchor.MiddleCenter;
         button.style.justifyContent = Justify.Center;
         button.style.alignItems = Align.Center;
-        button.style.backgroundColor = Colors.WithAlpha(Colors.ButtonSelectedBackground, 0.16f);
+        button.style.backgroundColor = background;
         button.style.color = Colors.SupporterTier4Text;
         UiStyle.HorizontalPadding(button.style, UiSpacing.Sm);
         UiStyle.Radius(button.style, Radii.Status);
-        UiStyle.Border(
-            button.style,
-            Borders.Thin,
-            Colors.WithAlpha(Colors.OutcomeGoldBorder, 0.58f)
+        UiStyle.Border(button.style, Borders.Thin, border);
+        UiHover.ApplyButtonPalette(
+            button,
+            background,
+            Colors.SupporterTier4Text,
+            border,
+            hoverBorder,
+            hoverBackground,
+            pressedBackground
+        );
+        button.style.transitionProperty = new List<StylePropertyName>
+        {
+            new("background-color"),
+            new("border-left-color"),
+            new("border-top-color"),
+            new("border-right-color"),
+            new("border-bottom-color"),
+            new("left"),
+            new("scale"),
+        };
+        button.style.transitionDuration = new List<TimeValue>
+        {
+            new(120f, TimeUnit.Millisecond),
+        };
+        button.style.left = 0f;
+        button.style.scale = new Scale(Vector3.one);
+        button.RegisterCallback<MouseEnterEvent>(_ =>
+        {
+            button.style.left = -3f;
+            button.style.scale = new Scale(new Vector3(1.06f, 1f, 1f));
+        }
+        );
+        button.RegisterCallback<MouseLeaveEvent>(_ =>
+        {
+            button.style.left = 0f;
+            button.style.scale = new Scale(Vector3.one);
+        }
         );
         return button;
     }

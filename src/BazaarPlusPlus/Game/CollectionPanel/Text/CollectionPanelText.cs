@@ -61,7 +61,11 @@ internal static class CollectionPanelText
         "顯示所有英雄的卡牌"
     );
     private static readonly LocalizedTextSet DayHeaderText = new("Day", "天数", "天數");
-    private static readonly LocalizedTextSet DayCaptionText = new("DAY", "天", "天");
+    private static readonly LocalizedTextSet DayCaptionText = new(
+        "DAY",
+        "<line-height=0.9em>天数</line-height>",
+        "<line-height=0.9em>天數</line-height>"
+    );
     private static readonly LocalizedTextSet TierSizeHeaderText = new(
         "Size / Quality",
         "尺寸 / 品质",

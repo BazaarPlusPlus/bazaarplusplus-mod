@@ -37,14 +37,15 @@ internal static class CollectionItemLoadArtPatch
         if (cacheSession == null)
             return true;
 
-        __result = LoadArtFromCache(__instance, marker, cacheSession);
+        __result = LoadArtFromCache(__instance, marker, cacheSession, isPremium);
         return false;
     }
 
     private static async Task LoadArtFromCache(
         CardPreviewItem instance,
         CollectionPanelOwnedMarker marker,
-        CollectionCardCacheSession cacheSession
+        CollectionCardCacheSession cacheSession,
+        bool isPremium
     )
     {
         string? acquiredArtKey = null;
@@ -100,7 +101,8 @@ internal static class CollectionItemLoadArtPatch
             var material = cacheSession.MaterialCache.GetOrCreate(
                 artKey,
                 assetData,
-                instance._cardMaterialShader
+                instance._cardMaterialShader,
+                isPremium
             );
             if (material == null)
             {

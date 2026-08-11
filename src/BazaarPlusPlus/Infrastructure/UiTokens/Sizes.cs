@@ -43,7 +43,11 @@ internal static class Sizes
     public const float ButtonCompactHeight = 24f;
     public const float ButtonFooterHeight = 36f;
     public const float RunsTabWidth = 72f;
-    public const float CollectionSortButtonWidth = 60f;
+    public const float CollectionSortActiveWidth = 76f;
+    public const float CollectionSortInactiveWidth = 64f;
+    public const float CollectionSortEnglishActiveWidth = 84f;
+    public const float CollectionSortEnglishInactiveWidth = 56f;
+    public const float CollectionSortIconSize = 14f;
     public const float CollectionSizeChipWidth = 72f;
     public const float CollectionSearchButtonSize = ButtonStandardHeight;
     public const float CollectionSearchIconSize = 18f;
@@ -74,8 +78,8 @@ internal static class Sizes
     public const int FacetModeFontSize = 13;
     public const float CollectionTabToggleWidth = 96f;
     public const float CollectionTabToggleHeight = 28f;
-    public const float CollectionTabActiveWidth = 120f;
-    public const float CollectionTabInactiveWidth = 72f;
+    public const float CollectionTabActiveWidth = 100f;
+    public const float CollectionTabInactiveWidth = 60f;
     public const float RowAccentWidth = 6f;
     public const float RowSideHostWidth = 62f;
     public const float RunRowHeight = 98f;

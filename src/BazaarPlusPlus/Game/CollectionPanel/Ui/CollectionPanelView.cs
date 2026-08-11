@@ -23,6 +23,10 @@ internal sealed partial class CollectionPanelView : IDisposable
     private const string FacetMatchAllName = "bpp-facet-match-all";
     private const string FacetMatchLabelName = "bpp-facet-match-label";
     private const string FacetChoiceDividerName = "bpp-facet-choice-divider";
+    private const string SortQualityButtonName = "bpp-collection-sort-quality";
+    private const string SortSizeButtonName = "bpp-collection-sort-size";
+    private const string SortButtonIconName = "bpp-collection-sort-icon";
+    private const string SortButtonLabelName = "bpp-collection-sort-label";
 
     private readonly Transform _parent;
     private readonly ICollectionPanelCommands _commands;
@@ -47,6 +51,7 @@ internal sealed partial class CollectionPanelView : IDisposable
     private TextField? _searchField;
     private Label? _searchPlaceholderLabel;
     private Button? _dayToggleButton;
+    private VisualElement? _dayToggleContent;
     private Label? _dayToggleCaption;
     private Label? _dayToggleValue;
     private Button? _sortQualityButton;
@@ -426,6 +431,7 @@ internal sealed partial class CollectionPanelView : IDisposable
             );
         if (_sortSizeButton != null)
             RefreshSortChip(_sortSizeButton, model.SortPriority == CollectionSortPriority.Size);
+        ApplySortGroupLayout(model.SortPriority);
 
         // Size/tags only narrow Items. On Skills, let Quality fill the row and let source filters
         // move up naturally instead of reserving dead space.
@@ -523,10 +529,11 @@ internal sealed partial class CollectionPanelView : IDisposable
         var skillsWidth = itemsSelected
             ? Sizes.CollectionTabInactiveWidth
             : Sizes.CollectionTabActiveWidth;
+        UiStyle.FixedWidth(_tabModeControl.style, itemsWidth + skillsWidth);
         UiStyle.FixedWidth(items.style, itemsWidth);
         UiStyle.FixedWidth(skills.style, skillsWidth);
-        UiStyle.HorizontalPadding(items.style, itemsSelected ? UiSpacing.Md : UiSpacing.Xs);
-        UiStyle.HorizontalPadding(skills.style, itemsSelected ? UiSpacing.Xs : UiSpacing.Md);
+        UiStyle.HorizontalPadding(items.style, itemsSelected ? UiSpacing.Sm : UiSpacing.Xs);
+        UiStyle.HorizontalPadding(skills.style, itemsSelected ? UiSpacing.Xs : UiSpacing.Sm);
         divider.style.left = itemsWidth;
     }
 
@@ -560,9 +567,9 @@ internal sealed partial class CollectionPanelView : IDisposable
         if (_searchPlaceholderLabel != null)
             _searchPlaceholderLabel.text = CollectionPanelText.SearchPlaceholder(activeType);
         if (_sortQualityButton != null)
-            _sortQualityButton.text = CollectionPanelText.SortQuality();
+            SetSortButtonText(_sortQualityButton, CollectionPanelText.SortQuality());
         if (_sortSizeButton != null)
-            _sortSizeButton.text = CollectionPanelText.SortSize();
+            SetSortButtonText(_sortSizeButton, CollectionPanelText.SortSize());
         if (_dayToggleButton != null)
             _dayToggleButton.tooltip = CollectionPanelText.DayHeader();
         if (_heroFilterLabel != null)
