@@ -29,6 +29,7 @@ Every record below is accepted; each file's own `Status:` line is authoritative 
 | [adr/0011](adr/0011-pure-decision-cores-for-timing-invariants.md) | timing invariants in pure decision cores, not MonoBehaviour glue |
 | [adr/0012](adr/0012-outbound-network-ownership.md) | outbound Mod API protocol and persistence owners |
 | [adr/0013](adr/0013-remote-data-and-release-boundaries.md) | runtime catalogs, release manifest, and build seed fetch are three lifecycles |
+| [adr/0014](adr/0014-combat-impact-accounting-contract.md) | Combat Impact numbers are ledger entries, reconciled per view |
 
 ## Document lifecycle
 
