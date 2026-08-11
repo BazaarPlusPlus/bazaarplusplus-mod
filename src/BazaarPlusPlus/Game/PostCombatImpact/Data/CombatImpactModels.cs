@@ -1,5 +1,6 @@
 #nullable enable
 using BazaarGameShared.Domain.Core.Types;
+using BazaarGameShared.Domain.Effect.Actions;
 
 namespace BazaarPlusPlus.Game.PostCombatImpact.Data;
 
@@ -217,7 +218,9 @@ internal sealed record CombatImpactEntity(
         string,
         CombatImpactPrerequisiteSkillSourceRule
     >? PrerequisiteSkillSourceRulesByEffectId = null,
-    IReadOnlyCollection<CombatImpactUseAttributionRule>? UseAttributionRules = null
+    IReadOnlyCollection<CombatImpactUseAttributionRule>? UseAttributionRules = null,
+    IReadOnlyDictionary<string, TActionCardModifyAttribute>? AbilityAttributeModifiersByEffectId =
+        null
 );
 
 internal static class CombatImpactTags

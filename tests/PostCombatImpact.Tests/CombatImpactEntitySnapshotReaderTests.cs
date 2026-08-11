@@ -2,6 +2,9 @@ using BazaarGameClient.Domain.Models.Cards;
 using BazaarGameShared.Domain.Cards.Item;
 using BazaarGameShared.Domain.Core;
 using BazaarGameShared.Domain.Core.Types;
+using BazaarGameShared.Domain.Effect;
+using BazaarGameShared.Domain.Effect.Actions;
+using BazaarGameShared.Domain.Values;
 using BazaarGameShared.Infra.Messages.CombatSimEvents;
 using BazaarGameShared.Infra.Messages.Shared;
 using BazaarPlusPlus.Game.PostCombatImpact.Data;
@@ -25,6 +28,52 @@ public sealed class CombatImpactEntitySnapshotReaderTests
         var card = RehydratedItem(templateTags: [ECardTag.Weapon], templateHiddenTags: []);
 
         Assert.Contains(ECardTag.Weapon, CombatImpactEntityTags.ResolveTags(card)!);
+    }
+
+    [Fact]
+    public void Direct_card_attribute_modifier_preserves_its_configured_value_graph()
+    {
+        var action = new TActionCardModifyAttribute
+        {
+            AttributeType = ECardAttributeType.DamageAmount,
+            Operation = EAttributeModifierOperation.Add,
+            Value = new TFixedValue { Value = 100 },
+        };
+
+        var modifiers = CombatImpactAbilityAttributeModifierReader.Read([
+            new TCardAbility { Id = "damage-gain", Action = action },
+        ]);
+
+        Assert.Same(action, Assert.Single(modifiers!).Value);
+    }
+
+    [Fact]
+    public void Conflicting_modifiers_with_the_same_effect_id_are_not_snapshotted()
+    {
+        var modifiers = CombatImpactAbilityAttributeModifierReader.Read([
+            new TCardAbility
+            {
+                Id = "ambiguous",
+                Action = new TActionCardModifyAttribute
+                {
+                    AttributeType = ECardAttributeType.DamageAmount,
+                    Operation = EAttributeModifierOperation.Add,
+                    Value = new TFixedValue { Value = 100 },
+                },
+            },
+            new TCardAbility
+            {
+                Id = "ambiguous",
+                Action = new TActionCardModifyAttribute
+                {
+                    AttributeType = ECardAttributeType.DamageAmount,
+                    Operation = EAttributeModifierOperation.Add,
+                    Value = new TFixedValue { Value = 4 },
+                },
+            },
+        ]);
+
+        Assert.Null(modifiers);
     }
 
     [Fact]

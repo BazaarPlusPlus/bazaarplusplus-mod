@@ -1,6 +1,9 @@
 using BazaarGameShared.Domain.Core;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Effect;
+using BazaarGameShared.Domain.Effect.Actions;
+using BazaarGameShared.Domain.Targeting;
+using BazaarGameShared.Domain.Values.ReferenceValues;
 using BazaarGameShared.Infra.Messages.CombatSimEvents;
 using BazaarGameShared.Infra.Messages.Shared;
 using BazaarPlusPlus.Game.PostCombatImpact.Data;
@@ -2508,6 +2511,97 @@ public sealed class CombatImpactProjectorTests
     }
 
     [Fact]
+    public void Bass_same_frame_damage_gains_are_split_when_configured_values_match_the_native_delta()
+    {
+        var simulation = new CombatSim();
+        simulation.Frames.Clear();
+        var bassId = InstanceId.TryParse("bass");
+        var damage = 1000;
+
+        for (var index = 0; index < 12; index++)
+        {
+            var frame = new CombatSimFrame();
+            frame.Events.Add(AttributeExecution("bass", "bass-gain", "bass"));
+            frame.Events.Add(AttributeExecution("slow-and-steady", "steady-gain", "bass"));
+            var delta = 104;
+            if (index == 0)
+            {
+                frame.Events.Add(AttributeExecution("snowstorm", "snowstorm-gain", "bass"));
+                delta += 10;
+            }
+            frame.CardUpdates[bassId] = DamageUpdate(bassId, damage, damage + delta);
+            damage += delta;
+            simulation.Frames.Add(frame);
+        }
+
+        for (var index = 0; index < 2; index++)
+        {
+            var frame = new CombatSimFrame();
+            frame.Events.Add(AttributeExecution("snowstorm", "snowstorm-gain", "bass"));
+            frame.CardUpdates[bassId] = DamageUpdate(bassId, damage, damage + 10);
+            damage += 10;
+            simulation.Frames.Add(frame);
+        }
+
+        var entities = Entities().ToDictionary(item => item.Key, item => item.Value);
+        entities["bass"] = AttributeGainEntity("bass", "Bass", 100, "bass-gain", 5);
+        entities["slow-and-steady"] = AttributeGainEntity(
+            "slow-and-steady",
+            "Slow and Steady",
+            4,
+            "steady-gain",
+            6
+        );
+        entities["snowstorm"] = AttributeGainEntity(
+            "snowstorm",
+            "Snowstorm",
+            10,
+            "snowstorm-gain",
+            7
+        );
+
+        var report = CombatImpactProjector.Project(simulation, entities);
+
+        AssertDamageGain(report, "bass", expectedCount: 12, expectedValue: 1200);
+        AssertDamageGain(report, "slow-and-steady", expectedCount: 12, expectedValue: 48);
+        AssertDamageGain(report, "snowstorm", expectedCount: 3, expectedValue: 30);
+
+        var received = Assert.Single(report.Received, candidate => candidate.Entity.Id == "bass");
+        var incoming = Assert.Single(received.Groups);
+        Assert.Equal("DamageAmount", incoming.NativeAttributeKey);
+        Assert.Equal(27, incoming.Count);
+        Assert.Equal(1278, incoming.ObservedValue);
+        Assert.Equal(3, incoming.Sources.Count);
+    }
+
+    [Fact]
+    public void Concurrent_configured_attribute_values_remain_omitted_when_their_sum_does_not_match()
+    {
+        var simulation = new CombatSim();
+        var bassId = InstanceId.TryParse("bass");
+        simulation.Frames[0].Events.Add(AttributeExecution("bass", "bass-gain", "bass"));
+        simulation
+            .Frames[0]
+            .Events.Add(AttributeExecution("slow-and-steady", "steady-gain", "bass"));
+        simulation.Frames[0].CardUpdates[bassId] = DamageUpdate(bassId, 1000, 1105);
+
+        var entities = Entities().ToDictionary(item => item.Key, item => item.Value);
+        entities["bass"] = AttributeGainEntity("bass", "Bass", 100, "bass-gain", 5);
+        entities["slow-and-steady"] = AttributeGainEntity(
+            "slow-and-steady",
+            "Slow and Steady",
+            4,
+            "steady-gain",
+            6
+        );
+
+        var report = CombatImpactProjector.Project(simulation, entities);
+
+        Assert.Empty(report.Sources);
+        Assert.Empty(report.Received);
+    }
+
+    [Fact]
     public void Known_effect_attribute_does_not_fall_back_to_an_unrelated_transition()
     {
         var simulation = new CombatSim();
@@ -4605,6 +4699,94 @@ public sealed class CombatImpactProjectorTests
             ActionType = action,
             Target = target,
         };
+
+    private static CombatSimEventEffectExecuted AttributeExecution(
+        string source,
+        string effectId,
+        string target
+    )
+    {
+        var executed = Executed(source, EActionCommandType.CardModifyAttribute, CardTarget(target));
+        executed.EffectId = effectId;
+        return executed;
+    }
+
+    private static CombatSimCardUpdate DamageUpdate(
+        InstanceId target,
+        int previousValue,
+        int currentValue
+    ) =>
+        new()
+        {
+            CardInstanceId = target,
+            Attributes =
+            {
+                [ECardAttributeType.DamageAmount] = new CombatSimCardAttributeUpdate
+                {
+                    AttributeType = ECardAttributeType.DamageAmount,
+                    PreviousValue = previousValue,
+                    CurrentValue = currentValue,
+                },
+            },
+        };
+
+    private static CombatImpactEntity AttributeGainEntity(
+        string id,
+        string name,
+        int configuredValue,
+        string effectId,
+        int order
+    )
+    {
+        var modifier = new TActionCardModifyAttribute
+        {
+            AttributeType = ECardAttributeType.DamageAmount,
+            Operation = EAttributeModifierOperation.Add,
+            Value = new TReferenceValueCardAttribute
+            {
+                AttributeType = ECardAttributeType.Custom_0,
+                Target = new TTargetCardSelf(),
+            },
+        };
+        return new CombatImpactEntity(
+            id,
+            name,
+            id == "bass" ? "Item" : "Skill",
+            null,
+            order,
+            Attributes: new Dictionary<ECardAttributeType, int>
+            {
+                [ECardAttributeType.Custom_0] = configuredValue,
+            },
+            AbilityAttributeTypesByEffectId: new Dictionary<string, ECardAttributeType>
+            {
+                [effectId] = ECardAttributeType.DamageAmount,
+            },
+            AbilityAttributeModifiersByEffectId: new Dictionary<string, TActionCardModifyAttribute>
+            {
+                [effectId] = modifier,
+            }
+        );
+    }
+
+    private static void AssertDamageGain(
+        CombatImpactReport report,
+        string sourceId,
+        int expectedCount,
+        int expectedValue
+    )
+    {
+        var source = Assert.Single(report.Sources, candidate => candidate.Entity.Id == sourceId);
+        var group = Assert.Single(source.Groups);
+        Assert.Equal(CombatImpactKind.AttributeChange, group.Kind);
+        Assert.Equal("DamageAmount", group.NativeAttributeKey);
+        Assert.Equal(expectedCount, group.Count);
+        Assert.Equal(expectedValue, group.ObservedValue);
+        var target = Assert.Single(group.Targets);
+        Assert.Equal("bass", target.Entity.Id);
+        Assert.Equal(expectedCount, target.Count);
+        Assert.Equal(expectedValue, target.ObservedValue);
+    }
 
     private static CombatSimEventCardTransformed Transformed(
         string originalId,
