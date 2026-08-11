@@ -742,6 +742,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
             is { Basis: CombatImpactAuthoritativeBasis.TotalAmount } total
             ? total.Value
             : group.ObservedValue;
+        var effectMarker = EffectMarker(group.Kind, group.NativeAttributeKey);
         BuildGroupHeader(
             textTemplate,
             headingRoot,
@@ -750,12 +751,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
             group.Surface,
             changeValue,
             group.HasMixedValueDirections,
-            CombatImpactMetricFormatter.Group(
-                group,
-                IsChinese(),
-                CriticalMarker(),
-                EffectMarker(group.Kind, group.NativeAttributeKey)
-            ),
+            CombatImpactMetricFormatter.Group(group, IsChinese(), CriticalMarker(), effectMarker),
             CombatImpactMetricFormatter.PeriodicImpact(
                 group,
                 IsChinese(),
@@ -788,7 +784,12 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
                         groupRoot,
                         "ImpactTargetRow",
                         target.Entity,
-                        CombatImpactMetricFormatter.Target(group, target, IsChinese()),
+                        CombatImpactMetricFormatter.Target(
+                            group,
+                            target,
+                            IsChinese(),
+                            effectMarker
+                        ),
                         generation
                     )
                 );
@@ -813,6 +814,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
     {
         var groupRoot = CreateVertical("ImpactReceivedGroup", parent, 4f);
         AddLayout(groupRoot.gameObject, preferredHeight: -1f, flexibleWidth: 1f);
+        var effectMarker = EffectMarker(group.Kind, group.NativeAttributeKey);
         BuildGroupHeader(
             textTemplate,
             groupRoot,
@@ -821,7 +823,12 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
             group.Surface,
             group.ObservedValue,
             group.HasMixedValueDirections,
-            CombatImpactMetricFormatter.IncomingGroup(group, IsChinese(), CriticalMarker())
+            CombatImpactMetricFormatter.IncomingGroup(
+                group,
+                IsChinese(),
+                CriticalMarker(),
+                effectMarker
+            )
         );
         var detailRows = new List<GameObject>();
         if (CombatImpactDetailPresentationPolicy.ShouldRenderEntityRows(group.Sources.Count))
@@ -834,7 +841,12 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
                         groupRoot,
                         "ImpactSourceRow",
                         source.Entity,
-                        CombatImpactMetricFormatter.IncomingSource(group, source, IsChinese()),
+                        CombatImpactMetricFormatter.IncomingSource(
+                            group,
+                            source,
+                            IsChinese(),
+                            effectMarker
+                        ),
                         generation
                     )
                 );
