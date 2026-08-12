@@ -541,6 +541,24 @@ public sealed class NativePairedTooltipArchitectureTests
     }
 
     [Fact]
+    public void Combat_impact_dividers_keep_a_two_unit_minimum_height()
+    {
+        var sourceRoot = MainSourceRoot(RepoRoot());
+        var view = File.ReadAllText(
+            Path.Combine(
+                sourceRoot,
+                "Patches",
+                "PostCombatImpact",
+                "NativePostCombatImpactTooltipView.cs"
+            )
+        );
+
+        Assert.Contains("private const float DividerHeight = 2f;", view, StringComparison.Ordinal);
+        Assert.Contains("preferredHeight: DividerHeight", view, StringComparison.Ordinal);
+        Assert.Contains("layout.minHeight = DividerHeight;", view, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Combat_impact_builds_only_the_visible_perspective_until_shift_requests_the_other()
     {
         var sourceRoot = MainSourceRoot(RepoRoot());

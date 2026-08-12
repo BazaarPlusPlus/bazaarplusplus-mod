@@ -216,6 +216,7 @@ Console.WriteLine(
 Console.WriteLine(
     $"P2 card_attribute groups={report.CardAttributeAttribution.DiagnosticGroups} "
         + $"claimants={report.CardAttributeAttribution.DiagnosedClaimants} "
+        + $"implicit_player_effects={report.CardAttributeAttribution.ImplicitPlayerEffects} "
         + $"concurrent_exact={report.CardAttributeAttribution.ConcurrentExactGroups} "
         + $"a2_solved={report.CardAttributeAttribution.SingleUnknownSolvedGroups} "
         + $"residual={report.CardAttributeAttribution.ResidualGroups} "

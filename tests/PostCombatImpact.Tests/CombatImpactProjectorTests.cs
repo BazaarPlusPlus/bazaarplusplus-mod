@@ -2637,14 +2637,6 @@ public sealed class CombatImpactProjectorTests
             "×2 · 总计 105",
             CombatImpactMetricFormatter.IncomingGroup(incoming, chinese: true)
         );
-        Assert.Equal(
-            "breakdown unavailable",
-            CombatImpactMetricFormatter.IncomingBreakdown(incoming, chinese: false)
-        );
-        Assert.Equal(
-            "明细不可用",
-            CombatImpactMetricFormatter.IncomingBreakdown(incoming, chinese: true)
-        );
         Assert.All(
             incoming.Sources,
             source =>
@@ -2833,10 +2825,6 @@ public sealed class CombatImpactProjectorTests
             "×4 · 209 total",
             CombatImpactMetricFormatter.IncomingGroup(incoming, chinese: false)
         );
-        Assert.Equal(
-            "breakdown unavailable",
-            CombatImpactMetricFormatter.IncomingBreakdown(incoming, chinese: false)
-        );
         Assert.All(
             incoming.Sources,
             source =>
@@ -2891,10 +2879,6 @@ public sealed class CombatImpactProjectorTests
         Assert.Equal(
             "×4 · 0 total",
             CombatImpactMetricFormatter.IncomingGroup(incoming, chinese: false)
-        );
-        Assert.Equal(
-            "breakdown unavailable",
-            CombatImpactMetricFormatter.IncomingBreakdown(incoming, chinese: false)
         );
     }
 
@@ -4986,6 +4970,77 @@ public sealed class CombatImpactProjectorTests
 
         Assert.Equal(1, group.Count);
         Assert.Equal(187, group.ObservedValue);
+    }
+
+    [Theory]
+    [InlineData(30)]
+    [InlineData(-20)]
+    public void Aura_teardown_does_not_offset_the_applied_contribution(int grantedValue)
+    {
+        var simulation = new CombatSim();
+        simulation.Frames.Clear();
+        var source = InstanceId.TryParse("source");
+        var target = InstanceId.TryParse("target");
+
+        var applied = new CombatSimFrame();
+        applied.Events.Add(
+            new CombatSimEventEffectAuraExecuted
+            {
+                EffectId = "persistent-aura",
+                Source = source,
+                AppliedTo = { CardTarget("target") },
+            }
+        );
+        applied.CardUpdates[target] = new CombatSimCardUpdate
+        {
+            CardInstanceId = target,
+            Attributes =
+            {
+                [ECardAttributeType.CritChance] = new CombatSimCardAttributeUpdate
+                {
+                    AttributeType = ECardAttributeType.CritChance,
+                    PreviousValue = 0,
+                    CurrentValue = grantedValue,
+                },
+            },
+        };
+        simulation.Frames.Add(applied);
+
+        var teardown = new CombatSimFrame();
+        teardown.Events.Add(
+            new CombatSimEventEffectAuraExecuted
+            {
+                EffectId = "persistent-aura",
+                Source = source,
+                RemovedFrom = { CardTarget("target") },
+            }
+        );
+        teardown.Events.Add(
+            new CombatSimEventCombatantDied { CombatantId = ECombatantId.Opponent }
+        );
+        teardown.CardUpdates[target] = new CombatSimCardUpdate
+        {
+            CardInstanceId = target,
+            Attributes =
+            {
+                [ECardAttributeType.CritChance] = new CombatSimCardAttributeUpdate
+                {
+                    AttributeType = ECardAttributeType.CritChance,
+                    PreviousValue = grantedValue,
+                    CurrentValue = 0,
+                },
+            },
+        };
+        simulation.Frames.Add(teardown);
+
+        var report = CombatImpactProjector.Project(simulation, Entities());
+        var caused = Assert.Single(Assert.Single(report.Sources).Groups);
+        var received = Assert.Single(Assert.Single(report.Received).Groups);
+
+        Assert.Equal(1, caused.Count);
+        Assert.Equal(grantedValue, caused.ObservedValue);
+        Assert.Equal(1, received.Count);
+        Assert.Equal(grantedValue, received.ObservedValue);
     }
 
     private static CombatImpactGroup ProjectSingleAuraAttribute(

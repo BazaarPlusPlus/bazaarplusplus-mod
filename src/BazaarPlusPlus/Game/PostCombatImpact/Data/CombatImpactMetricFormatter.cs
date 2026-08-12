@@ -220,11 +220,6 @@ internal static class CombatImpactMetricFormatter
         return string.Join(" · ", parts);
     }
 
-    internal static string IncomingBreakdown(CombatImpactIncomingGroup group, bool chinese) =>
-        group.TransitionLedger == null ? string.Empty
-        : chinese ? "明细不可用"
-        : "breakdown unavailable";
-
     private static bool ShouldShowCount(
         CombatImpactKind kind,
         CombatImpactEventSurface surface,

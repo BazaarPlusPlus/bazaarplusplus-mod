@@ -65,9 +65,7 @@ internal sealed class CombatImpactCorpusCatalog
         return new CombatImpactCorpusCatalog(cards);
     }
 
-    internal IReadOnlyDictionary<string, CombatImpactEntity> BuildEntities(
-        ReplayObservationInput replay
-    )
+    internal CombatImpactCorpusEntityBuild BuildEntities(ReplayObservationInput replay)
     {
         var seeds = new Dictionary<string, CorpusCardSeed>(StringComparer.Ordinal);
         foreach (var spawned in replay.Spawn.Events.OfType<GameSimEventCardSpawned>())
@@ -150,7 +148,12 @@ internal sealed class CombatImpactCorpusCatalog
                 CombatantId: combatant
             );
         }
-        return entities;
+        var implicitPlayerEffects = CombatImpactImplicitPlayerEffectReader.AddMissing(
+            replay.Combat,
+            entities,
+            _cards.Values
+        );
+        return new CombatImpactCorpusEntityBuild(entities, implicitPlayerEffects);
     }
 
     private static IReadOnlyDictionary<ECardAttributeType, int>? ReadAttributes(
@@ -245,6 +248,11 @@ internal sealed class CombatImpactCorpusCatalog
     );
 }
 
+internal sealed record CombatImpactCorpusEntityBuild(
+    IReadOnlyDictionary<string, CombatImpactEntity> Entities,
+    int ImplicitPlayerEffects
+);
+
 internal static class CombatImpactCorpusProjection
 {
     internal static CardAttributeAttributionCorpusReport Analyze(
@@ -254,6 +262,7 @@ internal static class CombatImpactCorpusProjection
     {
         var diagnostics = new List<CardAttributeAttributionCorpusObservation>();
         var rawExecutions = 0;
+        var implicitPlayerEffects = 0;
         foreach (var replay in replays.OrderBy(replay => replay.BattleId, StringComparer.Ordinal))
         {
             rawExecutions += replay.Combat.Frames.Sum(frame =>
@@ -264,7 +273,9 @@ internal static class CombatImpactCorpusProjection
                         && effect.Target is EffectTargetCard
                     )
             );
-            var entities = catalog.BuildEntities(replay);
+            var entityBuild = catalog.BuildEntities(replay);
+            var entities = entityBuild.Entities;
+            implicitPlayerEffects += entityBuild.ImplicitPlayerEffects;
             var report = CombatImpactProjector.Project(replay.Combat, entities);
             diagnostics.AddRange(
                 report.AttributeTransitionDiagnostics.Select(item =>
@@ -300,6 +311,7 @@ internal static class CombatImpactCorpusProjection
         return new CardAttributeAttributionCorpusReport(
             replays.Count,
             rawExecutions,
+            implicitPlayerEffects,
             diagnostics.Count,
             diagnostics.Sum(item => item.ClaimantCount),
             diagnostics.Count(item =>
@@ -464,6 +476,7 @@ internal static class CombatImpactCorpusProjection
 internal sealed record CardAttributeAttributionCorpusReport(
     int Battles,
     int RawTargetedExecutions,
+    int ImplicitPlayerEffects,
     int DiagnosticGroups,
     int DiagnosedClaimants,
     int SingleClaimantGroups,

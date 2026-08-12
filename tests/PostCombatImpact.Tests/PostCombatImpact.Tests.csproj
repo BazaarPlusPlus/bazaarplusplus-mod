@@ -36,6 +36,10 @@
       Link="CombatImpactAbilityAttributeModifierReader.cs"
     />
     <Compile
+      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactImplicitPlayerEffectReader.cs"
+      Link="CombatImpactImplicitPlayerEffectReader.cs"
+    />
+    <Compile
       Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactReportRegistry.cs"
       Link="CombatImpactReportRegistry.cs"
     />

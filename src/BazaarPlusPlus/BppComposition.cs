@@ -130,7 +130,7 @@ internal sealed class BppComposition : IDisposable
         _combatReplayModule = new CombatReplayModule(_eventBus);
         _bazaarAgentCombatSummaryModule = new BazaarAgentCombatSummaryModule(_eventBus);
         _combatStatusBarModule = new CombatStatusBarModule(_eventBus, _runContext);
-        _postCombatImpactModule = new PostCombatImpactModule(_eventBus);
+        _postCombatImpactModule = new PostCombatImpactModule(_eventBus, _staticCardMapProvider);
         _voiceSubtitlesModule = new VoiceSubtitlesModule(_paths.RequireDataRoot());
         _voiceSubtitlesInteropModule = new VoiceSubtitlesInteropModule();
         _supporterCatalogModule = new SupporterCatalogModule(

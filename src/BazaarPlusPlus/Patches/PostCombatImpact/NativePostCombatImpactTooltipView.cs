@@ -28,6 +28,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
     private const float TooltipReadableWidth = 360f;
     private const float TooltipGap = 18f;
     private const float CanvasMargin = 16f;
+    private const float DividerHeight = 2f;
     private const int NativeBottomPaddingReduction = 4;
     private const int NativeDenseBottomPaddingMaximum = 24;
     private const float PlacementEpsilon = 0.5f;
@@ -829,8 +830,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
                 IsChinese(),
                 CriticalMarker(),
                 effectMarker
-            ),
-            CombatImpactMetricFormatter.IncomingBreakdown(group, IsChinese())
+            )
         );
         var detailRows = new List<GameObject>();
         if (CombatImpactDetailPresentationPolicy.ShouldRenderEntityRows(group.Sources.Count))
@@ -1033,7 +1033,8 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         var image = divider.GetComponent<Image>();
         image.color = new Color32(112, 86, 43, 150);
         image.raycastTarget = false;
-        AddLayout(divider, preferredHeight: 1f, flexibleWidth: 1f);
+        var layout = AddLayout(divider, preferredHeight: DividerHeight, flexibleWidth: 1f);
+        layout.minHeight = DividerHeight;
         return divider;
     }
 

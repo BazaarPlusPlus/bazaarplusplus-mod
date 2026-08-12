@@ -1,10 +1,12 @@
 #nullable enable
 using BazaarGameClient.Domain.Models.Cards;
+using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Infra.Messages.CombatSimEvents;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.PostCombatImpact.Data;
 using BazaarPlusPlus.GameInterop.Events;
+using BazaarPlusPlus.GameInterop.StaticCards;
 using BazaarPlusPlus.Infrastructure;
 using TheBazaar;
 using TheBazaar.Tooltips;
@@ -67,13 +69,16 @@ internal interface IPostCombatImpactModule
 internal sealed class PostCombatImpactModule : IBppFeature, IPostCombatImpactModule
 {
     private readonly IBppEventBus _eventBus;
+    private readonly BppStaticCardMapProvider _cardMapProvider;
     private readonly CombatImpactReportRegistry _reports = new();
     private IDisposable? _subscription;
     private PostCombatImpactController? _runtime;
 
-    internal PostCombatImpactModule(IBppEventBus eventBus)
+    internal PostCombatImpactModule(IBppEventBus eventBus, BppStaticCardMapProvider cardMapProvider)
     {
-        _eventBus = eventBus;
+        _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
+        _cardMapProvider =
+            cardMapProvider ?? throw new ArgumentNullException(nameof(cardMapProvider));
     }
 
     internal CombatImpactReport LatestReport => _reports.Latest;
@@ -201,18 +206,49 @@ internal sealed class PostCombatImpactModule : IBppFeature, IPostCombatImpactMod
             return;
         }
 
-        _ = ProjectInBackgroundAsync(simulation, entities, generation);
+        var cardMapLoad = _cardMapProvider.BeginLoad(out _);
+        _ = ProjectInBackgroundAsync(simulation, entities, cardMapLoad, generation);
     }
 
     private async Task ProjectInBackgroundAsync(
         CombatSim simulation,
         IReadOnlyDictionary<string, CombatImpactEntity> entities,
+        Task<Dictionary<Guid, ITCard>?>? cardMapLoad,
         long generation
     )
     {
         try
         {
-            var report = await Task.Run(() => CombatImpactProjector.Project(simulation, entities))
+            var detachedEntities = new Dictionary<string, CombatImpactEntity>(
+                entities,
+                StringComparer.Ordinal
+            );
+            if (cardMapLoad != null)
+            {
+                Dictionary<Guid, ITCard>? cardMap;
+                try
+                {
+                    cardMap = await cardMapLoad.ConfigureAwait(false);
+                }
+                catch
+                {
+                    // Static-data enrichment is optional. Keep the ordinary projection available
+                    // if the shared card-map warmup failed for an unrelated feature.
+                    cardMap = null;
+                }
+                if (cardMap != null)
+                {
+                    CombatImpactImplicitPlayerEffectReader.AddMissing(
+                        simulation,
+                        detachedEntities,
+                        cardMap.Values.OfType<TCardBase>()
+                    );
+                }
+            }
+
+            var report = await Task.Run(() =>
+                    CombatImpactProjector.Project(simulation, detachedEntities)
+                )
                 .ConfigureAwait(false);
             if (!_reports.TryPublish(generation, report))
                 return;

@@ -1916,7 +1916,11 @@ internal static class CombatImpactProjector
                 );
                 var isReferenceValuedAura = IsReferenceValuedAuraEffect(aura, entities);
 
-                foreach (var target in aura.AppliedTo.Concat(aura.RemovedFrom))
+                // Combat teardown removes every surviving aura in one cleanup frame. Those
+                // removals are lifecycle bookkeeping, not negative impact caused by the source.
+                // Count the grant event itself, regardless of whether the granted value is
+                // positive or negative, and ignore RemovedFrom entirely.
+                foreach (var target in aura.AppliedTo)
                 {
                     if (target is EffectTargetPlayer playerTarget)
                     {
