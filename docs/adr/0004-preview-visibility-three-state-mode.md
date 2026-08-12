@@ -1,6 +1,6 @@
 # ADR-0004: Use three-state enchant visibility and configurable key-only upgrade preview
 
-Status: Accepted; consolidated 2026-07-19
+Status: Accepted
 
 ## Decision
 
