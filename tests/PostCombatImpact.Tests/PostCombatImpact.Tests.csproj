@@ -64,6 +64,14 @@
       Link="CombatImpactAttributionRuleReader.cs"
     />
     <Compile
+      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactActiveAbilityReader.cs"
+      Link="CombatImpactActiveAbilityReader.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactCriticalTriggerReader.cs"
+      Link="CombatImpactCriticalTriggerReader.cs"
+    />
+    <Compile
       Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactEntityTags.cs"
       Link="CombatImpactEntityTags.cs"
     />

@@ -254,7 +254,8 @@ internal sealed record CombatImpactEntity(
     >? PrerequisiteSkillSourceRulesByEffectId = null,
     IReadOnlyCollection<CombatImpactUseAttributionRule>? UseAttributionRules = null,
     IReadOnlyDictionary<string, TActionCardModifyAttribute>? AbilityAttributeModifiersByEffectId =
-        null
+        null,
+    IReadOnlyDictionary<string, EEffectPriority>? CriticalTriggerAbilitiesByEffectId = null
 );
 
 internal static class CombatImpactTags
@@ -633,11 +634,19 @@ internal sealed record CombatImpactReport(
     internal IReadOnlyList<CombatImpactAttributeTransitionDiagnostic> AttributeTransitionDiagnostics { get; init; } =
     [];
 
+    internal CombatImpactCriticalTriggerEvidenceAudit CriticalTriggerEvidenceAudit { get; init; } =
+        new(0, 0);
+
     internal static readonly CombatImpactReport Empty = new(
         Array.Empty<CombatImpactSource>(),
         Array.Empty<CombatImpactReceived>()
     );
 }
+
+internal sealed record CombatImpactCriticalTriggerEvidenceAudit(
+    int ResolvedOriginCount,
+    int AttributedOriginCount
+);
 
 internal sealed record CombatImpactProjectionInput(
     IReadOnlyDictionary<string, CombatImpactEntity> Entities,

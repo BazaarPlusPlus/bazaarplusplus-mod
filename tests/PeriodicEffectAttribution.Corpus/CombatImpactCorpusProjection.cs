@@ -132,6 +132,9 @@ internal sealed class CombatImpactCorpusCatalog
                     : null,
                 AbilityAttributeModifiersByEffectId: CombatImpactAbilityAttributeModifierReader.Read(
                     activeAbilities
+                ),
+                CriticalTriggerAbilitiesByEffectId: CombatImpactCriticalTriggerReader.Read(
+                    activeAbilities
                 )
             );
         }
@@ -263,6 +266,9 @@ internal static class CombatImpactCorpusProjection
         var diagnostics = new List<CardAttributeAttributionCorpusObservation>();
         var rawExecutions = 0;
         var implicitPlayerEffects = 0;
+        var criticalTriggerResolvedOrigins = 0;
+        var criticalTriggerAttributedOrigins = 0;
+        var criticalTriggerEvidenceFailures = new List<string>();
         foreach (var replay in replays.OrderBy(replay => replay.BattleId, StringComparer.Ordinal))
         {
             rawExecutions += replay.Combat.Frames.Sum(frame =>
@@ -277,6 +283,21 @@ internal static class CombatImpactCorpusProjection
             var entities = entityBuild.Entities;
             implicitPlayerEffects += entityBuild.ImplicitPlayerEffects;
             var report = CombatImpactProjector.Project(replay.Combat, entities);
+            criticalTriggerResolvedOrigins += report
+                .CriticalTriggerEvidenceAudit
+                .ResolvedOriginCount;
+            criticalTriggerAttributedOrigins += report
+                .CriticalTriggerEvidenceAudit
+                .AttributedOriginCount;
+            if (
+                report.CriticalTriggerEvidenceAudit.AttributedOriginCount
+                != report.CriticalTriggerEvidenceAudit.ResolvedOriginCount
+            )
+                criticalTriggerEvidenceFailures.Add(
+                    $"{replay.BattleId}:"
+                        + $"resolved={report.CriticalTriggerEvidenceAudit.ResolvedOriginCount}/"
+                        + $"attributed={report.CriticalTriggerEvidenceAudit.AttributedOriginCount}"
+                );
             diagnostics.AddRange(
                 report.AttributeTransitionDiagnostics.Select(item =>
                     Observe(replay, item, entities)
@@ -308,6 +329,13 @@ internal static class CombatImpactCorpusProjection
         var conservationFailures = diagnostics
             .Where(item => item.AttributedValue + item.ResidualValue != item.NetValue)
             .ToArray();
+        if (criticalTriggerAttributedOrigins != criticalTriggerResolvedOrigins)
+            throw new InvalidOperationException(
+                "Resolved on-card-critted trigger evidence was not fully attributed: "
+                    + $"resolved={criticalTriggerResolvedOrigins} "
+                    + $"attributed={criticalTriggerAttributedOrigins} "
+                    + $"battles={string.Join(',', criticalTriggerEvidenceFailures.Take(50))}."
+            );
         return new CardAttributeAttributionCorpusReport(
             replays.Count,
             rawExecutions,

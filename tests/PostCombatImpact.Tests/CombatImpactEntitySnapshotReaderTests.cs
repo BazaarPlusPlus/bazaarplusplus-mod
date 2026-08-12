@@ -1,4 +1,5 @@
 using BazaarGameClient.Domain.Models.Cards;
+using BazaarGameShared.Domain.Cards.Enchantments;
 using BazaarGameShared.Domain.Cards.Item;
 using BazaarGameShared.Domain.Cards.PlayerEffects;
 using BazaarGameShared.Domain.Core;
@@ -6,6 +7,7 @@ using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Effect;
 using BazaarGameShared.Domain.Effect.Actions;
 using BazaarGameShared.Domain.Effect.AuraActions;
+using BazaarGameShared.Domain.Effect.Trigger;
 using BazaarGameShared.Domain.Values;
 using BazaarGameShared.Domain.Values.ReferenceValues;
 using BazaarGameShared.Infra.Messages.CombatSimEvents;
@@ -77,6 +79,41 @@ public sealed class CombatImpactEntitySnapshotReaderTests
         ]);
 
         Assert.Null(modifiers);
+    }
+
+    [Fact]
+    public void Active_abilities_include_the_current_enchantments_crit_trigger()
+    {
+        var baseAbility = new TCardAbility { Id = "base" };
+        var enchantedCrit = new TCardAbility
+        {
+            Id = "e1",
+            Trigger = new TTriggerOnCardCritted(),
+            Priority = EEffectPriority.Medium,
+        };
+        var item = new ItemCard
+        {
+            Enchantment = EEnchantmentType.Fiery,
+            Template = new TCardItem
+            {
+                Enchantments = new Dictionary<EEnchantmentType, TEnchantment>
+                {
+                    [EEnchantmentType.Fiery] = new()
+                    {
+                        Abilities = new Dictionary<string, TCardAbility>
+                        {
+                            [enchantedCrit.Id] = enchantedCrit,
+                        },
+                    },
+                },
+            },
+        };
+
+        var abilities = CombatImpactActiveAbilityReader.Read(item, [baseAbility]);
+        var critTriggers = CombatImpactCriticalTriggerReader.Read(abilities);
+
+        Assert.Equal(["base", "e1"], abilities.Select(ability => ability.Id));
+        Assert.Equal(EEffectPriority.Medium, critTriggers?["e1"]);
     }
 
     [Fact]

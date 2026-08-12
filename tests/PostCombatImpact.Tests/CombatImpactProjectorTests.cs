@@ -1231,6 +1231,377 @@ public sealed class CombatImpactProjectorTests
     }
 
     [Fact]
+    public void Recovers_non_damage_crit_from_a_native_on_card_critted_trigger()
+    {
+        var simulation = new CombatSim();
+        simulation.Frames.Clear();
+        var origin = new CombatSimFrame
+        {
+            OpponentUpdates = new CombatSimPlayerUpdate
+            {
+                Attributes =
+                {
+                    [EPlayerAttributeType.Burn] = new CombatSimPlayerAttributeUpdate
+                    {
+                        AttributeType = EPlayerAttributeType.Burn,
+                        PreviousValue = 0,
+                        CurrentValue = 3,
+                    },
+                },
+            },
+        };
+        origin.Events.Add(
+            Executed(
+                "source",
+                EActionCommandType.PlayerBurnApply,
+                Player(ECombatantId.Opponent),
+                triggerSource: "source"
+            )
+        );
+        origin.Events.Add(
+            Executed(
+                "source",
+                EActionCommandType.PlayerShieldApply,
+                Player(ECombatantId.Player),
+                triggerSource: "source"
+            )
+        );
+        origin.PlayerUpdates = new CombatSimPlayerUpdate
+        {
+            HealthAdjustments =
+            {
+                new CombatSimPlayerHealthAdjustment
+                {
+                    DamageType = EDamageType.Shield,
+                    AttributeChanged = EPlayerHealthChangeType.Shield,
+                    Amount = 15,
+                    IsCrit = false,
+                },
+            },
+        };
+        simulation.Frames.Add(origin);
+
+        var evidence = new CombatSimFrame();
+        var gain = Executed(
+            "crit-listener",
+            EActionCommandType.CardModifyAttribute,
+            CardTarget("target"),
+            triggerSource: "source"
+        );
+        gain.EffectId = "crit-gain";
+        evidence.Events.Add(gain);
+        evidence.CardUpdates[InstanceId.TryParse("target")] = new CombatSimCardUpdate
+        {
+            CardInstanceId = InstanceId.TryParse("target"),
+            Attributes =
+            {
+                [ECardAttributeType.DamageAmount] = new CombatSimCardAttributeUpdate
+                {
+                    AttributeType = ECardAttributeType.DamageAmount,
+                    PreviousValue = 10,
+                    CurrentValue = 20,
+                },
+            },
+        };
+        simulation.Frames.Add(evidence);
+        simulation.CardStats["source"] = new Dictionary<ECardStats, int>
+        {
+            [ECardStats.BurnAdded] = 3,
+            [ECardStats.ShieldAdded] = 15,
+            [ECardStats.UseCount] = 1,
+        };
+
+        var entities = Entities().ToDictionary(item => item.Key, item => item.Value);
+        entities["source"] = entities["source"] with
+        {
+            Attributes = new Dictionary<ECardAttributeType, int>
+            {
+                [ECardAttributeType.BurnApplyAmount] = 3,
+                [ECardAttributeType.ShieldApplyAmount] = 15,
+            },
+        };
+        entities["crit-listener"] = new CombatImpactEntity(
+            "crit-listener",
+            "Boombox",
+            "Item",
+            null,
+            5,
+            AbilityAttributeTypesByEffectId: new Dictionary<string, ECardAttributeType>
+            {
+                ["crit-gain"] = ECardAttributeType.DamageAmount,
+            },
+            CriticalTriggerAbilitiesByEffectId: new Dictionary<string, EEffectPriority>
+            {
+                ["crit-gain"] = EEffectPriority.Low,
+            }
+        );
+
+        var report = CombatImpactProjector.Project(simulation, entities);
+        var source = Assert.Single(report.Sources, candidate => candidate.Entity.Id == "source");
+        var burn = Assert.Single(source.Groups, group => group.Kind == CombatImpactKind.Burn);
+        var shield = Assert.Single(source.Groups, group => group.Kind == CombatImpactKind.Shield);
+
+        Assert.Equal(1, burn.CriticalCount);
+        Assert.Equal(1, burn.CriticalOutcomeCount);
+        Assert.Null(burn.CriticalObservedValue);
+        Assert.Equal(0, shield.CriticalCount);
+        Assert.Equal(2, source.Groups.Count);
+        Assert.Equal(
+            report.CriticalTriggerEvidenceAudit.ResolvedOriginCount,
+            report.CriticalTriggerEvidenceAudit.AttributedOriginCount
+        );
+        Assert.Equal(1, report.CriticalTriggerEvidenceAudit.ResolvedOriginCount);
+    }
+
+    [Fact]
+    public void Does_not_apply_on_card_critted_evidence_to_an_unrelated_source()
+    {
+        var simulation = new CombatSim();
+        simulation.Frames.Clear();
+        var origin = new CombatSimFrame
+        {
+            OpponentUpdates = new CombatSimPlayerUpdate
+            {
+                HealthAdjustments =
+                {
+                    new CombatSimPlayerHealthAdjustment
+                    {
+                        DamageType = EDamageType.Damage,
+                        AttributeChanged = EPlayerHealthChangeType.Health,
+                        Amount = -10,
+                    },
+                },
+            },
+        };
+        origin.Events.Add(
+            Executed(
+                "source",
+                EActionCommandType.PlayerDamage,
+                Player(ECombatantId.Opponent),
+                triggerSource: "source"
+            )
+        );
+        simulation.Frames.Add(origin);
+
+        var evidence = new CombatSimFrame();
+        var gain = Executed(
+            "crit-listener",
+            EActionCommandType.CardModifyAttribute,
+            CardTarget("target"),
+            triggerSource: "trigger"
+        );
+        gain.EffectId = "crit-gain";
+        evidence.Events.Add(gain);
+        evidence.CardUpdates[InstanceId.TryParse("target")] = DamageUpdate(
+            InstanceId.TryParse("target"),
+            10,
+            20
+        );
+        simulation.Frames.Add(evidence);
+        simulation.CardStats["source"] = new Dictionary<ECardStats, int>
+        {
+            [ECardStats.DamageDone] = 10,
+        };
+
+        var entities = Entities().ToDictionary(item => item.Key, item => item.Value);
+        entities["crit-listener"] = new CombatImpactEntity(
+            "crit-listener",
+            "Boombox",
+            "Item",
+            null,
+            5,
+            AbilityAttributeTypesByEffectId: new Dictionary<string, ECardAttributeType>
+            {
+                ["crit-gain"] = ECardAttributeType.DamageAmount,
+            },
+            CriticalTriggerAbilitiesByEffectId: new Dictionary<string, EEffectPriority>
+            {
+                ["crit-gain"] = EEffectPriority.Low,
+            }
+        );
+
+        var damage = Assert.Single(
+            Assert
+                .Single(
+                    CombatImpactProjector.Project(simulation, entities).Sources,
+                    candidate => candidate.Entity.Id == "source"
+                )
+                .Groups
+        );
+
+        Assert.Equal(0, damage.CriticalCount);
+    }
+
+    [Fact]
+    public void Deduplicates_native_and_on_card_critted_evidence_for_one_activation()
+    {
+        var simulation = new CombatSim();
+        simulation.Frames.Clear();
+        var origin = new CombatSimFrame
+        {
+            OpponentUpdates = new CombatSimPlayerUpdate
+            {
+                HealthAdjustments =
+                {
+                    DamageAdjustment(EPlayerHealthChangeType.Health, -20, isCritical: true),
+                },
+            },
+        };
+        origin.Events.Add(
+            Executed(
+                "source",
+                EActionCommandType.PlayerDamage,
+                Player(ECombatantId.Opponent),
+                triggerSource: "source"
+            )
+        );
+        simulation.Frames.Add(origin);
+
+        var listener = new CombatSimFrame();
+        var gain = Executed(
+            "crit-listener",
+            EActionCommandType.CardModifyAttribute,
+            CardTarget("target"),
+            triggerSource: "source"
+        );
+        gain.EffectId = "crit-gain";
+        listener.Events.Add(gain);
+        listener.CardUpdates[InstanceId.TryParse("target")] = DamageUpdate(
+            InstanceId.TryParse("target"),
+            10,
+            20
+        );
+        simulation.Frames.Add(listener);
+        simulation.CardStats["source"] = new Dictionary<ECardStats, int>
+        {
+            [ECardStats.DamageDone] = 20,
+        };
+
+        var entities = Entities().ToDictionary(item => item.Key, item => item.Value);
+        entities["crit-listener"] = CriticalTriggerEntity(EEffectPriority.Low);
+
+        var damage = Assert.Single(
+            Assert
+                .Single(
+                    CombatImpactProjector.Project(simulation, entities).Sources,
+                    source => source.Entity.Id == "source"
+                )
+                .Groups
+        );
+
+        Assert.Equal(1, damage.CriticalCount);
+        Assert.Equal(1, damage.CriticalOutcomeCount);
+    }
+
+    [Fact]
+    public void Associates_low_priority_crit_evidence_with_a_same_frame_origin()
+    {
+        var simulation = new CombatSim();
+        simulation.Frames.Clear();
+        var frame = PlayerEffectFrame(
+            EActionCommandType.PlayerBurnApply,
+            EPlayerAttributeType.Burn,
+            0,
+            6
+        );
+        var gain = Executed(
+            "crit-listener",
+            EActionCommandType.CardModifyAttribute,
+            CardTarget("target"),
+            triggerSource: "source"
+        );
+        gain.EffectId = "crit-gain";
+        frame.Events.Add(gain);
+        frame.CardUpdates[InstanceId.TryParse("target")] = DamageUpdate(
+            InstanceId.TryParse("target"),
+            10,
+            20
+        );
+        simulation.Frames.Add(frame);
+        simulation.CardStats["source"] = new Dictionary<ECardStats, int>
+        {
+            [ECardStats.BurnAdded] = 6,
+        };
+
+        var entities = Entities().ToDictionary(item => item.Key, item => item.Value);
+        entities["source"] = entities["source"] with
+        {
+            Attributes = new Dictionary<ECardAttributeType, int>
+            {
+                [ECardAttributeType.BurnApplyAmount] = 3,
+            },
+        };
+        entities["crit-listener"] = CriticalTriggerEntity(EEffectPriority.Low);
+
+        var burn = Assert.Single(
+            Assert
+                .Single(
+                    CombatImpactProjector.Project(simulation, entities).Sources,
+                    source => source.Entity.Id == "source"
+                )
+                .Groups
+        );
+
+        Assert.Equal(1, burn.CriticalCount);
+    }
+
+    [Fact]
+    public void Does_not_associate_delayed_crit_evidence_with_an_unrelated_same_frame_activation()
+    {
+        var simulation = new CombatSim();
+        simulation.Frames.Clear();
+        simulation.Frames.Add(
+            PlayerEffectFrame(EActionCommandType.PlayerBurnApply, EPlayerAttributeType.Burn, 0, 6)
+        );
+        var evidence = PlayerEffectFrame(
+            EActionCommandType.PlayerBurnApply,
+            EPlayerAttributeType.Burn,
+            6,
+            9
+        );
+        var gain = Executed(
+            "crit-listener",
+            EActionCommandType.CardModifyAttribute,
+            CardTarget("target"),
+            triggerSource: "source"
+        );
+        gain.EffectId = "crit-gain";
+        evidence.Events.Add(gain);
+        evidence.CardUpdates[InstanceId.TryParse("target")] = DamageUpdate(
+            InstanceId.TryParse("target"),
+            10,
+            20
+        );
+        simulation.Frames.Add(evidence);
+        simulation.CardStats["source"] = new Dictionary<ECardStats, int>
+        {
+            [ECardStats.BurnAdded] = 9,
+        };
+
+        var entities = Entities().ToDictionary(item => item.Key, item => item.Value);
+        entities["source"] = entities["source"] with
+        {
+            Attributes = new Dictionary<ECardAttributeType, int>
+            {
+                [ECardAttributeType.BurnApplyAmount] = 3,
+            },
+        };
+        entities["crit-listener"] = CriticalTriggerEntity(EEffectPriority.Low);
+
+        var burn = Assert.Single(
+            Assert
+                .Single(
+                    CombatImpactProjector.Project(simulation, entities).Sources,
+                    source => source.Entity.Id == "source"
+                )
+                .Groups
+        );
+
+        Assert.Equal(1, burn.CriticalCount);
+        Assert.Equal(2, burn.Count);
+    }
+
+    [Fact]
     public void Recovers_damage_crits_when_multiple_same_frame_attacks_hide_native_adjustments()
     {
         var simulation = new CombatSim();
@@ -5237,6 +5608,23 @@ public sealed class CombatImpactProjectorTests
 
     private static EffectTargetCard CardTarget(string target) =>
         new() { Target = InstanceId.TryParse(target) };
+
+    private static CombatImpactEntity CriticalTriggerEntity(EEffectPriority priority) =>
+        new(
+            "crit-listener",
+            "Boombox",
+            "Item",
+            null,
+            5,
+            AbilityAttributeTypesByEffectId: new Dictionary<string, ECardAttributeType>
+            {
+                ["crit-gain"] = ECardAttributeType.DamageAmount,
+            },
+            CriticalTriggerAbilitiesByEffectId: new Dictionary<string, EEffectPriority>
+            {
+                ["crit-gain"] = priority,
+            }
+        );
 
     private static CombatSimPlayerUpdate Damage(int amount) =>
         new()
