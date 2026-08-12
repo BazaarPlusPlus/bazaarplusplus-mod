@@ -45,7 +45,7 @@ BazaarPlusPlus 是一个面向《The Bazaar》的 BepInEx 5 模组：战斗 UI �
 
 自动识别不到游戏目录时，用 `-p:ManagedPath=/path/to/TheBazaar_Data/Managed` 显式指定。运行 `./run.sh` 查看全部子命令及说明。
 
-- `voice-lines.json` 与 `tenwin_builds.json` 不存入仓库，构建时从 `src/BazaarPlusPlus/obj/remote-data/` 的共享副本嵌入；副本缺失时自动下载一次，也可用 `./run.sh fetch-data` 手动刷新。
+- `voice-lines.json` 与 `builds.json` 不存入仓库，构建时从 `src/BazaarPlusPlus/obj/remote-data/` 的共享副本嵌入；副本缺失时自动下载一次，也可用 `./run.sh fetch-data` 手动刷新。
 - 普通 Release 只编译；只有 `./run.sh publish` 会写入相邻 installer 仓库并生成 `BepInEx.zip`。
 
 ## 数据与网络行为

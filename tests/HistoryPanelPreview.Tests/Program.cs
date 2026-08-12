@@ -636,6 +636,7 @@ internal sealed class FakeSession : INativeCardPreviewSession
 internal sealed class FakeOwner : INativeCardPreviewOwner
 {
     public int Layer => 0;
+    public bool UsePremiumVisuals => false;
 
     public UnityEngine.Transform? ResolveParent(NativeCardPreviewSubject subject) => null;
 

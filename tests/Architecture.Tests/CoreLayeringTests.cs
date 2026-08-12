@@ -2930,14 +2930,14 @@ public class CoreLayeringTests
         Assert.Equal("102400", resources["voice-lines.json"]["MinBytes"]);
         Assert.Equal("true", resources["voice-lines.json"]["FetchWhenMissing"]);
         Assert.Equal(
-            "BazaarPlusPlus.Data.BuildRecommendations.tenwin_builds.json",
-            resources["tenwin_builds.json"]["LogicalName"]
+            "BazaarPlusPlus.Data.BuildRecommendations.builds.json",
+            resources["builds.json"]["LogicalName"]
         );
-        Assert.Equal("51200", resources["tenwin_builds.json"]["MinBytes"]);
-        Assert.Equal("false", resources["tenwin_builds.json"]["FetchWhenMissing"]);
+        Assert.Equal("51200", resources["builds.json"]["MinBytes"]);
+        Assert.Equal("false", resources["builds.json"]["FetchWhenMissing"]);
 
         var targetsText = File.ReadAllText(targetsPath);
-        Assert.Contains("Data/BuildRecommendations/tenwin_builds.json", targetsText);
+        Assert.Contains("Data/BuildRecommendations/builds.json", targetsText);
         Assert.Contains("TenWinBuildsEmbeddedPath", targetsText);
         Assert.Contains("VoiceLinesSourcePath", targetsText);
         Assert.Contains("PrepareLocalVoiceLinesSource", targetsText);

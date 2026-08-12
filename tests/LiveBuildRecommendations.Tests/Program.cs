@@ -40,7 +40,7 @@ internal static class TenWinBuildTests
         TestRemoteUrlsUseAnalyzerV5Latest();
         TestOptionalLiveSampleParses();
         TestFindRecommendationsHasNoRatingTierParam();
-        TestDefaultCachePathUsesTenwinBuildsFileName();
+        TestDefaultCachePathUsesBuildsFileName();
         TestSingleCardSelectionResolvesViaCardIndex();
         TestMultiCardSelectionPrefersIntersection();
         TestUnionFallbackWhenIntersectionEmptyButAllCovered();
@@ -277,13 +277,13 @@ internal static class TenWinBuildTests
         );
     }
 
-    private static void TestDefaultCachePathUsesTenwinBuildsFileName()
+    private static void TestDefaultCachePathUsesBuildsFileName()
     {
         var dataRootPath = Path.Combine(Path.GetTempPath(), $"bpp-data-root-{Guid.NewGuid():N}");
         var cachePath = TenWinBuildCatalogFactory.BuildCacheFilePath(dataRootPath);
 
         Assert(
-            cachePath == Path.Combine(dataRootPath, "tenwin_builds.json"),
+            cachePath == Path.Combine(dataRootPath, "builds.json"),
             "Ten-win build cache should live under the V5 data root."
         );
     }
@@ -594,7 +594,7 @@ internal static class TenWinBuildTests
         var json = source.ReadAsync(CancellationToken.None).AsTask().GetAwaiter().GetResult();
         Assert(
             !string.IsNullOrWhiteSpace(json),
-            "The bundled tenwin_builds.json seed should be embedded in the assembly."
+            "The bundled builds.json seed should be embedded in the assembly."
         );
 
         var corpus = TenWinBuildCorpus.Parse(json);
