@@ -14,28 +14,17 @@ using BazaarPlusPlus.ModApi;
 using BazaarPlusPlus.ModApi.Bundle;
 using MessagePack;
 
-const string corpusEnvironmentVariable = "BPP_REPLAY_CORPUS";
 const string bundleSampleLimitEnvironmentVariable = "BPP_BUNDLE_CORPUS_LIMIT";
-const string evidencePathEnvironmentVariable = "BPP_PERIODIC_EVIDENCE_PATH";
+const string evidencePathEnvironmentVariable = "BPP_COMBAT_IMPACT_EVIDENCE_PATH";
 const string gameDataPathEnvironmentVariable = "BPP_GAMEDATA_DB";
 const int defaultBundleSampleLimit = 100;
 
-if (args.Length > 2)
+if (args.Length is < 1 or > 2)
 {
-    throw new ArgumentException(
-        "Usage: PeriodicEffectAttribution.Corpus [replay-corpus-path] [report-path]"
-    );
+    throw new ArgumentException("Usage: CombatImpact.Corpus <replay-corpus-path> [report-path]");
 }
 
-var corpusPath =
-    args.Length >= 1 ? args[0] : Environment.GetEnvironmentVariable(corpusEnvironmentVariable);
-if (string.IsNullOrWhiteSpace(corpusPath))
-{
-    Console.WriteLine(
-        $"Periodic-effect corpus acceptance skipped; pass a path or set {corpusEnvironmentVariable}."
-    );
-    return;
-}
+var corpusPath = Path.GetFullPath(args[0]);
 
 if (!Directory.Exists(corpusPath))
     throw new DirectoryNotFoundException($"Replay corpus does not exist: {corpusPath}");
@@ -43,7 +32,7 @@ if (!Directory.Exists(corpusPath))
 var reportPath =
     args.Length == 2
         ? Path.GetFullPath(args[1])
-        : Path.Combine(AppContext.BaseDirectory, "periodic-effect-corpus-report.json");
+        : Path.GetFullPath(Path.Combine("artifacts", "combat-impact-corpus", "report.json"));
 var loadResult = LoadCorpus(corpusPath);
 var replays = loadResult.Replays;
 var invalidPayloads = loadResult.InvalidPayloads;
@@ -112,7 +101,24 @@ var evidencePath = string.IsNullOrWhiteSpace(configuredEvidencePath)
         Path.GetFileNameWithoutExtension(reportPath) + ".evidence.json"
     )
     : Path.GetFullPath(configuredEvidencePath);
-var evidence = BuildEvidenceSnapshot(report, loadResult, reportJson);
+var evidence = BuildEvidenceSnapshot(
+    report,
+    loadResult,
+    reportJson,
+    [
+        DescribeVerificationInput("game_data", gameDataPath),
+        DescribeVerificationInput(
+            "game_types",
+            typeof(CombatSim).Assembly.Location,
+            typeof(CombatSim).Assembly.GetName().Version?.ToString()
+        ),
+        DescribeVerificationInput(
+            "json_runtime",
+            typeof(Newtonsoft.Json.JsonConvert).Assembly.Location,
+            typeof(Newtonsoft.Json.JsonConvert).Assembly.GetName().Version?.ToString()
+        ),
+    ]
+);
 Directory.CreateDirectory(Path.GetDirectoryName(evidencePath)!);
 File.WriteAllText(
     evidencePath,
@@ -131,18 +137,20 @@ Console.WriteLine($"P1 evidence snapshot={evidencePath}");
 static object BuildEvidenceSnapshot(
     CorpusInventoryReport report,
     CorpusLoadResult loadResult,
-    string reportJson
+    string reportJson,
+    IReadOnlyList<VerificationInputArtifact> verificationInputs
 )
 {
     var reportBytes = Encoding.UTF8.GetBytes(reportJson + Environment.NewLine);
     return new
     {
-        EvidenceSchemaVersion = 1,
+        EvidenceSchemaVersion = 2,
         CorpusSchemaVersion = report.SchemaVersion,
         report.Attribution.ModelVersion,
         loadResult.SourceKind,
         loadResult.SourceCount,
         SourceArtifacts = loadResult.SourceArtifacts,
+        VerificationInputs = verificationInputs,
         BattleIds = report
             .BattlesSummary.Select(battle => battle.BattleId)
             .Order(StringComparer.Ordinal)
@@ -205,6 +213,21 @@ static object BuildEvidenceSnapshot(
         },
         report.CardAttributeAttribution,
     };
+}
+
+static VerificationInputArtifact DescribeVerificationInput(
+    string role,
+    string path,
+    string? version = null
+)
+{
+    using var stream = File.OpenRead(path);
+    return new VerificationInputArtifact(
+        role,
+        Path.GetFileName(path),
+        Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant(),
+        version
+    );
 }
 Console.WriteLine(
     $"P1 inventory report={reportPath} battles={report.Battles} frames={report.Frames} "
@@ -282,19 +305,27 @@ static int CountUpdatePeriodicAdjustments(CombatSimPlayerUpdate? update) =>
 
 static CorpusLoadResult LoadCorpus(string corpusPath)
 {
-    var bundleRoot = Path.Combine(corpusPath, "run-bundles");
-    if (!Directory.Exists(bundleRoot))
-        return LoadReplayPayloadCorpus(corpusPath);
+    var runBundleRoot = Path.Combine(corpusPath, "run-bundles");
+    if (Directory.Exists(runBundleRoot))
+    {
+        var runBundlePaths = SampleBundlePaths(runBundleRoot, "*.mpack.gz");
+        if (runBundlePaths.Length == 0)
+            throw new InvalidOperationException($"Run-bundle cache is empty: {runBundleRoot}");
+        return LoadBundleCorpus("run_bundles", runBundlePaths);
+    }
 
-    var bundlePaths = Directory
-        .EnumerateFiles(bundleRoot, "*.mpack.gz", SearchOption.AllDirectories)
+    var rawBundlePaths = SampleBundlePaths(corpusPath, "*.bundle");
+    return rawBundlePaths.Length > 0
+        ? LoadBundleCorpus("raw_v5_bundles", rawBundlePaths)
+        : LoadReplayPayloadCorpus(corpusPath);
+}
+
+static string[] SampleBundlePaths(string rootPath, string searchPattern) =>
+    Directory
+        .EnumerateFiles(rootPath, searchPattern, SearchOption.AllDirectories)
         .Order(StringComparer.Ordinal)
         .Take(BundleSampleLimit())
         .ToArray();
-    if (bundlePaths.Length == 0)
-        throw new InvalidOperationException($"Run-bundle cache is empty: {bundleRoot}");
-    return LoadBundleCorpus(bundlePaths);
-}
 
 static int BundleSampleLimit()
 {
@@ -337,7 +368,7 @@ static CorpusLoadResult LoadReplayPayloadCorpus(string corpusPath)
     );
 }
 
-static CorpusLoadResult LoadBundleCorpus(IReadOnlyList<string> bundlePaths)
+static CorpusLoadResult LoadBundleCorpus(string sourceKind, IReadOnlyList<string> bundlePaths)
 {
     var replays = new List<ReplayObservationInput>();
     var invalidPayloads = new List<string>();
@@ -407,7 +438,7 @@ static CorpusLoadResult LoadBundleCorpus(IReadOnlyList<string> bundlePaths)
     if (replays.Count == 0)
         throw new InvalidOperationException("Sampled run bundles contained no replay payloads.");
     return new CorpusLoadResult(
-        "run_bundles",
+        sourceKind,
         bundlePaths.Count,
         replays,
         invalidPayloads,
@@ -750,3 +781,10 @@ internal sealed record CorpusLoadResult(
 );
 
 internal sealed record CorpusSourceArtifact(string Name, string? Sha256);
+
+internal sealed record VerificationInputArtifact(
+    string Role,
+    string Name,
+    string Sha256,
+    string? Version
+);
