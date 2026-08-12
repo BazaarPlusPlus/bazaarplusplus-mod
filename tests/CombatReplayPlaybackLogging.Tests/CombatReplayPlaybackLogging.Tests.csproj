@@ -49,5 +49,9 @@
       Include="../../src/BazaarPlusPlus/Game/CombatReplay/ReplayPersistenceLogState.cs"
       Link="ReplayPersistenceLogState.cs"
     />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/CombatReplay/Bootstrap/ReplayPresentationTaskTracker.cs"
+      Link="ReplayPresentationTaskTracker.cs"
+    />
   </ItemGroup>
 </Project>

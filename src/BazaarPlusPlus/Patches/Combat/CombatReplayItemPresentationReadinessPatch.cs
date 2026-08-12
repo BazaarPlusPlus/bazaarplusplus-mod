@@ -4,13 +4,23 @@
 using BazaarGameClient.Domain.Models.Cards;
 using BazaarPlusPlus.Game.CombatReplay.Bootstrap;
 using HarmonyLib;
+using TheBazaar;
 
 namespace BazaarPlusPlus.Patches.Combat;
 
-[HarmonyPatch(typeof(ItemController), nameof(ItemController.Setup), [typeof(Card)])]
+[HarmonyPatch]
 internal static class CombatReplayItemPresentationReadinessPatch
 {
+    [HarmonyPatch(typeof(ItemController), nameof(ItemController.Setup), [typeof(Card)])]
     [HarmonyPostfix]
-    private static void Postfix(ItemController __instance, ref Task __result) =>
-        __result = ReplayItemPresentationReadiness.Track(__instance, __result);
+    private static void TrackItemSetup(ref Task __result) =>
+        __result = ReplayItemPresentationReadiness.Track(__result);
+}
+
+[HarmonyPatch(typeof(ReplayState), "SpawnCombatCards", [])]
+internal static class CombatReplayBoardSpawnReadinessPatch
+{
+    [HarmonyPostfix]
+    private static void TrackBoardSpawn(ref Task __result) =>
+        __result = ReplayItemPresentationReadiness.Track(__result);
 }
