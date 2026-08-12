@@ -410,8 +410,10 @@ test_corpus() {
         echo -e "${RED}Replay corpus directory not found: '$corpus_path'.${RESET}" >&2
         return 2
     fi
-    dotnet run --project tools/PeriodicEffectAttribution.Corpus/PeriodicEffectAttribution.Corpus.csproj \
-        -- "$@"
+    local report_path="${2:-$SCRIPT_DIR/artifacts/combat-impact-corpus/report.json}"
+    dotnet run --project tests/CombatImpact.Corpus/CombatImpact.Corpus.csproj \
+        -p:BppDeployToGame=false -p:ManagedPath="$MANAGED" \
+        -- "$corpus_path" "$report_path"
 }
 
 parse_test_options() {
@@ -600,7 +602,7 @@ Usage:
   $0 test-compat [-p:ManagedPath=...]
       Run every compatibility check whose local game/decompiled prerequisites are available.
   $0 test-corpus <replay-corpus-path> [report-path]
-      Run the retained offline periodic-effect evidence analysis. A corpus is mandatory.
+      Run the opt-in offline Combat Impact corpus acceptance. A corpus is mandatory.
   $0 format
   $0 format-check
       Format, or fail on unformatted files, with the repo-pinned CSharpier.

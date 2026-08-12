@@ -61,8 +61,7 @@ BazaarPlusPlus 是一个面向《The Bazaar》的 BepInEx 5 模组：战斗 UI �
 - `src/BazaarPlusPlus/`：主插件工程。`Plugin.cs` 为 BepInEx 入口，feature wiring 走 `BppComposition.cs` 组合根；其下按 `Core/`、`GameInterop/`、`Game/`、`Patches/`、`Infrastructure/`、`Data/` 分层，职责详见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 - `src/BazaarPlusPlus.ModApi/`、`src/BazaarPlusPlus.Storage/`、`src/BazaarPlusPlus.Localization/`：HTTP 客户端、本地持久化、本地化引擎三个独立程序集（零 game/Unity/BepInEx 依赖）。
 - `src/BazaarPlusPlus.BazaarAgent/`、`src/BazaarPlusPlus.BazaarAgentHost/`：可选的 BazaarAgent 纯核心与 host 插件。
-- `tests/`：12 个默认 xUnit 测试宿主、兼容性清单，以及由 `ScenarioRunner.Tests` 逐子进程执行的源码影子场景 capsule。
-- `tools/PeriodicEffectAttribution.Corpus/`：需要显式提供 replay corpus 的离线证据工具，不属于默认测试。
+- `tests/`：12 个默认 xUnit 测试宿主、兼容性清单、由 `ScenarioRunner.Tests` 逐子进程执行的源码影子场景 capsule，以及需要显式提供 replay corpus 的 `CombatImpact.Corpus` 离线验收 module；后者在默认测试中只做编译保护，不会执行 corpus 门禁。
 - `decompiled/`：游戏 DLL 的 ILSpy 反编译输出，只读参考。
 - `run.sh`：本地构建、测试、格式化和反编译入口。
 

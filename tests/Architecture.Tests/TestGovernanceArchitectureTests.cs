@@ -43,9 +43,13 @@ public sealed class TestGovernanceArchitectureTests
         var script = File.ReadAllText(Path.Combine(root, "run.sh"));
         var solutionPath = Path.Combine(root, "tests", "BazaarPlusPlus.Tests.slnx");
         var compatibilityPath = Path.Combine(root, "tests", "CompatibilityTests.manifest");
+        const string corpusProjectRelativePath =
+            "tests/CombatImpact.Corpus/CombatImpact.Corpus.csproj";
+        var corpusProjectPath = Path.Combine(root, corpusProjectRelativePath);
 
         Assert.True(File.Exists(solutionPath));
         Assert.True(File.Exists(compatibilityPath));
+        Assert.True(File.Exists(corpusProjectPath));
         Assert.Contains(
             "dotnet test tests/BazaarPlusPlus.Tests.slnx",
             script,
@@ -54,23 +58,28 @@ public sealed class TestGovernanceArchitectureTests
         Assert.DoesNotContain("find tests -name", script, StringComparison.Ordinal);
         Assert.Contains("test-compat", script, StringComparison.Ordinal);
         Assert.Contains("test-corpus", script, StringComparison.Ordinal);
-        Assert.Contains(
-            "tools/PeriodicEffectAttribution.Corpus/PeriodicEffectAttribution.Corpus.csproj",
-            script,
-            StringComparison.Ordinal
-        );
-        Assert.False(
-            File.Exists(
-                Path.Combine(
-                    root,
-                    "tests",
-                    "PeriodicEffectAttribution.Corpus",
-                    "PeriodicEffectAttribution.Corpus.csproj"
-                )
-            )
+        Assert.Contains(corpusProjectRelativePath, script, StringComparison.Ordinal);
+        Assert.Equal(
+            1,
+            script.Split(corpusProjectRelativePath, StringSplitOptions.None).Length - 1
         );
 
+        var architectureProject = XDocument.Load(
+            Path.Combine(root, "tests", "Architecture.Tests", "Architecture.Tests.csproj")
+        );
+        var corpusCompileReference = architectureProject
+            .Descendants("ProjectReference")
+            .Single(reference =>
+                string.Equals(
+                    (string?)reference.Attribute("Include"),
+                    "../CombatImpact.Corpus/CombatImpact.Corpus.csproj",
+                    StringComparison.Ordinal
+                )
+            );
+        Assert.Equal("false", (string?)corpusCompileReference.Attribute("ReferenceOutputAssembly"));
+
         var defaultSolution = XDocument.Load(solutionPath).ToString();
+        Assert.DoesNotContain("CombatImpact.Corpus", defaultSolution, StringComparison.Ordinal);
         foreach (var entry in CompatibilityEntries(compatibilityPath))
         {
             Assert.DoesNotContain(
@@ -108,7 +117,7 @@ public sealed class TestGovernanceArchitectureTests
     }
 
     [Fact]
-    public void Executable_scenario_capsules_are_closed_and_owned_by_one_xunit_host()
+    public void Executable_test_hosts_are_closed_and_owned_by_an_explicit_lane()
     {
         var root = RepoRoot();
         var props = XDocument.Load(Path.Combine(root, "Directory.Build.props"));
@@ -125,6 +134,7 @@ public sealed class TestGovernanceArchitectureTests
             )
             .Select(entry => Path.GetFileNameWithoutExtension(entry.Project))
             .ToHashSet(StringComparer.Ordinal);
+        var corpus = new HashSet<string>(StringComparer.Ordinal) { "CombatImpact.Corpus" };
         var executableProjects = Directory
             .EnumerateFiles(Path.Combine(root, "tests"), "*.csproj", SearchOption.AllDirectories)
             .Where(path =>
@@ -135,11 +145,13 @@ public sealed class TestGovernanceArchitectureTests
             .ToHashSet(StringComparer.Ordinal);
 
         Assert.True(
-            executableProjects.SetEquals(scenarios.Concat(compatibility)),
-            "Every executable test capsule must belong to the default scenario host or the "
-                + "compatibility manifest."
+            executableProjects.SetEquals(scenarios.Concat(compatibility).Concat(corpus)),
+            "Every executable test host must belong to the default scenario host, the "
+                + "compatibility manifest, or the explicit corpus lane."
         );
         Assert.DoesNotContain(scenarios, scenario => compatibility.Contains(scenario));
+        Assert.DoesNotContain(scenarios, scenario => corpus.Contains(scenario));
+        Assert.DoesNotContain(compatibility, project => corpus.Contains(project));
 
         var hostProject = File.ReadAllText(
             Path.Combine(root, "tests", "ScenarioRunner.Tests", "ScenarioRunner.Tests.csproj")

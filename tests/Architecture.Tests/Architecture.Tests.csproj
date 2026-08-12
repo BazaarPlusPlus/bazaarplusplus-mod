@@ -22,6 +22,10 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/BazaarPlusPlus.Storage/BazaarPlusPlus.Storage.csproj" />
+    <ProjectReference
+      Include="../CombatImpact.Corpus/CombatImpact.Corpus.csproj"
+      ReferenceOutputAssembly="false"
+    />
   </ItemGroup>
 
   <ItemGroup>

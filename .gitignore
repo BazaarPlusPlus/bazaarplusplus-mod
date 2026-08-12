@@ -48,8 +48,6 @@ Thumbs.db
 .sandbox-home
 report-ui
 tools/*
-!tools/PeriodicEffectAttribution.Corpus/
-!tools/PeriodicEffectAttribution.Corpus/**
 .claude
 .superpowers/
 *.lscache
