@@ -7,7 +7,7 @@ TestUnicodeFontCoverage();
 TestNativeGameFontSelection();
 TestBilingualItemNamePresentation();
 TestStablePanelTextCompactionKeepsStableSlots();
-TestCollectionSortButtonWidthIsCompact();
+TestCollectionSortWidthsKeepStableGroup();
 
 Console.WriteLine("UiFoundation checks passed.");
 
@@ -142,19 +142,26 @@ static void TestStablePanelTextCompactionKeepsStableSlots()
     );
 }
 
-static void TestCollectionSortButtonWidthIsCompact()
+static void TestCollectionSortWidthsKeepStableGroup()
 {
     Assert(
-        Sizes.CollectionSortButtonWidth == 60f,
-        "CollectionPanel sort buttons should use the compact 60pt token."
+        Sizes.CollectionSortActiveWidth > Sizes.CollectionSortInactiveWidth,
+        "Chinese CollectionPanel sort buttons should give the selected segment more room."
     );
     Assert(
-        Sizes.CollectionSortButtonWidth < Sizes.RunsTabWidth,
-        "CollectionPanel sort buttons should be narrower than top-level tab buttons."
+        Sizes.CollectionSortEnglishActiveWidth > Sizes.CollectionSortEnglishInactiveWidth,
+        "English CollectionPanel sort buttons should give the selected segment more room."
     );
     Assert(
-        Sizes.CollectionSortButtonWidth >= Sizes.InfoChipMinWidth,
-        "CollectionPanel sort buttons should not shrink below the existing compact chip floor."
+        Sizes.CollectionSortActiveWidth + Sizes.CollectionSortInactiveWidth
+            == Sizes.CollectionSortEnglishActiveWidth
+                + Sizes.CollectionSortEnglishInactiveWidth,
+        "Changing language should preserve the total sort-group width."
+    );
+    Assert(
+        Sizes.CollectionSortInactiveWidth >= Sizes.InfoChipMinWidth
+            && Sizes.CollectionSortEnglishInactiveWidth >= Sizes.InfoChipMinWidth,
+        "Inactive sort segments should not shrink below the compact chip floor."
     );
 }
 
