@@ -8,6 +8,7 @@ using BazaarGameShared.Infra.Messages;
 using BazaarGameShared.Infra.Messages.CombatSimEvents;
 using BazaarGameShared.Infra.Messages.GameSimEvents;
 using BazaarPlusPlus.Game.CombatReplay;
+using BazaarPlusPlus.Game.PostCombatImpact.Data;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.ModApi;
 using BazaarPlusPlus.ModApi.Bundle;
@@ -16,6 +17,7 @@ using MessagePack;
 const string corpusEnvironmentVariable = "BPP_REPLAY_CORPUS";
 const string bundleSampleLimitEnvironmentVariable = "BPP_BUNDLE_CORPUS_LIMIT";
 const string evidencePathEnvironmentVariable = "BPP_PERIODIC_EVIDENCE_PATH";
+const string gameDataPathEnvironmentVariable = "BPP_GAMEDATA_DB";
 const int defaultBundleSampleLimit = 100;
 
 if (args.Length > 2)
@@ -45,6 +47,11 @@ var reportPath =
 var loadResult = LoadCorpus(corpusPath);
 var replays = loadResult.Replays;
 var invalidPayloads = loadResult.InvalidPayloads;
+var gameDataPath = ResolveGameDataPath();
+var cardAttributeAttribution = CombatImpactCorpusProjection.Analyze(
+    replays,
+    CombatImpactCorpusCatalog.Load(gameDataPath)
+);
 
 var sample = replays
     .Select(replay => new BoundarySample(
@@ -87,10 +94,10 @@ var jsonOptions = new JsonSerializerOptions
     PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
     WriteIndented = true,
 };
-var report = CorpusInventory.Build(replays, invalidPayloads);
+var report = CorpusInventory.Build(replays, invalidPayloads, cardAttributeAttribution);
 var reportJson = JsonSerializer.Serialize(report, jsonOptions);
 var repeatedJson = JsonSerializer.Serialize(
-    CorpusInventory.Build(replays, invalidPayloads),
+    CorpusInventory.Build(replays, invalidPayloads, cardAttributeAttribution),
     jsonOptions
 );
 if (!string.Equals(reportJson, repeatedJson, StringComparison.Ordinal))
@@ -196,6 +203,7 @@ static object BuildEvidenceSnapshot(
             report.Attribution.RegenStableSpawnBaselineAttributed,
             report.Attribution.RegenStableSpawnBaselineUnknown,
         },
+        report.CardAttributeAttribution,
     };
 }
 Console.WriteLine(
@@ -205,6 +213,20 @@ Console.WriteLine(
         + $"unresolved_actions={report.Sources.UnresolvedActions} "
         + $"missing_stat_identities={report.Sources.MissingStatSourceIdentities.Count}"
 );
+Console.WriteLine(
+    $"P2 card_attribute groups={report.CardAttributeAttribution.DiagnosticGroups} "
+        + $"claimants={report.CardAttributeAttribution.DiagnosedClaimants} "
+        + $"concurrent_exact={report.CardAttributeAttribution.ConcurrentExactGroups} "
+        + $"a2_solved={report.CardAttributeAttribution.SingleUnknownSolvedGroups} "
+        + $"residual={report.CardAttributeAttribution.ResidualGroups} "
+        + $"single_unknown={report.CardAttributeAttribution.SingleUnknownResidualGroups} "
+        + $"a2_remaining={report.CardAttributeAttribution.RemainingSingleUnknownSolvableGroups} "
+        + $"single_unknown_range={report.CardAttributeAttribution.SingleUnknownRangeGroups} "
+        + $"b_candidate={report.CardAttributeAttribution.EventOrderReplayCandidateGroups} "
+        + $"b_multiply={report.CardAttributeAttribution.EventOrderReplayMultiplyGroups} "
+        + $"conservation_failures={report.CardAttributeAttribution.ConservationFailures} "
+        + $"game_data={gameDataPath}"
+);
 
 static int CountPeriodicStats(CombatSim combat) =>
     combat.CardStats.Values.Count(stats =>
@@ -212,6 +234,39 @@ static int CountPeriodicStats(CombatSim combat) =>
         || stats.ContainsKey(ECardStats.PoisonAdded)
         || stats.ContainsKey(ECardStats.RegenAdded)
     );
+
+static string ResolveGameDataPath()
+{
+    var configured = Environment.GetEnvironmentVariable(gameDataPathEnvironmentVariable);
+    if (!string.IsNullOrWhiteSpace(configured))
+        return Path.GetFullPath(configured);
+
+    var candidates = new[]
+    {
+        Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            "Library",
+            "Application Support",
+            "com.TempoStorm.TheBazaar",
+            "prod",
+            "cache",
+            "GameData.db"
+        ),
+        Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "TempoStorm",
+            "TheBazaar",
+            "prod",
+            "cache",
+            "GameData.db"
+        ),
+    };
+    var resolved = candidates.FirstOrDefault(File.Exists);
+    return resolved
+        ?? throw new FileNotFoundException(
+            $"GameData.db was not found; set {gameDataPathEnvironmentVariable}."
+        );
+}
 
 static int CountPeriodicAdjustments(CombatSim combat) =>
     combat.Frames.Sum(frame =>
@@ -445,6 +500,40 @@ static void Validate(CorpusInventoryReport report)
         throw new InvalidOperationException(
             $"Corpus contained invalid payloads: {string.Join(",", report.InvalidPayloads)}"
         );
+    var cardAttributes = report.CardAttributeAttribution;
+    if (cardAttributes.DiagnosticGroups == 0 || cardAttributes.DiagnosedClaimants == 0)
+    {
+        throw new InvalidOperationException("Card-attribute attribution diagnostics were vacuous.");
+    }
+    if (
+        cardAttributes.ConcurrentExactGroups
+            + cardAttributes.SingleUnknownSolvedGroups
+            + cardAttributes.ResidualGroups
+        == 0
+    )
+    {
+        throw new InvalidOperationException(
+            "Card-attribute attribution diagnostics observed no concurrent claimant group."
+        );
+    }
+    if (cardAttributes.ConservationFailures != 0)
+    {
+        throw new InvalidOperationException(
+            $"Card-attribute attribution failed conservation in {cardAttributes.ConservationFailures} groups."
+        );
+    }
+    if (
+        cardAttributes.ResidualObservations.Any(observation =>
+            observation.Resolution
+                == CombatImpactAttributeTransitionResolution.ConcurrentResidual.ToString()
+            && observation.FailureReasons.Count == 0
+        )
+    )
+    {
+        throw new InvalidOperationException(
+            "A residual card-attribute group was emitted without an auditable failure reason."
+        );
+    }
     if (report.Sources.ResolvedActions == 0 || report.Sources.MissingStatSourceIdentities.Count > 0)
     {
         throw new InvalidOperationException(

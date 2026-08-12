@@ -3,6 +3,7 @@ using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Effect;
 using BazaarGameShared.Domain.Effect.Actions;
 using BazaarGameShared.Domain.Targeting;
+using BazaarGameShared.Domain.Values;
 using BazaarGameShared.Domain.Values.ReferenceValues;
 using BazaarGameShared.Infra.Messages.CombatSimEvents;
 using BazaarGameShared.Infra.Messages.Shared;
@@ -2575,7 +2576,7 @@ public sealed class CombatImpactProjectorTests
     }
 
     [Fact]
-    public void Concurrent_configured_attribute_values_remain_omitted_when_their_sum_does_not_match()
+    public void Concurrent_configured_attribute_mismatch_preserves_counts_and_one_received_residual()
     {
         var simulation = new CombatSim();
         var bassId = InstanceId.TryParse("bass");
@@ -2597,8 +2598,304 @@ public sealed class CombatImpactProjectorTests
 
         var report = CombatImpactProjector.Project(simulation, entities);
 
-        Assert.Empty(report.Sources);
-        Assert.Empty(report.Received);
+        Assert.Equal(2, report.Sources.Count);
+        foreach (var sourceId in new[] { "bass", "slow-and-steady" })
+        {
+            var source = Assert.Single(
+                report.Sources,
+                candidate => candidate.Entity.Id == sourceId
+            );
+            var group = Assert.Single(source.Groups);
+            Assert.Equal(1, group.Count);
+            Assert.Null(group.ObservedValue);
+            Assert.Equal(CombatImpactCoverage.None, group.ObservedCoverage);
+            Assert.True(group.HasUnattributedTransitionValue);
+            Assert.Equal("×1", CombatImpactMetricFormatter.Group(group, chinese: false));
+
+            var target = Assert.Single(group.Targets);
+            Assert.Null(target.ObservedValue);
+            Assert.True(target.HasUnattributedTransitionValue);
+            Assert.Equal("×1", CombatImpactMetricFormatter.Target(group, target, chinese: false));
+        }
+
+        var received = Assert.Single(report.Received);
+        var incoming = Assert.Single(received.Groups);
+        Assert.Equal("bass", received.Entity.Id);
+        Assert.Equal(2, incoming.Count);
+        Assert.Null(incoming.ObservedValue);
+        var ledger = Assert.IsType<CombatImpactIncomingTransitionLedger>(incoming.TransitionLedger);
+        Assert.Equal(105, ledger.NetValue);
+        Assert.Equal(0, ledger.AttributedValue);
+        Assert.Equal(105, ledger.ResidualValue);
+        Assert.Equal(2, ledger.ResidualApplicationCount);
+        Assert.Equal(1, ledger.ResidualFrameCount);
+        Assert.Equal(
+            "×2 · 105 total",
+            CombatImpactMetricFormatter.IncomingGroup(incoming, chinese: false)
+        );
+        Assert.Equal(
+            "×2 · 总计 105",
+            CombatImpactMetricFormatter.IncomingGroup(incoming, chinese: true)
+        );
+        Assert.Equal(
+            "breakdown unavailable",
+            CombatImpactMetricFormatter.IncomingBreakdown(incoming, chinese: false)
+        );
+        Assert.Equal(
+            "明细不可用",
+            CombatImpactMetricFormatter.IncomingBreakdown(incoming, chinese: true)
+        );
+        Assert.All(
+            incoming.Sources,
+            source =>
+                Assert.Equal(
+                    "×1",
+                    CombatImpactMetricFormatter.IncomingSource(incoming, source, chinese: false)
+                )
+        );
+    }
+
+    [Fact]
+    public void Solves_one_statically_unknown_concurrent_attribute_claimant_from_the_net_delta()
+    {
+        var simulation = new CombatSim();
+        var targetId = InstanceId.TryParse("target");
+        simulation.Frames[0].Events.Add(AttributeExecution("known", "known-gain", "target"));
+        simulation.Frames[0].Events.Add(AttributeExecution("unknown", "unknown-gain", "target"));
+        simulation.Frames[0].CardUpdates[targetId] = DamageUpdate(targetId, 100, 117);
+
+        var knownModifier = new TActionCardModifyAttribute
+        {
+            AttributeType = ECardAttributeType.DamageAmount,
+            Operation = EAttributeModifierOperation.Add,
+            Value = new TFixedValue { Value = 5 },
+        };
+        var unknownModifier = new TActionCardModifyAttribute
+        {
+            AttributeType = ECardAttributeType.DamageAmount,
+            Operation = EAttributeModifierOperation.Add,
+            Value = new TReferenceValueCardAttributeUnscaled(),
+        };
+        var entities = Entities().ToDictionary(item => item.Key, item => item.Value);
+        entities["known"] = AttributeModifierEntity(
+            "known",
+            "Known Gain",
+            "known-gain",
+            knownModifier,
+            5
+        );
+        entities["unknown"] = AttributeModifierEntity(
+            "unknown",
+            "Unknown Gain",
+            "unknown-gain",
+            unknownModifier,
+            6
+        );
+
+        var report = CombatImpactProjector.Project(simulation, entities);
+
+        AssertAttributeGain(report, "known", "target", expectedCount: 1, expectedValue: 5);
+        AssertAttributeGain(report, "unknown", "target", expectedCount: 1, expectedValue: 12);
+        var incoming = Assert.Single(Assert.Single(report.Received).Groups);
+        Assert.Equal(17, incoming.ObservedValue);
+        Assert.Null(incoming.TransitionLedger);
+        var diagnostic = Assert.Single(report.AttributeTransitionDiagnostics);
+        Assert.Equal(
+            CombatImpactAttributeTransitionResolution.ConcurrentSingleUnknownSolved,
+            diagnostic.Resolution
+        );
+        Assert.Equal(17, diagnostic.AttributedValue);
+        Assert.Equal(0, diagnostic.ResidualValue);
+        Assert.Equal(0, diagnostic.UnresolvedClaimantCount);
+        Assert.Equal(
+            [CombatImpactAttributeTransitionFailureReason.CardAttributeUnscaled],
+            diagnostic.FailureReasons
+        );
+    }
+
+    [Fact]
+    public void Rejects_a_solved_range_delta_outside_the_configured_bounds()
+    {
+        var simulation = new CombatSim();
+        var targetId = InstanceId.TryParse("target");
+        simulation.Frames[0].Events.Add(AttributeExecution("known", "known-gain", "target"));
+        simulation.Frames[0].Events.Add(AttributeExecution("unknown", "unknown-gain", "target"));
+        simulation.Frames[0].CardUpdates[targetId] = DamageUpdate(targetId, 100, 117);
+
+        var entities = Entities().ToDictionary(item => item.Key, item => item.Value);
+        entities["known"] = AttributeModifierEntity(
+            "known",
+            "Known Gain",
+            "known-gain",
+            new TActionCardModifyAttribute
+            {
+                AttributeType = ECardAttributeType.DamageAmount,
+                Operation = EAttributeModifierOperation.Add,
+                Value = new TFixedValue { Value = 5 },
+            },
+            5
+        );
+        entities["unknown"] = AttributeModifierEntity(
+            "unknown",
+            "Range Gain",
+            "unknown-gain",
+            new TActionCardModifyAttribute
+            {
+                AttributeType = ECardAttributeType.DamageAmount,
+                Operation = EAttributeModifierOperation.Add,
+                Value = new TRangeValue { MinValue = 1, MaxValue = 3 },
+            },
+            6
+        );
+
+        var report = CombatImpactProjector.Project(simulation, entities);
+
+        Assert.All(
+            report.Sources,
+            source => Assert.Null(Assert.Single(source.Groups).ObservedValue)
+        );
+        var incoming = Assert.Single(Assert.Single(report.Received).Groups);
+        Assert.Equal(17, incoming.TransitionLedger?.NetValue);
+        var diagnostic = Assert.Single(report.AttributeTransitionDiagnostics);
+        Assert.Equal(
+            CombatImpactAttributeTransitionResolution.ConcurrentResidual,
+            diagnostic.Resolution
+        );
+        Assert.Equal(1, diagnostic.UnresolvedClaimantCount);
+        Assert.Equal(
+            [CombatImpactAttributeTransitionFailureReason.RangeValue],
+            diagnostic.FailureReasons
+        );
+    }
+
+    [Fact]
+    public void Mixed_exact_and_residual_attribute_frames_hide_partial_source_amounts()
+    {
+        var simulation = new CombatSim();
+        simulation.Frames.Clear();
+        var bassId = InstanceId.TryParse("bass");
+
+        var exact = new CombatSimFrame();
+        exact.Events.Add(AttributeExecution("bass", "bass-gain", "bass"));
+        exact.Events.Add(AttributeExecution("slow-and-steady", "steady-gain", "bass"));
+        exact.CardUpdates[bassId] = DamageUpdate(bassId, 1000, 1104);
+        simulation.Frames.Add(exact);
+
+        var residual = new CombatSimFrame();
+        residual.Events.Add(AttributeExecution("bass", "bass-gain", "bass"));
+        residual.Events.Add(AttributeExecution("slow-and-steady", "steady-gain", "bass"));
+        residual.CardUpdates[bassId] = DamageUpdate(bassId, 1104, 1209);
+        simulation.Frames.Add(residual);
+
+        var entities = Entities().ToDictionary(item => item.Key, item => item.Value);
+        entities["bass"] = AttributeGainEntity("bass", "Bass", 100, "bass-gain", 5);
+        entities["slow-and-steady"] = AttributeGainEntity(
+            "slow-and-steady",
+            "Slow and Steady",
+            4,
+            "steady-gain",
+            6
+        );
+
+        var report = CombatImpactProjector.Project(simulation, entities);
+
+        var bass = Assert.Single(report.Sources, source => source.Entity.Id == "bass");
+        var bassGain = Assert.Single(bass.Groups);
+        Assert.Equal(100, bassGain.ObservedValue);
+        Assert.Equal(CombatImpactCoverage.Partial, bassGain.ObservedCoverage);
+        Assert.True(bassGain.HasUnattributedTransitionValue);
+        Assert.Equal("×2", CombatImpactMetricFormatter.Group(bassGain, chinese: false));
+        Assert.Equal(
+            "×2",
+            CombatImpactMetricFormatter.Target(
+                bassGain,
+                Assert.Single(bassGain.Targets),
+                chinese: false
+            )
+        );
+
+        var steady = Assert.Single(report.Sources, source => source.Entity.Id == "slow-and-steady");
+        var steadyGain = Assert.Single(steady.Groups);
+        Assert.Equal(4, steadyGain.ObservedValue);
+        Assert.Equal("×2", CombatImpactMetricFormatter.Group(steadyGain, chinese: false));
+
+        var incoming = Assert.Single(Assert.Single(report.Received).Groups);
+        Assert.Equal(4, incoming.Count);
+        Assert.Equal(104, incoming.ObservedValue);
+        Assert.Equal(CombatImpactCoverage.Partial, incoming.ObservedCoverage);
+        var ledger = Assert.IsType<CombatImpactIncomingTransitionLedger>(incoming.TransitionLedger);
+        Assert.Equal(209, ledger.NetValue);
+        Assert.Equal(104, ledger.AttributedValue);
+        Assert.Equal(105, ledger.ResidualValue);
+        Assert.Equal(2, ledger.ResidualApplicationCount);
+        Assert.Equal(1, ledger.ResidualFrameCount);
+        Assert.Equal(
+            "×4 · 209 total",
+            CombatImpactMetricFormatter.IncomingGroup(incoming, chinese: false)
+        );
+        Assert.Equal(
+            "breakdown unavailable",
+            CombatImpactMetricFormatter.IncomingBreakdown(incoming, chinese: false)
+        );
+        Assert.All(
+            incoming.Sources,
+            source =>
+            {
+                Assert.True(source.HasUnattributedTransitionValue);
+                Assert.Equal(
+                    "×2",
+                    CombatImpactMetricFormatter.IncomingSource(incoming, source, chinese: false)
+                );
+            }
+        );
+    }
+
+    [Fact]
+    public void Opposing_residual_attribute_frames_conserve_a_zero_net_transition()
+    {
+        var simulation = new CombatSim();
+        simulation.Frames.Clear();
+        var bassId = InstanceId.TryParse("bass");
+        var values = new[] { (Previous: 1000, Current: 1105), (Previous: 1105, Current: 1000) };
+        foreach (var (previous, current) in values)
+        {
+            var frame = new CombatSimFrame();
+            frame.Events.Add(AttributeExecution("bass", "bass-gain", "bass"));
+            frame.Events.Add(AttributeExecution("slow-and-steady", "steady-gain", "bass"));
+            frame.CardUpdates[bassId] = DamageUpdate(bassId, previous, current);
+            simulation.Frames.Add(frame);
+        }
+
+        var entities = Entities().ToDictionary(item => item.Key, item => item.Value);
+        entities["bass"] = AttributeGainEntity("bass", "Bass", 100, "bass-gain", 5);
+        entities["slow-and-steady"] = AttributeGainEntity(
+            "slow-and-steady",
+            "Slow and Steady",
+            4,
+            "steady-gain",
+            6
+        );
+
+        var incoming = Assert.Single(
+            Assert.Single(CombatImpactProjector.Project(simulation, entities).Received).Groups
+        );
+        var ledger = Assert.IsType<CombatImpactIncomingTransitionLedger>(incoming.TransitionLedger);
+
+        Assert.Equal(4, incoming.Count);
+        Assert.True(incoming.HasMixedValueDirections);
+        Assert.Equal(0, ledger.NetValue);
+        Assert.Equal(0, ledger.AttributedValue);
+        Assert.Equal(0, ledger.ResidualValue);
+        Assert.Equal(4, ledger.ResidualApplicationCount);
+        Assert.Equal(2, ledger.ResidualFrameCount);
+        Assert.Equal(
+            "×4 · 0 total",
+            CombatImpactMetricFormatter.IncomingGroup(incoming, chinese: false)
+        );
+        Assert.Equal(
+            "breakdown unavailable",
+            CombatImpactMetricFormatter.IncomingBreakdown(incoming, chinese: false)
+        );
     }
 
     [Fact]
@@ -4222,6 +4519,48 @@ public sealed class CombatImpactProjectorTests
     }
 
     [Fact]
+    public void Residual_does_not_duplicate_a_transition_claimed_by_another_action_kind()
+    {
+        var simulation = new CombatSim();
+        var target = InstanceId.TryParse("target");
+        simulation
+            .Frames[0]
+            .Events.Add(Executed("source", EActionCommandType.CardHaste, CardTarget("target")));
+        simulation.Frames[0].Events.Add(AttributeExecution("trigger", "haste-gain", "target"));
+        simulation.Frames[0].CardUpdates[target] = HasteUpdate(target, 950);
+
+        var entities = EntitiesWithSourceAttribute(ECardAttributeType.HasteAmount, 1_000)
+            .ToDictionary(item => item.Key, item => item.Value);
+        entities["trigger"] = entities["trigger"] with
+        {
+            AbilityAttributeTypesByEffectId = new Dictionary<string, ECardAttributeType>
+            {
+                ["haste-gain"] = ECardAttributeType.Haste,
+            },
+            AbilityAttributeModifiersByEffectId = new Dictionary<string, TActionCardModifyAttribute>
+            {
+                ["haste-gain"] = new TActionCardModifyAttribute
+                {
+                    AttributeType = ECardAttributeType.Haste,
+                    Operation = EAttributeModifierOperation.Add,
+                    Value = new TFixedValue { Value = 50 },
+                },
+            },
+        };
+
+        var report = CombatImpactProjector.Project(simulation, entities);
+
+        var source = Assert.Single(report.Sources);
+        var haste = Assert.Single(source.Groups);
+        Assert.Equal("source", source.Entity.Id);
+        Assert.Equal(CombatImpactKind.Haste, haste.Kind);
+        Assert.Equal(1_000, haste.ObservedValue);
+        var incoming = Assert.Single(Assert.Single(report.Received).Groups);
+        Assert.Equal(CombatImpactKind.Haste, incoming.Kind);
+        Assert.Null(incoming.TransitionLedger);
+    }
+
+    [Fact]
     public void Generic_player_modifier_does_not_block_a_specific_attribute_transition()
     {
         var simulation = new CombatSim();
@@ -4769,9 +5108,40 @@ public sealed class CombatImpactProjectorTests
         );
     }
 
+    private static CombatImpactEntity AttributeModifierEntity(
+        string id,
+        string name,
+        string effectId,
+        TActionCardModifyAttribute modifier,
+        int order
+    ) =>
+        new(
+            id,
+            name,
+            "Skill",
+            null,
+            order,
+            AbilityAttributeTypesByEffectId: new Dictionary<string, ECardAttributeType>
+            {
+                [effectId] = modifier.AttributeType,
+            },
+            AbilityAttributeModifiersByEffectId: new Dictionary<string, TActionCardModifyAttribute>
+            {
+                [effectId] = modifier,
+            }
+        );
+
     private static void AssertDamageGain(
         CombatImpactReport report,
         string sourceId,
+        int expectedCount,
+        int expectedValue
+    ) => AssertAttributeGain(report, sourceId, "bass", expectedCount, expectedValue);
+
+    private static void AssertAttributeGain(
+        CombatImpactReport report,
+        string sourceId,
+        string targetId,
         int expectedCount,
         int expectedValue
     )
@@ -4783,7 +5153,7 @@ public sealed class CombatImpactProjectorTests
         Assert.Equal(expectedCount, group.Count);
         Assert.Equal(expectedValue, group.ObservedValue);
         var target = Assert.Single(group.Targets);
-        Assert.Equal("bass", target.Entity.Id);
+        Assert.Equal(targetId, target.Entity.Id);
         Assert.Equal(expectedCount, target.Count);
         Assert.Equal(expectedValue, target.ObservedValue);
     }

@@ -24,7 +24,8 @@ internal static class CorpusInventory
 
     internal static CorpusInventoryReport Build(
         IReadOnlyList<ReplayObservationInput> replays,
-        IReadOnlyList<string> invalidPayloads
+        IReadOnlyList<string> invalidPayloads,
+        CardAttributeAttributionCorpusReport cardAttributeAttribution
     )
     {
         var adjustments = new SortedDictionary<string, AdjustmentAggregate>(StringComparer.Ordinal);
@@ -147,7 +148,7 @@ internal static class CorpusInventory
         }
 
         return new CorpusInventoryReport(
-            SchemaVersion: 4,
+            SchemaVersion: 5,
             Battles: replays.Count,
             Frames: totalFrames,
             InvalidPayloads: invalidPayloads.Order(StringComparer.Ordinal).ToArray(),
@@ -172,6 +173,7 @@ internal static class CorpusInventory
             Rules: RuleCandidateCoverage.Build(periodicFrames),
             TerminalImpact: terminalImpact,
             Attribution: attribution,
+            CardAttributeAttribution: cardAttributeAttribution,
             BattlesSummary: battleSummaries,
             PeriodicFrames: periodicFrames
         );
@@ -655,6 +657,7 @@ internal sealed record CorpusInventoryReport(
     RuleCandidateCoverage Rules,
     TerminalImpactCoverage TerminalImpact,
     AttributionCoverage Attribution,
+    CardAttributeAttributionCorpusReport CardAttributeAttribution,
     IReadOnlyList<BattleInventorySummary> BattlesSummary,
     IReadOnlyList<PeriodicFrameObservation> PeriodicFrames
 );

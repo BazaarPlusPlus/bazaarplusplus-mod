@@ -9,8 +9,13 @@
   <ItemGroup>
     <ProjectReference Include="../../src/BazaarPlusPlus.ModApi/BazaarPlusPlus.ModApi.csproj" />
     <PackageReference Include="MessagePack" />
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
     <Reference Include="BazaarGameShared">
       <HintPath>$(ManagedPath)/BazaarGameShared.dll</HintPath>
+    </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>$(ManagedPath)/Newtonsoft.Json.dll</HintPath>
     </Reference>
   </ItemGroup>
 
@@ -22,6 +27,38 @@
     <Compile
       Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/PeriodicEffectAttribution.cs"
       Link="PeriodicEffectAttribution.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactAbilityAttributeModifierReader.cs"
+      Link="CombatImpactAbilityAttributeModifierReader.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactAggregator.cs"
+      Link="CombatImpactAggregator.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactAttributionRuleReader.cs"
+      Link="CombatImpactAttributionRuleReader.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactProjector.cs"
+      Link="CombatImpactProjector.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactTransformLineage.cs"
+      Link="CombatImpactTransformLineage.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactTransformedCardSnapshotReader.cs"
+      Link="CombatImpactTransformedCardSnapshotReader.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/GameInterop/CombatSimulation/CardActionCostSpentEventReader.cs"
+      Link="CardActionCostSpentEventReader.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/GameInterop/CombatSimulation/OptionalCombatTempoTypes.cs"
+      Link="OptionalCombatTempoTypes.cs"
     />
     <Compile
       Include="../../src/BazaarPlusPlus/Game/CombatReplay/CombatReplayPayloadStore.cs"

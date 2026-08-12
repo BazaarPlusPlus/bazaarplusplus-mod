@@ -118,6 +118,40 @@ internal enum CombatImpactResidualCoverage
     UpperBound,
 }
 
+internal enum CombatImpactAttributeTransitionResidualReason
+{
+    ConcurrentAttributionUnavailable,
+}
+
+internal enum CombatImpactAttributeTransitionResolution
+{
+    SingleClaimantNet,
+    ConcurrentConfiguredExact,
+    ConcurrentSingleUnknownSolved,
+    ConcurrentResidual,
+}
+
+internal enum CombatImpactAttributeTransitionFailureReason
+{
+    ModifierUnavailable,
+    AttributeMismatch,
+    MultiplyOperation,
+    AdditiveMultiplyOperation,
+    UnsupportedOperation,
+    RangeValue,
+    CardAttributeUnscaled,
+    AttributeChangeReference,
+    PlayerAttributeReference,
+    CardCountReference,
+    NonSelfCardReference,
+    SourceAttributeUnavailable,
+    DynamicReferenceModifier,
+    NonIntegralConfiguredValue,
+    UnsupportedValueType,
+    ConfiguredSumMismatch,
+    ClaimantIdentityMismatch,
+}
+
 internal readonly record struct PeriodicImpactKey(
     string SourceId,
     ECombatantId Combatant,
@@ -305,6 +339,38 @@ internal sealed record CombatImpactEvent(
 
     internal CombatImpactTriggerScope TriggerScope { get; init; } =
         CombatImpactTriggerScope.NotApplicable;
+
+    internal bool IsUnattributedTransitionClaimant { get; init; }
+
+    internal int? UnattributedTransitionValue { get; init; }
+
+    internal int? AttributeTransitionNetValue { get; init; }
+
+    internal CombatImpactAttributeTransitionResolution? AttributeTransitionResolution { get; init; }
+
+    internal IReadOnlyList<CombatImpactAttributeTransitionFailureReason> AttributeTransitionFailureReasons { get; init; } =
+    [];
+
+    internal int AttributeTransitionUnresolvedClaimantCount { get; init; }
+
+    internal bool AttributeTransitionEventOrderReplayReconciles { get; init; }
+
+    internal bool AttributeTransitionEventOrderReplayIncludesMultiply { get; init; }
+}
+
+internal sealed record CombatImpactAttributeTransitionResidual(
+    int FrameIndex,
+    string TargetId,
+    string NativeAttributeKey,
+    int Value,
+    CombatImpactValueUnit Unit,
+    int ApplicationCount,
+    CombatImpactAttributeTransitionResidualReason Reason
+)
+{
+    internal CombatImpactKind Kind => CombatImpactKind.AttributeChange;
+
+    internal CombatImpactEventSurface Surface => CombatImpactEventSurface.CardAttribute;
 }
 
 internal sealed record CombatImpactApplicationLedger(
@@ -338,6 +404,8 @@ internal sealed record CombatImpactTarget(
 )
 {
     internal int ValuedApplicationCount { get; init; }
+
+    internal bool HasUnattributedTransitionValue { get; init; }
 }
 
 internal sealed record CombatImpactAuthoritativeMetric
@@ -444,6 +512,8 @@ internal sealed record CombatImpactGroup(
 
     internal CombatImpactPeriodicImpact? PeriodicImpact { get; init; }
 
+    internal bool HasUnattributedTransitionValue { get; init; }
+
     internal bool HasDivergentTargetCoverage =>
         UnresolvedTargetCount > 0
         || AuthoritativeMetric is { Basis: CombatImpactAuthoritativeBasis.TotalAmount } total
@@ -480,7 +550,34 @@ internal sealed record CombatImpactIncomingSource(
 )
 {
     internal int ValuedApplicationCount { get; init; }
+
+    internal bool HasUnattributedTransitionValue { get; init; }
 }
+
+internal sealed record CombatImpactIncomingTransitionLedger(
+    int NetValue,
+    int AttributedValue,
+    int ResidualValue,
+    int ResidualApplicationCount,
+    int ResidualFrameCount,
+    CombatImpactValueUnit Unit
+);
+
+internal sealed record CombatImpactAttributeTransitionDiagnostic(
+    int FrameIndex,
+    string TargetId,
+    string NativeAttributeKey,
+    int NetValue,
+    int AttributedValue,
+    int ResidualValue,
+    int ClaimantCount,
+    int UnresolvedClaimantCount,
+    CombatImpactValueUnit Unit,
+    CombatImpactAttributeTransitionResolution Resolution,
+    IReadOnlyList<CombatImpactAttributeTransitionFailureReason> FailureReasons,
+    bool EventOrderReplayReconciles,
+    bool EventOrderReplayIncludesMultiply
+);
 
 internal sealed record CombatImpactIncomingGroup(
     CombatImpactKind Kind,
@@ -510,6 +607,8 @@ internal sealed record CombatImpactIncomingGroup(
     internal int UnresolvedSourceCount { get; init; }
 
     internal int ValuedApplicationCount { get; init; }
+
+    internal CombatImpactIncomingTransitionLedger? TransitionLedger { get; init; }
 }
 
 internal sealed record CombatImpactReceived(
@@ -531,6 +630,9 @@ internal sealed record CombatImpactReport(
     internal IReadOnlyList<CombatImpactProjectionDiagnostic> ProjectionDiagnostics { get; init; } =
     [];
 
+    internal IReadOnlyList<CombatImpactAttributeTransitionDiagnostic> AttributeTransitionDiagnostics { get; init; } =
+    [];
+
     internal static readonly CombatImpactReport Empty = new(
         Array.Empty<CombatImpactSource>(),
         Array.Empty<CombatImpactReceived>()
@@ -542,4 +644,8 @@ internal sealed record CombatImpactProjectionInput(
     IReadOnlyList<CombatImpactEvent> Events,
     IReadOnlyDictionary<string, int> UseCounts,
     IReadOnlyDictionary<string, IReadOnlyList<CombatImpactAuthoritativeMetric>> AuthoritativeMetrics
-);
+)
+{
+    internal IReadOnlyList<CombatImpactAttributeTransitionResidual> AttributeTransitionResiduals { get; init; } =
+    [];
+}

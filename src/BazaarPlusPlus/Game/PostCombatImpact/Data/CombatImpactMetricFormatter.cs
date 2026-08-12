@@ -80,7 +80,7 @@ internal static class CombatImpactMetricFormatter
         }
         else
         {
-            if (group.ObservedValue.HasValue)
+            if (group.ObservedValue.HasValue && !group.HasUnattributedTransitionValue)
             {
                 parts.Add(
                     ObservedValue(
@@ -167,7 +167,7 @@ internal static class CombatImpactMetricFormatter
     )
     {
         var count = $"×{target.Count}";
-        if (!target.ObservedValue.HasValue)
+        if (!target.ObservedValue.HasValue || target.HasUnattributedTransitionValue)
             return ShouldShowCount(group.Kind, group.Surface, group.OccurrenceBasis)
                 ? count
                 : string.Empty;
@@ -194,7 +194,18 @@ internal static class CombatImpactMetricFormatter
         var parts = new List<string>();
         if (group.Count > 0 && ShouldShowCount(group.Kind, group.Surface, group.OccurrenceBasis))
             parts.Add(Count(group.Count, group.CriticalCount, chinese, criticalMarker));
-        if (group.ObservedValue.HasValue)
+        if (group.TransitionLedger is { } transitionLedger)
+        {
+            var value = ObservedValue(
+                group.Kind,
+                transitionLedger.NetValue,
+                transitionLedger.Unit,
+                chinese,
+                effectMarker
+            );
+            parts.Add(chinese ? $"总计 {value}" : $"{value} total");
+        }
+        else if (group.ObservedValue.HasValue)
         {
             var value = ObservedValue(
                 group.Kind,
@@ -208,6 +219,11 @@ internal static class CombatImpactMetricFormatter
 
         return string.Join(" · ", parts);
     }
+
+    internal static string IncomingBreakdown(CombatImpactIncomingGroup group, bool chinese) =>
+        group.TransitionLedger == null ? string.Empty
+        : chinese ? "明细不可用"
+        : "breakdown unavailable";
 
     private static bool ShouldShowCount(
         CombatImpactKind kind,
@@ -236,7 +252,7 @@ internal static class CombatImpactMetricFormatter
     )
     {
         var count = $"×{source.Count}";
-        if (!source.ObservedValue.HasValue)
+        if (!source.ObservedValue.HasValue || source.HasUnattributedTransitionValue)
             return ShouldShowCount(group.Kind, group.Surface, group.OccurrenceBasis)
                 ? count
                 : string.Empty;

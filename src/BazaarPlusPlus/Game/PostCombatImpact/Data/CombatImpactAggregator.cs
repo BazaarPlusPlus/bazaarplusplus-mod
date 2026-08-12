@@ -22,9 +22,14 @@ internal static class CombatImpactAggregator
             .ThenBy(source => source.Entity.Id, StringComparer.Ordinal)
             .ToArray();
 
-        var received = input
-            .Events.Select(item => item.TargetId)
-            .Distinct(StringComparer.Ordinal)
+        var receivedTargetIds = new HashSet<string>(
+            input.Events.Select(item => item.TargetId),
+            StringComparer.Ordinal
+        );
+        receivedTargetIds.UnionWith(
+            input.AttributeTransitionResiduals.Select(item => item.TargetId)
+        );
+        var received = receivedTargetIds
             .Select(targetId => BuildReceived(input, targetId))
             .Where(target => target != null)
             .Cast<CombatImpactReceived>()
@@ -162,6 +167,9 @@ internal static class CombatImpactAggregator
                 authoritativeMetric,
                 hasMixedValueDirections
             ),
+            HasUnattributedTransitionValue = events.Any(item =>
+                item.IsUnattributedTransitionClaimant
+            ),
         };
     }
 
@@ -178,9 +186,30 @@ internal static class CombatImpactAggregator
         var events = input
             .Events.Where(item => string.Equals(item.TargetId, targetId, StringComparison.Ordinal))
             .ToArray();
-        var groups = events
-            .GroupBy(item => Key(item.Kind, item.NativeAttributeKey, item.Surface))
-            .Select(group => BuildIncomingGroup(input.Entities, group.Key, group.ToArray()))
+        var residuals = input
+            .AttributeTransitionResiduals.Where(item =>
+                string.Equals(item.TargetId, targetId, StringComparison.Ordinal)
+            )
+            .ToArray();
+        var groupKeys = new HashSet<GroupKey>(
+            events.Select(item => Key(item.Kind, item.NativeAttributeKey, item.Surface))
+        );
+        groupKeys.UnionWith(
+            residuals.Select(item => Key(item.Kind, item.NativeAttributeKey, item.Surface))
+        );
+        var groups = groupKeys
+            .Select(key =>
+                BuildIncomingGroup(
+                    input.Entities,
+                    key,
+                    events
+                        .Where(item => Key(item.Kind, item.NativeAttributeKey, item.Surface) == key)
+                        .ToArray(),
+                    residuals
+                        .Where(item => Key(item.Kind, item.NativeAttributeKey, item.Surface) == key)
+                        .ToArray()
+                )
+            )
             .ToList();
 
         var orderedGroups = groups
@@ -191,13 +220,18 @@ internal static class CombatImpactAggregator
         if (orderedGroups.Length == 0)
             return null;
 
-        return new CombatImpactReceived(targetEntity, events.Length, orderedGroups);
+        return new CombatImpactReceived(
+            targetEntity,
+            orderedGroups.Sum(group => group.Count),
+            orderedGroups
+        );
     }
 
     private static CombatImpactIncomingGroup BuildIncomingGroup(
         IReadOnlyDictionary<string, CombatImpactEntity> entities,
         GroupKey key,
-        IReadOnlyList<CombatImpactEvent> events
+        IReadOnlyList<CombatImpactEvent> events,
+        IReadOnlyList<CombatImpactAttributeTransitionResidual> residuals
     )
     {
         var sources = events
@@ -210,16 +244,18 @@ internal static class CombatImpactAggregator
             .ThenBy(source => source.Entity.Name, StringComparer.OrdinalIgnoreCase)
             .ThenBy(source => source.Entity.Id, StringComparer.Ordinal)
             .ToArray();
-        var unresolvedSourceCount = Math.Max(0, events.Count - sources.Sum(source => source.Count));
         var observed = BuildObserved(events);
+        var transitionLedger = BuildIncomingTransitionLedger(observed, residuals);
+        var count = events.Count > 0 ? events.Count : residuals.Sum(item => item.ApplicationCount);
+        var unresolvedSourceCount = Math.Max(0, count - sources.Sum(source => source.Count));
 
         var critical = BuildCritical(events);
         return new CombatImpactIncomingGroup(
             key.Kind,
             key.NativeAttributeKey,
-            events.Count,
+            count,
             observed.Value,
-            observed.Unit,
+            transitionLedger?.Unit ?? observed.Unit,
             observed.Coverage,
             sources
         )
@@ -229,14 +265,53 @@ internal static class CombatImpactAggregator
             CriticalCount = critical.Count,
             CriticalOutcomeCount = critical.OutcomeCount,
             CriticalObservedValue = critical.Observed.Value,
-            HasMixedValueDirections = HasMixedValueDirections(events),
+            HasMixedValueDirections = HasMixedValueDirections(events, residuals),
             UnresolvedSourceCount = unresolvedSourceCount,
             ValuedApplicationCount = observed.ValuedApplicationCount,
+            TransitionLedger = transitionLedger,
         };
+    }
+
+    private static CombatImpactIncomingTransitionLedger? BuildIncomingTransitionLedger(
+        ObservedAggregate observed,
+        IReadOnlyList<CombatImpactAttributeTransitionResidual> residuals
+    )
+    {
+        if (residuals.Count == 0)
+            return null;
+
+        var units = residuals.Select(item => item.Unit).ToHashSet();
+        if (observed.Value.HasValue)
+            units.Add(observed.Unit);
+        if (units.Count != 1)
+            return null;
+
+        var attributedValue = observed.Value.GetValueOrDefault();
+        var residualValue = SaturatingSum(residuals.Select(item => item.Value));
+        return new CombatImpactIncomingTransitionLedger(
+            SaturatingSum([attributedValue, residualValue]),
+            attributedValue,
+            residualValue,
+            residuals.Sum(item => item.ApplicationCount),
+            residuals.Select(item => item.FrameIndex).Distinct().Count(),
+            units.Single()
+        );
     }
 
     private static bool HasMixedValueDirections(IReadOnlyList<CombatImpactEvent> events) =>
         events.Any(item => item.Value is > 0) && events.Any(item => item.Value is < 0);
+
+    private static bool HasMixedValueDirections(
+        IReadOnlyList<CombatImpactEvent> events,
+        IReadOnlyList<CombatImpactAttributeTransitionResidual> residuals
+    )
+    {
+        var hasPositive =
+            events.Any(item => item.Value is > 0) || residuals.Any(item => item.Value > 0);
+        var hasNegative =
+            events.Any(item => item.Value is < 0) || residuals.Any(item => item.Value < 0);
+        return hasPositive && hasNegative;
+    }
 
     private static CriticalAggregate BuildCritical(IReadOnlyList<CombatImpactEvent> events)
     {
@@ -303,6 +378,9 @@ internal static class CombatImpactAggregator
         )
         {
             ValuedApplicationCount = observed.ValuedApplicationCount,
+            HasUnattributedTransitionValue = events.Any(item =>
+                item.IsUnattributedTransitionClaimant
+            ),
         };
     }
 
@@ -324,6 +402,9 @@ internal static class CombatImpactAggregator
         )
         {
             ValuedApplicationCount = observed.ValuedApplicationCount,
+            HasUnattributedTransitionValue = events.Any(item =>
+                item.IsUnattributedTransitionClaimant
+            ),
         };
     }
 

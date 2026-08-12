@@ -822,14 +822,15 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
             group.Kind,
             group.NativeAttributeKey,
             group.Surface,
-            group.ObservedValue,
+            group.TransitionLedger?.NetValue ?? group.ObservedValue,
             group.HasMixedValueDirections,
             CombatImpactMetricFormatter.IncomingGroup(
                 group,
                 IsChinese(),
                 CriticalMarker(),
                 effectMarker
-            )
+            ),
+            CombatImpactMetricFormatter.IncomingBreakdown(group, IsChinese())
         );
         var detailRows = new List<GameObject>();
         if (CombatImpactDetailPresentationPolicy.ShouldRenderEntityRows(group.Sources.Count))
