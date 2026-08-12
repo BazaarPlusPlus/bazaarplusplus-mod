@@ -21,7 +21,10 @@ public sealed class MacNativeReplayArchitectureTests
         Assert.DoesNotContain(elements, element => element.Name.LocalName == "MacFfmpegZip");
         Assert.DoesNotContain(elements, element => element.Name.LocalName == "MacFfmpegLicense");
         Assert.DoesNotContain(elements, element => element.Name.LocalName == "WindowsFfmpegZip");
-        Assert.DoesNotContain(elements, element => element.Name.LocalName == "WindowsFfmpegLicense");
+        Assert.DoesNotContain(
+            elements,
+            element => element.Name.LocalName == "WindowsFfmpegLicense"
+        );
         Assert.Contains(elements, element => element.Name.LocalName == "WindowsReplayPlugin");
         Assert.Contains(elements, element => element.Name.LocalName == "IsWindowsHost");
         Assert.Contains(
@@ -71,7 +74,8 @@ public sealed class MacNativeReplayArchitectureTests
             .ToList();
         Assert.Contains(
             staleWindowsFiles,
-            path => path.EndsWith("BepInEx/plugins/ffmpeg.exe", StringComparison.Ordinal)
+            path =>
+                path.EndsWith("BepInEx/plugins/ffmpeg.exe", StringComparison.Ordinal)
                 || path.EndsWith("BepInEx\\plugins\\ffmpeg.exe", StringComparison.Ordinal)
         );
         Assert.Contains(
@@ -83,8 +87,16 @@ public sealed class MacNativeReplayArchitectureTests
             .Where(element => element.Name.LocalName == "Error")
             .Select(element => element.Attribute("Condition")?.Value ?? string.Empty)
             .ToList();
-        Assert.Contains(packageErrors, condition => condition.Contains("InstallerMacReplayPluginBundle", StringComparison.Ordinal));
-        Assert.Contains(packageErrors, condition => condition.Contains("InstallerWindowsReplayPlugin", StringComparison.Ordinal));
+        Assert.Contains(
+            packageErrors,
+            condition =>
+                condition.Contains("InstallerMacReplayPluginBundle", StringComparison.Ordinal)
+        );
+        Assert.Contains(
+            packageErrors,
+            condition =>
+                condition.Contains("InstallerWindowsReplayPlugin", StringComparison.Ordinal)
+        );
     }
 
     [Fact]
@@ -209,11 +221,7 @@ public sealed class MacNativeReplayArchitectureTests
             windowsNativeProbe >= 0,
             $"Missing Windows native availability probe in {sourcePath}."
         );
-        Assert.DoesNotContain(
-            "Task.Run",
-            source,
-            StringComparison.Ordinal
-        );
+        Assert.DoesNotContain("Task.Run", source, StringComparison.Ordinal);
     }
 
     private static string RepoRoot([CallerFilePath] string file = "") =>

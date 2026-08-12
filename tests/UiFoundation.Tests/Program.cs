@@ -154,8 +154,7 @@ static void TestCollectionSortWidthsKeepStableGroup()
     );
     Assert(
         Sizes.CollectionSortActiveWidth + Sizes.CollectionSortInactiveWidth
-            == Sizes.CollectionSortEnglishActiveWidth
-                + Sizes.CollectionSortEnglishInactiveWidth,
+            == Sizes.CollectionSortEnglishActiveWidth + Sizes.CollectionSortEnglishInactiveWidth,
         "Changing language should preserve the total sort-group width."
     );
     Assert(

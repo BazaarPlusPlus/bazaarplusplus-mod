@@ -13,6 +13,7 @@ namespace VoiceSubtitles.Tests;
 public sealed class VoiceSubtitlesTests
 {
     [Fact]
+    [Trait("TestKind", "EmbeddedSeed")]
     public void Embedded_seed_loads_a_valid_nonempty_catalog()
     {
         var lines = LoadEmbeddedLines();

@@ -1614,9 +1614,7 @@ internal sealed partial class CollectionPanelView
         _dayToggleCaption.style.whiteSpace = WhiteSpace.NoWrap;
         _dayToggleCaption.style.unityTextAlign = TextAnchor.MiddleCenter;
         _dayToggleCaption.style.flexShrink = 0f;
-        _dayToggleValue.style.fontSize = isChinese
-            ? Sizes.FontButton + 1
-            : Sizes.FontButton;
+        _dayToggleValue.style.fontSize = isChinese ? Sizes.FontButton + 1 : Sizes.FontButton;
         _dayToggleValue.style.height = StyleKeyword.Auto;
         _dayToggleValue.style.unityTextAlign = TextAnchor.MiddleCenter;
         _dayToggleValue.style.flexShrink = 0f;

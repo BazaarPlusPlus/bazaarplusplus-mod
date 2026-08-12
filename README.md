@@ -39,13 +39,15 @@ BazaarPlusPlus 是一个面向《The Bazaar》的 BepInEx 5 模组：战斗 UI �
 
 ```bash
 ./run.sh build          # Debug 构建（识别到游戏目录时自动复制到 BepInEx/plugins/）
-./run.sh test           # 全部测试
+./run.sh test           # 默认离线测试（不部署游戏、不下载种子）
+./run.sh test-compat    # 显式运行本机条件满足的兼容性前提测试
+./run.sh test-corpus /path/to/replays  # 显式运行 replay 证据语料分析
 ./run.sh publish        # 生产发布：刷新远端数据、种子门禁、安装器打包
 ```
 
 自动识别不到游戏目录时，用 `-p:ManagedPath=/path/to/TheBazaar_Data/Managed` 显式指定。运行 `./run.sh` 查看全部子命令及说明。
 
-- `voice-lines.json` 与 `builds.json` 不存入仓库，构建时从 `src/BazaarPlusPlus/obj/remote-data/` 的共享副本嵌入；副本缺失时自动下载一次，也可用 `./run.sh fetch-data` 手动刷新。
+- 默认本地构建从 `src/BazaarPlusPlus/obj/remote-data/` 嵌入 `voice-lines.json`（缺失时自动获取），并使用仓库内的 `builds.json` 基线；`./run.sh fetch-data` 可手动刷新远端种子，发布流程会在语义门禁通过后再将新种子提升为构建输入。
 - 普通 Release 只编译；只有 `./run.sh publish` 会写入相邻 installer 仓库并生成 `BepInEx.zip`。
 
 ## 数据与网络行为
@@ -59,7 +61,8 @@ BazaarPlusPlus 是一个面向《The Bazaar》的 BepInEx 5 模组：战斗 UI �
 - `src/BazaarPlusPlus/`：主插件工程。`Plugin.cs` 为 BepInEx 入口，feature wiring 走 `BppComposition.cs` 组合根；其下按 `Core/`、`GameInterop/`、`Game/`、`Patches/`、`Infrastructure/`、`Data/` 分层，职责详见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 - `src/BazaarPlusPlus.ModApi/`、`src/BazaarPlusPlus.Storage/`、`src/BazaarPlusPlus.Localization/`：HTTP 客户端、本地持久化、本地化引擎三个独立程序集（零 game/Unity/BepInEx 依赖）。
 - `src/BazaarPlusPlus.BazaarAgent/`、`src/BazaarPlusPlus.BazaarAgentHost/`：可选的 BazaarAgent 纯核心与 host 插件。
-- `tests/`：按特性拆分的测试项目。
+- `tests/`：12 个默认 xUnit 测试宿主、兼容性清单，以及由 `ScenarioRunner.Tests` 逐子进程执行的源码影子场景 capsule。
+- `tools/PeriodicEffectAttribution.Corpus/`：需要显式提供 replay corpus 的离线证据工具，不属于默认测试。
 - `decompiled/`：游戏 DLL 的 ILSpy 反编译输出，只读参考。
 - `run.sh`：本地构建、测试、格式化和反编译入口。
 

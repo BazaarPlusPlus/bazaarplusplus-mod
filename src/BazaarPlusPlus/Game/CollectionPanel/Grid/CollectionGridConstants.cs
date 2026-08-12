@@ -100,5 +100,4 @@ internal static class CollectionGridConstants
 
     public static int ColumnsFor(ECardType type) =>
         type == ECardType.Skill ? SkillColumns : ItemColumns;
-
 }

@@ -401,5 +401,9 @@ internal sealed class WindowsMediaFoundationVideoEncoder : IReplayVideoEncoder
     private static extern int BppMfCopyError(IntPtr handle, StringBuilder buffer, int capacity);
 
     [DllImport(NativeLibrary, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
-    private static extern int BppMfCopyEncoderName(IntPtr handle, StringBuilder buffer, int capacity);
+    private static extern int BppMfCopyEncoderName(
+        IntPtr handle,
+        StringBuilder buffer,
+        int capacity
+    );
 }
