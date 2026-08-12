@@ -6,12 +6,24 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(RemoteEmbeddedDataPrepared)' == 'true'">
+    <DefineConstants>$(DefineConstants);REMOTE_EMBEDDED_DATA_PREPARED</DefineConstants>
+  </PropertyGroup>
+
   <PropertyGroup>
     <ProjectRoot>$(MSBuildThisFileDirectory)../../</ProjectRoot>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" />
     <Compile Include="../Shared/LocalizationTestBootstrap.cs" Link="LocalizationTestBootstrap.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource
+      Include="Fixtures/analyzer-v5-schema2-contract.json"
+      LogicalName="LiveBuildRecommendations.Tests.analyzer-v5-schema2-contract.json"
+    />
   </ItemGroup>
 
   <ItemGroup>
