@@ -2,6 +2,10 @@
 using BazaarGameShared.Domain.Core;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Effect;
+using BazaarGameShared.Domain.Effect.Actions;
+using BazaarGameShared.Domain.Targeting;
+using BazaarGameShared.Domain.Values;
+using BazaarGameShared.Domain.Values.ReferenceValues;
 using BazaarGameShared.Infra.Messages.CombatSimEvents;
 using BazaarGameShared.Infra.Messages.Shared;
 using BazaarPlusPlus.GameInterop.CombatSimulation;
@@ -122,6 +126,17 @@ internal static class CombatImpactProjector
                     TriggerFrameIndex = execution.FrameIndex,
                     ActivitySourceResolution = triggerProvenance.SourceResolution,
                     TriggerScope = triggerProvenance.Scope,
+                    IsUnattributedTransitionClaimant = resolved.IsUnattributedTransitionClaimant,
+                    UnattributedTransitionValue = resolved.UnattributedTransitionValue,
+                    AttributeTransitionNetValue = resolved.AttributeTransitionNetValue,
+                    AttributeTransitionResolution = resolved.AttributeTransitionResolution,
+                    AttributeTransitionFailureReasons = resolved.AttributeTransitionFailureReasons,
+                    AttributeTransitionUnresolvedClaimantCount =
+                        resolved.AttributeTransitionUnresolvedClaimantCount,
+                    AttributeTransitionEventOrderReplayReconciles =
+                        resolved.AttributeTransitionEventOrderReplayReconciles,
+                    AttributeTransitionEventOrderReplayIncludesMultiply =
+                        resolved.AttributeTransitionEventOrderReplayIncludesMultiply,
                 }
             );
         }
@@ -264,6 +279,15 @@ internal static class CombatImpactProjector
             transformLineage,
             entities
         );
+        var canonicalAttributeTransitionResiduals = ProjectAttributeTransitionResiduals(events)
+            .Select(item =>
+                item with
+                {
+                    TargetId = transformLineage.ResolveKnown(item.TargetId, entities),
+                }
+            )
+            .ToArray();
+        var attributeTransitionDiagnostics = ProjectAttributeTransitionDiagnostics(events);
 
         var report = CombatImpactAggregator.Aggregate(
             new CombatImpactProjectionInput(
@@ -272,6 +296,9 @@ internal static class CombatImpactProjector
                 canonicalUseCounts,
                 canonicalAuthoritative
             )
+            {
+                AttributeTransitionResiduals = canonicalAttributeTransitionResiduals,
+            }
         );
         report = AttachPeriodicImpacts(
             report,
@@ -279,7 +306,11 @@ internal static class CombatImpactProjector
             transformLineage,
             entities
         );
-        return report with { ProjectionDiagnostics = diagnostics.Distinct().ToArray() };
+        return report with
+        {
+            ProjectionDiagnostics = diagnostics.Distinct().ToArray(),
+            AttributeTransitionDiagnostics = attributeTransitionDiagnostics,
+        };
     }
 
     private static IReadOnlyList<CombatImpactEvent> CanonicalizeEvents(
@@ -633,7 +664,8 @@ internal static class CombatImpactProjector
                             kind,
                             IsTransitionUnique(frame, executed, item, entities),
                             executed,
-                            entities
+                            entities,
+                            cardAttributes
                         )
                     : default;
                 if (
@@ -679,6 +711,122 @@ internal static class CombatImpactProjector
         }
         return projections;
     }
+
+    private static IReadOnlyList<CombatImpactAttributeTransitionResidual> ProjectAttributeTransitionResiduals(
+        IReadOnlyList<CombatImpactEvent> events
+    ) =>
+        events
+            .Where(item =>
+                item.Kind == CombatImpactKind.AttributeChange
+                && item.Surface == CombatImpactEventSurface.CardAttribute
+                && item.IsUnattributedTransitionClaimant
+                && item.TriggerFrameIndex.HasValue
+                && item.UnattributedTransitionValue.HasValue
+            )
+            .GroupBy(item => new AttributeTransitionResidualKey(
+                item.TriggerFrameIndex!.Value,
+                item.TargetId,
+                item.NativeAttributeKey ?? CombatImpactAggregator.NativeKey(item.Kind),
+                item.Unit
+            ))
+            .Select(group =>
+            {
+                var values = group
+                    .Select(item => item.UnattributedTransitionValue!.Value)
+                    .Distinct()
+                    .Take(2)
+                    .ToArray();
+                return values.Length == 1
+                    ? new CombatImpactAttributeTransitionResidual(
+                        group.Key.FrameIndex,
+                        group.Key.TargetId,
+                        group.Key.NativeAttributeKey,
+                        values[0],
+                        group.Key.Unit,
+                        group.Count(),
+                        CombatImpactAttributeTransitionResidualReason.ConcurrentAttributionUnavailable
+                    )
+                    : null;
+            })
+            .Where(residual => residual != null)
+            .Cast<CombatImpactAttributeTransitionResidual>()
+            .ToArray();
+
+    private static IReadOnlyList<CombatImpactAttributeTransitionDiagnostic> ProjectAttributeTransitionDiagnostics(
+        IReadOnlyList<CombatImpactEvent> events
+    ) =>
+        events
+            .Where(item =>
+                item.AttributeTransitionResolution.HasValue
+                && item.AttributeTransitionNetValue.HasValue
+                && item.TriggerFrameIndex.HasValue
+            )
+            .GroupBy(item => new AttributeTransitionResidualKey(
+                item.TriggerFrameIndex!.Value,
+                item.TargetId,
+                item.NativeAttributeKey ?? CombatImpactAggregator.NativeKey(item.Kind),
+                item.Unit
+            ))
+            .Select(group =>
+            {
+                var netValues = group
+                    .Select(item => item.AttributeTransitionNetValue!.Value)
+                    .Distinct()
+                    .Take(2)
+                    .ToArray();
+                if (netValues.Length != 1)
+                    return null;
+
+                var resolution =
+                    group.Any(item =>
+                        item.AttributeTransitionResolution
+                        == CombatImpactAttributeTransitionResolution.ConcurrentResidual
+                    )
+                        ? CombatImpactAttributeTransitionResolution.ConcurrentResidual
+                    : group.Any(item =>
+                        item.AttributeTransitionResolution
+                        == CombatImpactAttributeTransitionResolution.ConcurrentSingleUnknownSolved
+                    )
+                        ? CombatImpactAttributeTransitionResolution.ConcurrentSingleUnknownSolved
+                    : group.Any(item =>
+                        item.AttributeTransitionResolution
+                        == CombatImpactAttributeTransitionResolution.ConcurrentConfiguredExact
+                    )
+                        ? CombatImpactAttributeTransitionResolution.ConcurrentConfiguredExact
+                    : CombatImpactAttributeTransitionResolution.SingleClaimantNet;
+                var attributedValue = SaturatingInt(
+                    group.Where(item => item.Value.HasValue).Sum(item => (long)item.Value!.Value)
+                );
+                var residualValue =
+                    resolution == CombatImpactAttributeTransitionResolution.ConcurrentResidual
+                        ? SaturatingInt((long)netValues[0] - attributedValue)
+                        : 0;
+                return new CombatImpactAttributeTransitionDiagnostic(
+                    group.Key.FrameIndex,
+                    group.Key.TargetId,
+                    group.Key.NativeAttributeKey,
+                    netValues[0],
+                    attributedValue,
+                    residualValue,
+                    group.Count(),
+                    group.Max(item => item.AttributeTransitionUnresolvedClaimantCount),
+                    group.Key.Unit,
+                    resolution,
+                    group
+                        .SelectMany(item => item.AttributeTransitionFailureReasons)
+                        .Distinct()
+                        .OrderBy(reason => reason)
+                        .ToArray(),
+                    group.Any(item => item.AttributeTransitionEventOrderReplayReconciles),
+                    group.Any(item => item.AttributeTransitionEventOrderReplayIncludesMultiply)
+                );
+            })
+            .Where(diagnostic => diagnostic != null)
+            .Cast<CombatImpactAttributeTransitionDiagnostic>()
+            .OrderBy(diagnostic => diagnostic.FrameIndex)
+            .ThenBy(diagnostic => diagnostic.TargetId, StringComparer.Ordinal)
+            .ThenBy(diagnostic => diagnostic.NativeAttributeKey, StringComparer.Ordinal)
+            .ToArray();
 
     private static void AddLifestealEvents(
         CombatSim simulation,
@@ -1541,15 +1689,92 @@ internal static class CombatImpactProjector
         CombatSimEventEffectExecuted effect,
         IReadOnlyDictionary<string, CombatImpactEntity> entities,
         out ECardAttributeType attributeType
-    ) =>
-        TryResolveEffectAttributeType(
-            effect.Source?.Value,
-            effect.TriggerSource?.Value,
-            effect.EffectId,
-            entities,
-            static entity => entity.AbilityAttributeTypesByEffectId,
-            out attributeType
-        );
+    )
+    {
+        if (
+            TryResolveEffectAttributeType(
+                effect.Source?.Value,
+                effect.TriggerSource?.Value,
+                effect.EffectId,
+                entities,
+                static entity => entity.AbilityAttributeTypesByEffectId,
+                out attributeType
+            )
+        )
+            return true;
+        if (TryResolveAbilityAttributeModifier(effect, entities, out _, out var modifier))
+        {
+            attributeType = modifier.AttributeType;
+            return true;
+        }
+
+        attributeType = default;
+        return false;
+    }
+
+    private static bool TryResolveAbilityAttributeModifier(
+        CombatSimEventEffectExecuted effect,
+        IReadOnlyDictionary<string, CombatImpactEntity> entities,
+        out string sourceId,
+        out TActionCardModifyAttribute modifier
+    )
+    {
+        if (
+            TryResolveAbilityAttributeModifier(
+                effect.Source?.Value,
+                effect.EffectId,
+                entities,
+                out sourceId,
+                out modifier
+            )
+        )
+            return true;
+        if (
+            !string.Equals(
+                effect.Source?.Value,
+                effect.TriggerSource?.Value,
+                StringComparison.Ordinal
+            )
+            && TryResolveAbilityAttributeModifier(
+                effect.TriggerSource?.Value,
+                effect.EffectId,
+                entities,
+                out sourceId,
+                out modifier
+            )
+        )
+            return true;
+
+        sourceId = string.Empty;
+        modifier = null!;
+        return false;
+    }
+
+    private static bool TryResolveAbilityAttributeModifier(
+        string? candidateSourceId,
+        string? effectId,
+        IReadOnlyDictionary<string, CombatImpactEntity> entities,
+        out string sourceId,
+        out TActionCardModifyAttribute modifier
+    )
+    {
+        if (
+            !string.IsNullOrWhiteSpace(candidateSourceId)
+            && !string.IsNullOrWhiteSpace(effectId)
+            && entities.TryGetValue(candidateSourceId!, out var source)
+            && source.AbilityAttributeModifiersByEffectId is { } modifiers
+            && modifiers.TryGetValue(effectId!, out var resolvedModifier)
+        )
+        {
+            sourceId = candidateSourceId!;
+            modifier = resolvedModifier;
+            return true;
+        }
+
+        sourceId = string.Empty;
+        modifier = null!;
+        return false;
+    }
 
     private static bool TryResolveAuraAttributeType(
         CombatSimEventEffectAuraExecuted effect,
@@ -1691,7 +1916,11 @@ internal static class CombatImpactProjector
                 );
                 var isReferenceValuedAura = IsReferenceValuedAuraEffect(aura, entities);
 
-                foreach (var target in aura.AppliedTo.Concat(aura.RemovedFrom))
+                // Combat teardown removes every surviving aura in one cleanup frame. Those
+                // removals are lifecycle bookkeeping, not negative impact caused by the source.
+                // Count the grant event itself, regardless of whether the granted value is
+                // positive or negative, and ignore RemovedFrom entirely.
+                foreach (var target in aura.AppliedTo)
                 {
                     if (target is EffectTargetPlayer playerTarget)
                     {
@@ -2240,7 +2469,8 @@ internal static class CombatImpactProjector
         CombatImpactKind kind,
         bool transitionIsUnique,
         IReadOnlyList<CombatSimEventEffectExecuted> executed,
-        IReadOnlyDictionary<string, CombatImpactEntity> entities
+        IReadOnlyDictionary<string, CombatImpactEntity> entities,
+        IReadOnlyDictionary<string, Dictionary<ECardAttributeType, int>> cardAttributes
     )
     {
         if (
@@ -2249,7 +2479,14 @@ internal static class CombatImpactProjector
                 is EActionCommandType.CardModifyAttribute
                     or EActionCommandType.PlayerModifyAttribute
         )
-            return ResolveConcreteAttributeTransition(frame, item, kind, executed, entities);
+            return ResolveConcreteAttributeTransition(
+                frame,
+                item,
+                kind,
+                executed,
+                entities,
+                cardAttributes
+            );
 
         if (TryResolveCategoricalCardAction(frame, item, kind, out var categoricalAction))
             return categoricalAction;
@@ -2425,7 +2662,8 @@ internal static class CombatImpactProjector
         CombatSimEventEffectExecuted item,
         CombatImpactKind kind,
         IReadOnlyList<CombatSimEventEffectExecuted> executed,
-        IReadOnlyDictionary<string, CombatImpactEntity> entities
+        IReadOnlyDictionary<string, CombatImpactEntity> entities,
+        IReadOnlyDictionary<string, Dictionary<ECardAttributeType, int>> cardAttributes
     )
     {
         if (item.ActionType == EActionCommandType.PlayerModifyAttribute)
@@ -2498,6 +2736,22 @@ internal static class CombatImpactProjector
             cardChange = cardChanges[0];
         }
         if (
+            TryResolveConcurrentConfiguredCardAttributeTransition(
+                item,
+                executed,
+                entities,
+                cardAttributes,
+                cardChange,
+                kind,
+                out var configuredTransition,
+                out var concurrentFailureReasons,
+                out var unresolvedClaimantCount,
+                out var eventOrderReplayReconciles,
+                out var eventOrderReplayIncludesMultiply
+            )
+        )
+            return configuredTransition;
+        if (
             IsClaimedByAnotherExecution(
                 executed,
                 item,
@@ -2508,7 +2762,41 @@ internal static class CombatImpactProjector
                 entities
             )
         )
-            return ResolvedImpactValue.Empty(kind, item.ActionType);
+        {
+            if (
+                !CanPreserveConcurrentCardAttributeResidual(
+                    executed,
+                    item,
+                    new ImpactTransitionClaim(
+                        ImpactTransitionDomain.CardAttribute,
+                        (int)cardChange.AttributeType
+                    ),
+                    entities
+                )
+            )
+                return ResolvedImpactValue.Empty(kind, item.ActionType);
+
+            return new ResolvedImpactValue(
+                null,
+                UnitFor(cardChange.AttributeType.ToString()),
+                cardChange.AttributeType.ToString(),
+                false,
+                CombatImpactValueBasis.None
+            )
+            {
+                Surface = CombatImpactEventSurface.CardAttribute,
+                IsUnattributedTransitionClaimant = true,
+                UnattributedTransitionValue = cardChange.Delta,
+                AttributeTransitionNetValue = cardChange.Delta,
+                AttributeTransitionResolution =
+                    CombatImpactAttributeTransitionResolution.ConcurrentResidual,
+                AttributeTransitionFailureReasons = concurrentFailureReasons,
+                AttributeTransitionUnresolvedClaimantCount = unresolvedClaimantCount,
+                AttributeTransitionEventOrderReplayReconciles = eventOrderReplayReconciles,
+                AttributeTransitionEventOrderReplayIncludesMultiply =
+                    eventOrderReplayIncludesMultiply,
+            };
+        }
 
         return new ResolvedImpactValue(
             cardChange.Delta,
@@ -2519,7 +2807,523 @@ internal static class CombatImpactProjector
         )
         {
             Surface = CombatImpactEventSurface.CardAttribute,
+            AttributeTransitionNetValue = cardChange.Delta,
+            AttributeTransitionResolution =
+                CombatImpactAttributeTransitionResolution.SingleClaimantNet,
         };
+    }
+
+    private static bool TryResolveConcurrentConfiguredCardAttributeTransition(
+        CombatSimEventEffectExecuted item,
+        IReadOnlyList<CombatSimEventEffectExecuted> executed,
+        IReadOnlyDictionary<string, CombatImpactEntity> entities,
+        IReadOnlyDictionary<string, Dictionary<ECardAttributeType, int>> cardAttributes,
+        CombatSimCardAttributeUpdate cardChange,
+        CombatImpactKind kind,
+        out ResolvedImpactValue resolved,
+        out IReadOnlyList<CombatImpactAttributeTransitionFailureReason> failureReasons,
+        out int unresolvedClaimantCount,
+        out bool eventOrderReplayReconciles,
+        out bool eventOrderReplayIncludesMultiply
+    )
+    {
+        resolved = default;
+        failureReasons = [];
+        unresolvedClaimantCount = 0;
+        eventOrderReplayReconciles = false;
+        eventOrderReplayIncludesMultiply = false;
+        var targetId = ResolveTargetId(item.Target);
+        var transition = new ImpactTransitionClaim(
+            ImpactTransitionDomain.CardAttribute,
+            (int)cardChange.AttributeType
+        );
+        var claimants = executed
+            .Where(candidate =>
+                string.Equals(ResolveTargetId(candidate.Target), targetId, StringComparison.Ordinal)
+                && ClaimsTransition(candidate, transition, entities)
+            )
+            .ToArray();
+        if (claimants.Length <= 1)
+            return false;
+
+        long configuredTotal = 0;
+        int? itemDelta = null;
+        CombatSimEventEffectExecuted? unknownClaimant = null;
+        var unknownFailureReason = default(CombatImpactAttributeTransitionFailureReason);
+        var failures = new HashSet<CombatImpactAttributeTransitionFailureReason>();
+        foreach (var claimant in claimants)
+        {
+            if (
+                !TryResolveConfiguredCardAttributeDelta(
+                    claimant,
+                    entities,
+                    cardAttributes,
+                    cardChange.AttributeType,
+                    out var configuredDelta,
+                    out var failureReason
+                )
+            )
+            {
+                failures.Add(failureReason);
+                unresolvedClaimantCount++;
+                if (unresolvedClaimantCount == 1)
+                {
+                    unknownClaimant = claimant;
+                    unknownFailureReason = failureReason;
+                }
+                else
+                {
+                    unknownClaimant = null;
+                }
+                continue;
+            }
+
+            configuredTotal += configuredDelta;
+            if (ReferenceEquals(claimant, item))
+                itemDelta = configuredDelta;
+        }
+
+        if (
+            unresolvedClaimantCount == 1
+            && unknownClaimant != null
+            && unknownFailureReason
+                != CombatImpactAttributeTransitionFailureReason.ModifierUnavailable
+        )
+        {
+            var solvedDelta = (long)cardChange.Delta - configuredTotal;
+            if (
+                solvedDelta is >= int.MinValue and <= int.MaxValue
+                && IsPlausibleSingleUnknownDelta(
+                    unknownClaimant,
+                    entities,
+                    cardChange.AttributeType,
+                    (int)solvedDelta
+                )
+            )
+            {
+                if (ReferenceEquals(unknownClaimant, item))
+                    itemDelta = (int)solvedDelta;
+                if (itemDelta.HasValue)
+                {
+                    failureReasons = failures.OrderBy(reason => reason).ToArray();
+                    unresolvedClaimantCount = 0;
+                    resolved = new ResolvedImpactValue(
+                        itemDelta.Value,
+                        UnitFor(cardChange.AttributeType.ToString()),
+                        cardChange.AttributeType.ToString(),
+                        false,
+                        CombatImpactValueBasis.ConfiguredActionAmount
+                    )
+                    {
+                        Surface = CombatImpactEventSurface.CardAttribute,
+                        AttributeTransitionNetValue = cardChange.Delta,
+                        AttributeTransitionResolution =
+                            CombatImpactAttributeTransitionResolution.ConcurrentSingleUnknownSolved,
+                        AttributeTransitionFailureReasons = failureReasons,
+                    };
+                    return true;
+                }
+            }
+        }
+
+        if (failures.Count > 0)
+        {
+            eventOrderReplayReconciles = TryReplayConfiguredCardAttributeTransitionInEventOrder(
+                claimants,
+                entities,
+                cardAttributes,
+                targetId,
+                cardChange,
+                out eventOrderReplayIncludesMultiply
+            );
+            failureReasons = failures.OrderBy(reason => reason).ToArray();
+            return false;
+        }
+        if (!itemDelta.HasValue)
+        {
+            failureReasons =
+            [
+                CombatImpactAttributeTransitionFailureReason.ClaimantIdentityMismatch,
+            ];
+            return false;
+        }
+        if (configuredTotal != cardChange.Delta)
+        {
+            eventOrderReplayReconciles = TryReplayConfiguredCardAttributeTransitionInEventOrder(
+                claimants,
+                entities,
+                cardAttributes,
+                targetId,
+                cardChange,
+                out eventOrderReplayIncludesMultiply
+            );
+            failureReasons = [CombatImpactAttributeTransitionFailureReason.ConfiguredSumMismatch];
+            return false;
+        }
+
+        resolved = new ResolvedImpactValue(
+            itemDelta.Value,
+            UnitFor(cardChange.AttributeType.ToString()),
+            cardChange.AttributeType.ToString(),
+            false,
+            CombatImpactValueBasis.ConfiguredActionAmount
+        )
+        {
+            Surface = CombatImpactEventSurface.CardAttribute,
+            AttributeTransitionNetValue = cardChange.Delta,
+            AttributeTransitionResolution =
+                CombatImpactAttributeTransitionResolution.ConcurrentConfiguredExact,
+        };
+        return true;
+    }
+
+    private static bool TryReplayConfiguredCardAttributeTransitionInEventOrder(
+        IReadOnlyList<CombatSimEventEffectExecuted> claimants,
+        IReadOnlyDictionary<string, CombatImpactEntity> entities,
+        IReadOnlyDictionary<string, Dictionary<ECardAttributeType, int>> cardAttributes,
+        string? targetId,
+        CombatSimCardAttributeUpdate cardChange,
+        out bool includesMultiply
+    )
+    {
+        includesMultiply = false;
+        if (string.IsNullOrWhiteSpace(targetId))
+            return false;
+
+        long runningValue = cardChange.PreviousValue;
+        foreach (var claimant in claimants)
+        {
+            if (
+                !TryResolveAbilityAttributeModifier(
+                    claimant,
+                    entities,
+                    out var modifierSourceId,
+                    out var modifier
+                )
+                || modifier.AttributeType != cardChange.AttributeType
+                || !TryResolveEventOrderReplayValue(
+                    modifier.Value,
+                    modifierSourceId,
+                    targetId!,
+                    cardChange.AttributeType,
+                    runningValue,
+                    cardAttributes,
+                    out var operand
+                )
+            )
+                return false;
+
+            runningValue = modifier.Operation switch
+            {
+                EAttributeModifierOperation.Add => runningValue + operand,
+                EAttributeModifierOperation.Subtract => runningValue - operand,
+                EAttributeModifierOperation.Multiply => runningValue * operand,
+                _ => long.MinValue,
+            };
+            if (modifier.Operation == EAttributeModifierOperation.Multiply)
+                includesMultiply = true;
+            if (runningValue is < int.MinValue or > int.MaxValue)
+                return false;
+        }
+
+        return runningValue == cardChange.CurrentValue;
+    }
+
+    private static bool TryResolveEventOrderReplayValue(
+        ITValue value,
+        string sourceId,
+        string targetId,
+        ECardAttributeType targetAttribute,
+        long runningTargetValue,
+        IReadOnlyDictionary<string, Dictionary<ECardAttributeType, int>> cardAttributes,
+        out int configuredValue
+    )
+    {
+        if (value is TFixedValue fixedValue)
+            return TryConvertExactInt(fixedValue.Value, out configuredValue);
+        if (value is not TReferenceValueCardAttribute reference)
+        {
+            configuredValue = 0;
+            return false;
+        }
+        if (reference.Target is not TTargetCardSelf)
+        {
+            configuredValue = 0;
+            return false;
+        }
+
+        long rawValue;
+        if (
+            string.Equals(sourceId, targetId, StringComparison.Ordinal)
+            && reference.AttributeType == targetAttribute
+        )
+        {
+            rawValue = runningTargetValue;
+        }
+        else if (
+            !cardAttributes.TryGetValue(sourceId, out var sourceAttributes)
+            || !sourceAttributes.TryGetValue(reference.AttributeType, out var sourceValue)
+        )
+        {
+            configuredValue = 0;
+            return false;
+        }
+        else
+        {
+            rawValue = sourceValue;
+        }
+        if (rawValue is < int.MinValue or > int.MaxValue)
+        {
+            configuredValue = 0;
+            return false;
+        }
+        if (!TryApplyStaticModifier((int)rawValue, reference.Modifier, out var modifiedValue))
+        {
+            configuredValue = 0;
+            return false;
+        }
+        return TryConvertExactInt(modifiedValue, out configuredValue);
+    }
+
+    private static bool IsPlausibleSingleUnknownDelta(
+        CombatSimEventEffectExecuted claimant,
+        IReadOnlyDictionary<string, CombatImpactEntity> entities,
+        ECardAttributeType expectedAttribute,
+        int solvedDelta
+    )
+    {
+        if (
+            !TryResolveAbilityAttributeModifier(claimant, entities, out _, out var modifier)
+            || modifier.AttributeType != expectedAttribute
+        )
+            return false;
+        if (
+            modifier.Value is not TRangeValue range
+            || modifier.Operation
+                is not (EAttributeModifierOperation.Add or EAttributeModifierOperation.Subtract)
+        )
+            return true;
+        if (
+            !TryApplyStaticModifier(range.MinValue, range.Modifier, out var firstBound)
+            || !TryApplyStaticModifier(range.MaxValue, range.Modifier, out var secondBound)
+        )
+            return false;
+
+        var minimum = Math.Min(firstBound, secondBound);
+        var maximum = Math.Max(firstBound, secondBound);
+        if (modifier.Operation == EAttributeModifierOperation.Subtract)
+            (minimum, maximum) = (-maximum, -minimum);
+        return solvedDelta >= minimum - 0.0001f && solvedDelta <= maximum + 0.0001f;
+    }
+
+    private static bool CanPreserveConcurrentCardAttributeResidual(
+        IReadOnlyList<CombatSimEventEffectExecuted> executed,
+        CombatSimEventEffectExecuted item,
+        ImpactTransitionClaim transition,
+        IReadOnlyDictionary<string, CombatImpactEntity> entities
+    )
+    {
+        var targetId = ResolveTargetId(item.Target);
+        var claimants = executed
+            .Where(candidate =>
+                string.Equals(ResolveTargetId(candidate.Target), targetId, StringComparison.Ordinal)
+                && ClaimsTransition(candidate, transition, entities)
+            )
+            .ToArray();
+        return claimants.Length > 1
+            && claimants.All(candidate =>
+                candidate.ActionType == EActionCommandType.CardModifyAttribute
+            );
+    }
+
+    private static bool TryResolveConfiguredCardAttributeDelta(
+        CombatSimEventEffectExecuted effect,
+        IReadOnlyDictionary<string, CombatImpactEntity> entities,
+        IReadOnlyDictionary<string, Dictionary<ECardAttributeType, int>> cardAttributes,
+        ECardAttributeType expectedAttribute,
+        out int delta,
+        out CombatImpactAttributeTransitionFailureReason failureReason
+    )
+    {
+        delta = 0;
+        failureReason = default;
+        if (effect.ActionType != EActionCommandType.CardModifyAttribute)
+        {
+            failureReason = CombatImpactAttributeTransitionFailureReason.UnsupportedOperation;
+            return false;
+        }
+        if (
+            !TryResolveAbilityAttributeModifier(
+                effect,
+                entities,
+                out var modifierSourceId,
+                out var modifier
+            )
+        )
+        {
+            failureReason = CombatImpactAttributeTransitionFailureReason.ModifierUnavailable;
+            return false;
+        }
+        if (modifier.AttributeType != expectedAttribute)
+        {
+            failureReason = CombatImpactAttributeTransitionFailureReason.AttributeMismatch;
+            return false;
+        }
+        if (
+            modifier.Operation
+            is not (EAttributeModifierOperation.Add or EAttributeModifierOperation.Subtract)
+        )
+        {
+            failureReason = modifier.Operation switch
+            {
+                EAttributeModifierOperation.Multiply =>
+                    CombatImpactAttributeTransitionFailureReason.MultiplyOperation,
+                EAttributeModifierOperation.AdditiveMultiply =>
+                    CombatImpactAttributeTransitionFailureReason.AdditiveMultiplyOperation,
+                _ => CombatImpactAttributeTransitionFailureReason.UnsupportedOperation,
+            };
+            return false;
+        }
+        if (
+            !TryResolveConfiguredValue(
+                modifier.Value,
+                modifierSourceId,
+                cardAttributes,
+                out var configuredValue,
+                out failureReason
+            )
+        )
+            return false;
+
+        delta =
+            modifier.Operation == EAttributeModifierOperation.Subtract
+                ? -configuredValue
+                : configuredValue;
+        return true;
+    }
+
+    private static bool TryResolveConfiguredValue(
+        ITValue value,
+        string sourceId,
+        IReadOnlyDictionary<string, Dictionary<ECardAttributeType, int>> cardAttributes,
+        out int configuredValue,
+        out CombatImpactAttributeTransitionFailureReason failureReason
+    )
+    {
+        failureReason = default;
+        switch (value)
+        {
+            case TFixedValue fixedValue:
+                if (TryConvertExactInt(fixedValue.Value, out configuredValue))
+                    return true;
+                failureReason =
+                    CombatImpactAttributeTransitionFailureReason.NonIntegralConfiguredValue;
+                return false;
+            case TReferenceValueCardAttribute reference:
+                if (reference.Target is not TTargetCardSelf)
+                {
+                    configuredValue = 0;
+                    failureReason =
+                        CombatImpactAttributeTransitionFailureReason.NonSelfCardReference;
+                    return false;
+                }
+                if (
+                    !cardAttributes.TryGetValue(sourceId, out var attributes)
+                    || !attributes.TryGetValue(reference.AttributeType, out var attributeValue)
+                )
+                {
+                    configuredValue = 0;
+                    failureReason =
+                        CombatImpactAttributeTransitionFailureReason.SourceAttributeUnavailable;
+                    return false;
+                }
+                if (
+                    !TryApplyStaticModifier(
+                        attributeValue,
+                        reference.Modifier,
+                        out var modifiedValue
+                    )
+                )
+                {
+                    configuredValue = 0;
+                    failureReason =
+                        CombatImpactAttributeTransitionFailureReason.DynamicReferenceModifier;
+                    return false;
+                }
+                if (TryConvertExactInt(modifiedValue, out configuredValue))
+                    return true;
+                failureReason =
+                    CombatImpactAttributeTransitionFailureReason.NonIntegralConfiguredValue;
+                return false;
+            case TRangeValue:
+                configuredValue = 0;
+                failureReason = CombatImpactAttributeTransitionFailureReason.RangeValue;
+                return false;
+            case TReferenceValueCardAttributeUnscaled:
+                configuredValue = 0;
+                failureReason = CombatImpactAttributeTransitionFailureReason.CardAttributeUnscaled;
+                return false;
+            case TReferenceValueAttributeChange:
+                configuredValue = 0;
+                failureReason =
+                    CombatImpactAttributeTransitionFailureReason.AttributeChangeReference;
+                return false;
+            case TReferenceValuePlayerAttribute:
+                configuredValue = 0;
+                failureReason =
+                    CombatImpactAttributeTransitionFailureReason.PlayerAttributeReference;
+                return false;
+            case TReferenceValueCardCount:
+                configuredValue = 0;
+                failureReason = CombatImpactAttributeTransitionFailureReason.CardCountReference;
+                return false;
+            default:
+                configuredValue = 0;
+                failureReason = CombatImpactAttributeTransitionFailureReason.UnsupportedValueType;
+                return false;
+        }
+    }
+
+    private static bool TryApplyStaticModifier(
+        float originalValue,
+        TValueModifier? modifier,
+        out float modifiedValue
+    )
+    {
+        if (modifier == null)
+        {
+            modifiedValue = originalValue;
+            return true;
+        }
+        if (modifier.Value is not TFixedValue)
+        {
+            modifiedValue = 0;
+            return false;
+        }
+
+        // The fixed operand is the only reference modifier we can evaluate without live game
+        // context. Delegate its rounding and divide-by-zero semantics to the native value type.
+        modifiedValue = modifier.GetModifiedValue(originalValue, default);
+        return !float.IsNaN(modifiedValue) && !float.IsInfinity(modifiedValue);
+    }
+
+    private static bool TryConvertExactInt(float value, out int converted)
+    {
+        converted = 0;
+        if (
+            float.IsNaN(value)
+            || float.IsInfinity(value)
+            || value < int.MinValue
+            || value > int.MaxValue
+        )
+            return false;
+
+        var rounded = Math.Round(value, MidpointRounding.AwayFromZero);
+        if (Math.Abs(value - rounded) > 0.0001d)
+            return false;
+
+        converted = (int)rounded;
+        return true;
     }
 
     private static bool IsClaimedByAnotherExecution(
@@ -2547,9 +3351,11 @@ internal static class CombatImpactProjector
             entities != null
             && effect.ActionType == EActionCommandType.CardModifyAttribute
             && transition.Domain == ImpactTransitionDomain.CardAttribute
-            && TryResolveAbilityAttributeType(effect, entities, out var attributeType)
         )
-            return (int)attributeType == transition.Attribute;
+        {
+            return !TryResolveAbilityAttributeType(effect, entities, out var attributeType)
+                || (int)attributeType == transition.Attribute;
+        }
 
         return ClaimsTransition(effect.ActionType, transition);
     }
@@ -2952,6 +3758,23 @@ internal static class CombatImpactProjector
 
         internal bool HasCriticalAdjustmentCandidate { get; init; }
 
+        internal bool IsUnattributedTransitionClaimant { get; init; }
+
+        internal int? UnattributedTransitionValue { get; init; }
+
+        internal int? AttributeTransitionNetValue { get; init; }
+
+        internal CombatImpactAttributeTransitionResolution? AttributeTransitionResolution { get; init; }
+
+        internal IReadOnlyList<CombatImpactAttributeTransitionFailureReason> AttributeTransitionFailureReasons { get; init; } =
+        [];
+
+        internal int AttributeTransitionUnresolvedClaimantCount { get; init; }
+
+        internal bool AttributeTransitionEventOrderReplayReconciles { get; init; }
+
+        internal bool AttributeTransitionEventOrderReplayIncludesMultiply { get; init; }
+
         internal static ResolvedImpactValue Empty(
             CombatImpactKind kind,
             EActionCommandType action
@@ -3042,6 +3865,13 @@ internal static class CombatImpactProjector
     private readonly record struct DamageCriticalRecoveryKey(
         string SourceId,
         string NativeAttributeKey
+    );
+
+    private readonly record struct AttributeTransitionResidualKey(
+        int FrameIndex,
+        string TargetId,
+        string NativeAttributeKey,
+        CombatImpactValueUnit Unit
     );
 
     private readonly record struct CriticalRecoveryResult(int CriticalCount, int? CriticalValue);

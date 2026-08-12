@@ -7,26 +7,26 @@ public sealed class CombatImpactMetricFormatterTests
 {
     private const string BurnIcon = "<sprite name=Burn>";
     private const string CritIcon = "<sprite name=Crit>";
+    private const string DamageIcon = "<sprite name=Damage>";
 
     private static readonly CombatImpactEntity Target = new("target", "Target", "Item", null, 0);
 
     [Theory]
-    [InlineData(950, (int)CombatImpactValueUnit.Milliseconds, false, false, "0.95s")]
-    [InlineData(1000, (int)CombatImpactValueUnit.Milliseconds, false, false, "1s")]
-    [InlineData(1100, (int)CombatImpactValueUnit.Milliseconds, false, false, "1.10s")]
-    [InlineData(950, (int)CombatImpactValueUnit.Milliseconds, false, true, "0.95s")]
-    [InlineData(20, (int)CombatImpactValueUnit.PercentagePoints, true, false, "+20%")]
-    [InlineData(-10, (int)CombatImpactValueUnit.Amount, true, false, "-10")]
-    [InlineData(999_999, (int)CombatImpactValueUnit.Amount, false, false, "999,999")]
-    [InlineData(1_000_000, (int)CombatImpactValueUnit.Amount, false, false, "1M")]
-    [InlineData(12_345_678, (int)CombatImpactValueUnit.Amount, true, false, "+12.35M")]
-    [InlineData(-12_345_678, (int)CombatImpactValueUnit.Amount, true, false, "-12.35M")]
-    [InlineData(int.MaxValue, (int)CombatImpactValueUnit.Amount, false, false, "2.15B")]
-    [InlineData(int.MinValue, (int)CombatImpactValueUnit.Amount, false, false, "-2.15B")]
-    public void Values_use_product_sign_duration_and_precision_rules(
+    [InlineData(950, (int)CombatImpactValueUnit.Milliseconds, false, "0.95s")]
+    [InlineData(1000, (int)CombatImpactValueUnit.Milliseconds, false, "1s")]
+    [InlineData(1100, (int)CombatImpactValueUnit.Milliseconds, false, "1.10s")]
+    [InlineData(950, (int)CombatImpactValueUnit.Milliseconds, true, "0.95s")]
+    [InlineData(20, (int)CombatImpactValueUnit.PercentagePoints, false, "20%")]
+    [InlineData(-10, (int)CombatImpactValueUnit.Amount, false, "-10")]
+    [InlineData(999_999, (int)CombatImpactValueUnit.Amount, false, "999,999")]
+    [InlineData(1_000_000, (int)CombatImpactValueUnit.Amount, false, "1M")]
+    [InlineData(12_345_678, (int)CombatImpactValueUnit.Amount, false, "12.35M")]
+    [InlineData(-12_345_678, (int)CombatImpactValueUnit.Amount, false, "-12.35M")]
+    [InlineData(int.MaxValue, (int)CombatImpactValueUnit.Amount, false, "2.15B")]
+    [InlineData(int.MinValue, (int)CombatImpactValueUnit.Amount, false, "-2.15B")]
+    public void Values_use_product_duration_and_precision_rules(
         int value,
         int unitValue,
-        bool showSign,
         bool chinese,
         string expected
     )
@@ -34,7 +34,6 @@ public sealed class CombatImpactMetricFormatterTests
         var formatted = CombatImpactMetricFormatter.Value(
             value,
             (CombatImpactValueUnit)unitValue,
-            showSign,
             chinese
         );
 
@@ -262,11 +261,86 @@ public sealed class CombatImpactMetricFormatterTests
         var formatted = CombatImpactMetricFormatter.Group(
             burn,
             chinese: false,
-            totalMarker: BurnIcon
+            effectMarker: BurnIcon
         );
 
         Assert.Equal("×2 · <sprite name=Burn>18", formatted);
         Assert.DoesNotContain("total", formatted, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Attribute_change_values_use_the_effect_icon_without_a_positive_sign()
+    {
+        var target = new CombatImpactTarget(
+            Target,
+            3,
+            30,
+            CombatImpactValueUnit.Amount,
+            CombatImpactCoverage.Exact
+        );
+        var gained = new CombatImpactGroup(
+            CombatImpactKind.AttributeChange,
+            "DamageAmount",
+            6,
+            750,
+            CombatImpactValueUnit.Amount,
+            CombatImpactCoverage.Exact,
+            null,
+            0,
+            [target]
+        );
+        var source = new CombatImpactIncomingSource(
+            Target,
+            3,
+            30,
+            CombatImpactValueUnit.Amount,
+            CombatImpactCoverage.Exact
+        );
+        var incoming = new CombatImpactIncomingGroup(
+            CombatImpactKind.AttributeChange,
+            "DamageAmount",
+            6,
+            750,
+            CombatImpactValueUnit.Amount,
+            CombatImpactCoverage.Exact,
+            [source]
+        );
+        var lost = gained with { ObservedValue = -750 };
+
+        Assert.Equal(
+            "×6 · <sprite name=Damage>750",
+            CombatImpactMetricFormatter.Group(gained, chinese: false, effectMarker: DamageIcon)
+        );
+        Assert.Equal(
+            "×3 · <sprite name=Damage>30",
+            CombatImpactMetricFormatter.Target(
+                gained,
+                target,
+                chinese: false,
+                effectMarker: DamageIcon
+            )
+        );
+        Assert.Equal(
+            "×6 · <sprite name=Damage>750",
+            CombatImpactMetricFormatter.IncomingGroup(
+                incoming,
+                chinese: false,
+                effectMarker: DamageIcon
+            )
+        );
+        Assert.Equal(
+            "×3 · <sprite name=Damage>30",
+            CombatImpactMetricFormatter.IncomingSource(
+                incoming,
+                source,
+                chinese: false,
+                effectMarker: DamageIcon
+            )
+        );
+        Assert.Equal(
+            "×6 · <sprite name=Damage>-750",
+            CombatImpactMetricFormatter.Group(lost, chinese: false, effectMarker: DamageIcon)
+        );
     }
 
     [Fact]
@@ -398,8 +472,8 @@ public sealed class CombatImpactMetricFormatterTests
     }
 
     [Theory]
-    [InlineData((int)CombatImpactOccurrenceBasis.ExplicitExecution, "×3 · +90", "×2 · +60")]
-    [InlineData((int)CombatImpactOccurrenceBasis.ReconstructedTransition, "+90", "+60")]
+    [InlineData((int)CombatImpactOccurrenceBasis.ExplicitExecution, "×3 · 90", "×2 · 60")]
+    [InlineData((int)CombatImpactOccurrenceBasis.ReconstructedTransition, "90", "60")]
     public void Attribute_transition_counts_require_explicit_execution_evidence(
         int occurrenceBasisValue,
         string expectedGroup,
@@ -484,8 +558,8 @@ public sealed class CombatImpactMetricFormatterTests
             []
         );
 
-        Assert.Equal("×4 · +3,514", CombatImpactMetricFormatter.Group(group, chinese: false));
-        Assert.Equal("×4 · +3,514", CombatImpactMetricFormatter.Group(group, chinese: true));
+        Assert.Equal("×4 · 3,514", CombatImpactMetricFormatter.Group(group, chinese: false));
+        Assert.Equal("×4 · 3,514", CombatImpactMetricFormatter.Group(group, chinese: true));
     }
 
     [Fact]

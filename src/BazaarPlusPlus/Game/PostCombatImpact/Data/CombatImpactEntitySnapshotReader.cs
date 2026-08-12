@@ -147,6 +147,10 @@ internal static class CombatImpactEntitySnapshotReader
         var item = card as ItemCard;
         var effectAttributes = ReadEffectAttributeTypes(card, item);
         var activeEffects = ReadActiveEffects(card);
+        var abilityAttributeModifiers = ReadAbilityAttributeModifiers(
+            item,
+            activeEffects.Abilities
+        );
         entities[instanceId] = new CombatImpactEntity(
             instanceId,
             name!,
@@ -176,8 +180,32 @@ internal static class CombatImpactEntitySnapshotReader
             ),
             card.Type == ECardType.SocketEffect
                 ? CombatImpactAttributionRuleReader.ReadUseRules(activeEffects.Abilities)
-                : null
+                : null,
+            abilityAttributeModifiers
         );
+    }
+
+    private static IReadOnlyDictionary<
+        string,
+        TActionCardModifyAttribute
+    >? ReadAbilityAttributeModifiers(ItemCard? item, IEnumerable<TCardAbility>? activeAbilities)
+    {
+        try
+        {
+            var abilities = activeAbilities?.ToList() ?? [];
+            if (
+                item?.Enchantment is { } enchantmentType
+                && item.GetEnchantments() is { } enchantments
+                && enchantments.TryGetValue(enchantmentType, out var enchantment)
+            )
+                abilities.AddRange(enchantment.Abilities.Values);
+
+            return CombatImpactAbilityAttributeModifierReader.Read(abilities);
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private static ActiveEffects ReadActiveEffects(Card card)

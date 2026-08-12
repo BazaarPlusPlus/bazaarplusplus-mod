@@ -28,6 +28,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
     private const float TooltipReadableWidth = 360f;
     private const float TooltipGap = 18f;
     private const float CanvasMargin = 16f;
+    private const float DividerHeight = 2f;
     private const int NativeBottomPaddingReduction = 4;
     private const int NativeDenseBottomPaddingMaximum = 24;
     private const float PlacementEpsilon = 0.5f;
@@ -39,8 +40,9 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
     private const float TriggerSummaryFontScale = 0.64f;
     private const float GroupLabelFontScale = 1f;
     private const float GroupMetricFontScale = 1f;
-    private const float GroupSecondaryMetricFontScale = 0.62f;
-    private const float GroupStackedMetricMinFontScale = 0.68f;
+    private const float GroupSecondaryMetricFontScale = 0.8f;
+    private const float GroupStackedMetricMinFontScale = 0.78f;
+    private const float GroupStackedMetricPreferredHeight = 56f;
     private const float GroupStackedMetricOpticalOffset = 2f;
     private const float GroupIconColumnPreferredWidth = 34f;
     private const float TargetNameFontScale = 0.875f;
@@ -742,6 +744,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
             is { Basis: CombatImpactAuthoritativeBasis.TotalAmount } total
             ? total.Value
             : group.ObservedValue;
+        var effectMarker = EffectMarker(group.Kind, group.NativeAttributeKey);
         BuildGroupHeader(
             textTemplate,
             headingRoot,
@@ -750,12 +753,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
             group.Surface,
             changeValue,
             group.HasMixedValueDirections,
-            CombatImpactMetricFormatter.Group(
-                group,
-                IsChinese(),
-                CriticalMarker(),
-                EffectMarker(group.Kind, group.NativeAttributeKey)
-            ),
+            CombatImpactMetricFormatter.Group(group, IsChinese(), CriticalMarker(), effectMarker),
             CombatImpactMetricFormatter.PeriodicImpact(
                 group,
                 IsChinese(),
@@ -788,7 +786,12 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
                         groupRoot,
                         "ImpactTargetRow",
                         target.Entity,
-                        CombatImpactMetricFormatter.Target(group, target, IsChinese()),
+                        CombatImpactMetricFormatter.Target(
+                            group,
+                            target,
+                            IsChinese(),
+                            effectMarker
+                        ),
                         generation
                     )
                 );
@@ -813,15 +816,21 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
     {
         var groupRoot = CreateVertical("ImpactReceivedGroup", parent, 4f);
         AddLayout(groupRoot.gameObject, preferredHeight: -1f, flexibleWidth: 1f);
+        var effectMarker = EffectMarker(group.Kind, group.NativeAttributeKey);
         BuildGroupHeader(
             textTemplate,
             groupRoot,
             group.Kind,
             group.NativeAttributeKey,
             group.Surface,
-            group.ObservedValue,
+            group.TransitionLedger?.NetValue ?? group.ObservedValue,
             group.HasMixedValueDirections,
-            CombatImpactMetricFormatter.IncomingGroup(group, IsChinese(), CriticalMarker())
+            CombatImpactMetricFormatter.IncomingGroup(
+                group,
+                IsChinese(),
+                CriticalMarker(),
+                effectMarker
+            )
         );
         var detailRows = new List<GameObject>();
         if (CombatImpactDetailPresentationPolicy.ShouldRenderEntityRows(group.Sources.Count))
@@ -834,7 +843,12 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
                         groupRoot,
                         "ImpactSourceRow",
                         source.Entity,
-                        CombatImpactMetricFormatter.IncomingSource(group, source, IsChinese()),
+                        CombatImpactMetricFormatter.IncomingSource(
+                            group,
+                            source,
+                            IsChinese(),
+                            effectMarker
+                        ),
                         generation
                     )
                 );
@@ -856,6 +870,9 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         float preferredHeight = 48f
     )
     {
+        var hasSecondaryMetric = !string.IsNullOrWhiteSpace(secondaryMetricText);
+        if (hasSecondaryMetric)
+            preferredHeight = Mathf.Max(preferredHeight, GroupStackedMetricPreferredHeight);
         var header = CreateHorizontal(
             "ImpactGroupHeader",
             parent,
@@ -899,7 +916,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         // Group titles are controlled product labels and must stay literal even when the row is
         // constrained; unlike generic cloned text, they never opt into ellipsis.
         labelText.overflowMode = TextOverflowModes.Overflow;
-        if (string.IsNullOrWhiteSpace(secondaryMetricText))
+        if (!hasSecondaryMetric)
         {
             var metric = CloneText(
                 textTemplate,
@@ -1016,7 +1033,8 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         var image = divider.GetComponent<Image>();
         image.color = new Color32(112, 86, 43, 150);
         image.raycastTarget = false;
-        AddLayout(divider, preferredHeight: 1f, flexibleWidth: 1f);
+        var layout = AddLayout(divider, preferredHeight: DividerHeight, flexibleWidth: 1f);
+        layout.minHeight = DividerHeight;
         return divider;
     }
 
