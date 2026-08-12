@@ -1,6 +1,6 @@
 # ADR-0006: Ship BazaarAgent as an optional dependent plugin
 
-Status: Accepted; supersedes ADR-0005
+Status: Accepted; absorbs ADR-0005
 
 ## Decision
 

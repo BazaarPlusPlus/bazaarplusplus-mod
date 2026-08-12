@@ -23,7 +23,7 @@ One line each, full record in [adr/](adr/). A line here exists to stop a settled
 - ADR-0001: Expose run/encounter state via on-demand `IEncounterStateProbe`, not an event-sourced timeline tracker.
 - ADR-0002: Mount MonoBehaviour features via one-line `IBppMountable`/`BppMountableRegistry`, generalized to `ComponentMount<T>`.
 - ADR-0003: Render HistoryPanel previews via a `ScreenSpaceOverlay` Canvas, **not** an offscreen RenderTexture — URP cannot render uGUI to RT. Do not re-propose the RT path.
-- ADR-0004: Enchant preview is three-state visibility (`Off`/`AutoOnPedestalChoice`/`Always`, default `Always`); upgrade preview is hold-Shift only.
+- ADR-0004: Enchant preview is three-state visibility (`Off`/`AutoOnPedestalChoice`/`Always`, default `Always`); upgrade preview uses configurable `Hold`/`Toggle` activation, defaulting to hold-Shift.
 - ADR-0006: BazaarAgent is its own BepInEx plugin depending on BazaarPlusPlus — dependency inverted, fixed loopback `127.0.0.1:47900`. Absorbs ADR-0005.
 - ADR-0007: Replay exit is explicit and single-owner. The V1 replay-control endpoints were removed; the agent `Continue` Flow action is emitted only at `finishedAwaitingContinue`, and `CombatReplayRuntime.TryContinueReplay` is the only programmatic `ReplayState` exit. Absorbs ADR-0008.
 - ADR-0009: Keep behavior-specific seams and reject cosmetic unifications — the three Core seams, HistoryPanel async/state ownership, distinct tooltip normalizers, catalog-local facet snapshots, evidence-free registration-order rules.
