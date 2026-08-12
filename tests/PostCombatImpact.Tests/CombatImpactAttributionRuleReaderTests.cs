@@ -14,6 +14,38 @@ namespace PostCombatImpact.Tests;
 public sealed class CombatImpactAttributionRuleReaderTests
 {
     [Fact]
+    public void Reads_on_card_critted_ability_ids_and_priorities()
+    {
+        var abilities = new[]
+        {
+            new TCardAbility
+            {
+                Id = "crit-low",
+                Trigger = new BazaarGameShared.Domain.Effect.Trigger.TTriggerOnCardCritted(),
+                Priority = EEffectPriority.Low,
+            },
+            new TCardAbility
+            {
+                Id = "crit-immediate",
+                Trigger = new BazaarGameShared.Domain.Effect.Trigger.TTriggerOnCardCritted(),
+                Priority = EEffectPriority.Immediate,
+            },
+            new TCardAbility
+            {
+                Id = "fired",
+                Trigger = new BazaarGameShared.Domain.Effect.Trigger.TTriggerOnCardFired(),
+            },
+        };
+
+        var triggers = CombatImpactCriticalTriggerReader.Read(abilities);
+
+        Assert.Equal(2, triggers?.Count);
+        Assert.Equal(EEffectPriority.Low, triggers?["crit-low"]);
+        Assert.Equal(EEffectPriority.Immediate, triggers?["crit-immediate"]);
+        Assert.False(triggers?.ContainsKey("fired"));
+    }
+
+    [Fact]
     public void Reads_minor_on_use_tempo_rule_from_public_item_tag_graph()
     {
         var skillId = Guid.NewGuid();

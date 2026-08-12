@@ -45,6 +45,10 @@
       Link="CombatImpactAttributionRuleReader.cs"
     />
     <Compile
+      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactCriticalTriggerReader.cs"
+      Link="CombatImpactCriticalTriggerReader.cs"
+    />
+    <Compile
       Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactProjector.cs"
       Link="CombatImpactProjector.cs"
     />

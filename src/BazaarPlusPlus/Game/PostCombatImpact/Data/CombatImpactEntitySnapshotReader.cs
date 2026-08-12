@@ -147,9 +147,9 @@ internal static class CombatImpactEntitySnapshotReader
         var item = card as ItemCard;
         var effectAttributes = ReadEffectAttributeTypes(card, item);
         var activeEffects = ReadActiveEffects(card);
-        var abilityAttributeModifiers = ReadAbilityAttributeModifiers(
-            item,
-            activeEffects.Abilities
+        var activeAbilities = CombatImpactActiveAbilityReader.Read(item, activeEffects.Abilities);
+        var abilityAttributeModifiers = CombatImpactAbilityAttributeModifierReader.Read(
+            activeAbilities
         );
         entities[instanceId] = new CombatImpactEntity(
             instanceId,
@@ -174,38 +174,13 @@ internal static class CombatImpactEntitySnapshotReader
             CombatImpactEntityTags.ResolveHiddenTags(card),
             card.Section,
             CombatImpactEntityTags.ResolveTags(card),
-            CombatImpactAttributionRuleReader.ReadSourceRules(
-                activeEffects.Abilities,
-                activeEffects.Auras
-            ),
+            CombatImpactAttributionRuleReader.ReadSourceRules(activeAbilities, activeEffects.Auras),
             card.Type == ECardType.SocketEffect
-                ? CombatImpactAttributionRuleReader.ReadUseRules(activeEffects.Abilities)
+                ? CombatImpactAttributionRuleReader.ReadUseRules(activeAbilities)
                 : null,
-            abilityAttributeModifiers
+            abilityAttributeModifiers,
+            CombatImpactCriticalTriggerReader.Read(activeAbilities)
         );
-    }
-
-    private static IReadOnlyDictionary<
-        string,
-        TActionCardModifyAttribute
-    >? ReadAbilityAttributeModifiers(ItemCard? item, IEnumerable<TCardAbility>? activeAbilities)
-    {
-        try
-        {
-            var abilities = activeAbilities?.ToList() ?? [];
-            if (
-                item?.Enchantment is { } enchantmentType
-                && item.GetEnchantments() is { } enchantments
-                && enchantments.TryGetValue(enchantmentType, out var enchantment)
-            )
-                abilities.AddRange(enchantment.Abilities.Values);
-
-            return CombatImpactAbilityAttributeModifierReader.Read(abilities);
-        }
-        catch
-        {
-            return null;
-        }
     }
 
     private static ActiveEffects ReadActiveEffects(Card card)

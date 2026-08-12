@@ -269,6 +269,11 @@ internal static class CombatImpactProjector
             events,
             diagnostics
         );
+        var criticalTriggerEvidenceAudit = AttachCriticalTriggerEvidence(
+            events,
+            executions,
+            entities
+        );
         AttachNativeActivationCriticalCounts(events);
         RecoverAmbiguousDamageCriticals(events, authoritative);
 
@@ -310,6 +315,7 @@ internal static class CombatImpactProjector
         {
             ProjectionDiagnostics = diagnostics.Distinct().ToArray(),
             AttributeTransitionDiagnostics = attributeTransitionDiagnostics,
+            CriticalTriggerEvidenceAudit = criticalTriggerEvidenceAudit,
         };
     }
 
@@ -703,7 +709,8 @@ internal static class CombatImpactProjector
                         item.TriggerSource?.Value,
                         frameIndex,
                         item.EffectId,
-                        item.ActionType
+                        item.ActionType,
+                        item.ExecutionContextId
                     )
                 );
             }
@@ -1194,6 +1201,167 @@ internal static class CombatImpactProjector
             CriticalOutcomeCount = 1,
             CriticalValue = matchesCritical ? observed : null,
         };
+    }
+
+    private static CombatImpactCriticalTriggerEvidenceAudit AttachCriticalTriggerEvidence(
+        IList<CombatImpactEvent> events,
+        IReadOnlyList<ProjectedExecution> executions,
+        IReadOnlyDictionary<string, CombatImpactEntity> entities
+    )
+    {
+        var observed = executions
+            .Where(execution =>
+                execution.DirectSourceId is { Length: > 0 } sourceId
+                && execution.TriggerSourceId is { Length: > 0 }
+                && execution.EffectId is { Length: > 0 } effectId
+                && entities.TryGetValue(sourceId, out var source)
+                && source.CriticalTriggerAbilitiesByEffectId?.ContainsKey(effectId) == true
+            )
+            .Select(execution => new CriticalTriggerExecutionEvidence(
+                execution.TriggerSourceId!,
+                execution.FrameIndex,
+                entities[execution.DirectSourceId!].CriticalTriggerAbilitiesByEffectId![
+                    execution.EffectId!
+                ],
+                execution.DirectSourceId!,
+                execution.EffectId!,
+                execution.ExecutionContextId
+            ))
+            .Distinct()
+            .ToArray();
+        var resolutions = observed
+            .Select(evidence => TryResolveCriticalTriggerOrigin(events, executions, evidence))
+            .ToArray();
+        var evidence = resolutions
+            .Where(origin => origin.HasValue)
+            .Select(origin => origin!.Value)
+            .ToHashSet();
+        if (evidence.Count == 0)
+            return new CombatImpactCriticalTriggerEvidenceAudit(0, 0);
+
+        var candidates = events
+            .Select((item, index) => new IndexedImpactEvent(index, item))
+            .Where(item =>
+                item.Event.TriggerFrameIndex.HasValue
+                && evidence.Contains(
+                    new CriticalTriggerEvidenceKey(
+                        item.Event.SourceId,
+                        item.Event.TriggerFrameIndex.Value
+                    )
+                )
+                && CanReceiveCriticalTriggerEvidence(item.Event)
+            )
+            .GroupBy(item => new CriticalTriggerEvidenceKey(
+                item.Event.SourceId,
+                item.Event.TriggerFrameIndex!.Value
+            ));
+
+        var candidatesByOrigin = candidates.ToDictionary(
+            group => group.Key,
+            group => group.ToArray()
+        );
+        var attributed = 0;
+        foreach (var origin in evidence)
+        {
+            if (!candidatesByOrigin.TryGetValue(origin, out var items))
+                continue;
+            if (items.Any(item => item.Event.CriticalCount > 0 || item.Event.IsCritical))
+            {
+                attributed++;
+                continue;
+            }
+
+            var originating = SelectCriticalTriggerOrigin(items);
+            events[originating.Index] = events[originating.Index] with
+            {
+                CriticalCount = 1,
+                CriticalOutcomeCount = 1,
+                CriticalValue = null,
+            };
+            attributed++;
+        }
+        return new CombatImpactCriticalTriggerEvidenceAudit(evidence.Count, attributed);
+    }
+
+    private static CriticalTriggerEvidenceKey? TryResolveCriticalTriggerOrigin(
+        IEnumerable<CombatImpactEvent> events,
+        IReadOnlyList<ProjectedExecution> executions,
+        CriticalTriggerExecutionEvidence evidence
+    )
+    {
+        var candidateFrames = events
+            .Where(item =>
+                string.Equals(item.SourceId, evidence.TriggerSourceId, StringComparison.Ordinal)
+                && item.TriggerFrameIndex is { } frameIndex
+                && frameIndex <= evidence.FrameIndex
+                && frameIndex >= evidence.FrameIndex - 1
+                && CanReceiveCriticalTriggerEvidence(item)
+            )
+            .Select(item => item.TriggerFrameIndex!.Value)
+            .Distinct()
+            .OrderByDescending(frameIndex => frameIndex)
+            .ToArray();
+        if (candidateFrames.Length == 0)
+            return null;
+
+        var sameFrame = candidateFrames.Contains(evidence.FrameIndex);
+        var previousFrame = candidateFrames.Contains(evidence.FrameIndex - 1);
+        var originFrame = evidence.Priority switch
+        {
+            EEffectPriority.Immediate when sameFrame => evidence.FrameIndex,
+            EEffectPriority.Immediate when previousFrame => evidence.FrameIndex - 1,
+            _ when previousFrame
+                    && !HasSelfTriggeredExecution(
+                        executions,
+                        evidence.TriggerSourceId,
+                        evidence.FrameIndex
+                    ) => evidence.FrameIndex - 1,
+            _ when sameFrame => evidence.FrameIndex,
+            _ => -1,
+        };
+
+        return originFrame >= 0
+            ? new CriticalTriggerEvidenceKey(evidence.TriggerSourceId, originFrame)
+            : null;
+    }
+
+    private static bool HasSelfTriggeredExecution(
+        IEnumerable<ProjectedExecution> executions,
+        string sourceId,
+        int frameIndex
+    ) =>
+        executions.Any(execution =>
+            execution.FrameIndex == frameIndex
+            && string.Equals(execution.DirectSourceId, sourceId, StringComparison.Ordinal)
+            && string.Equals(execution.TriggerSourceId, sourceId, StringComparison.Ordinal)
+        );
+
+    private static bool CanReceiveCriticalTriggerEvidence(CombatImpactEvent item) =>
+        item.Surface == CombatImpactEventSurface.AppliedEffect
+        && item.OccurrenceBasis == CombatImpactOccurrenceBasis.ExplicitExecution;
+
+    private static IndexedImpactEvent SelectCriticalTriggerOrigin(
+        IReadOnlyList<IndexedImpactEvent> candidates
+    )
+    {
+        foreach (
+            var preferredKind in new[]
+            {
+                CombatImpactKind.DirectDamage,
+                CombatImpactKind.Burn,
+                CombatImpactKind.Poison,
+                CombatImpactKind.Healing,
+                CombatImpactKind.Shield,
+                CombatImpactKind.AttributeChange,
+            }
+        )
+        {
+            var matches = candidates.Where(item => item.Event.Kind == preferredKind).ToArray();
+            if (matches.Length == 1)
+                return matches[0];
+        }
+
+        return candidates[0];
     }
 
     private static void AttachNativeActivationCriticalCounts(IList<CombatImpactEvent> events)
@@ -1905,7 +2073,8 @@ internal static class CombatImpactProjector
                                 triggerSourceId,
                                 0,
                                 aura.EffectId,
-                                default
+                                default,
+                                aura.ExecutionContextId
                             ),
                             entities
                         );
@@ -3821,7 +3990,8 @@ internal static class CombatImpactProjector
         string? TriggerSourceId,
         int FrameIndex,
         string? EffectId,
-        EActionCommandType ActionType
+        EActionCommandType ActionType,
+        string? ExecutionContextId
     )
     {
         internal bool PrerequisiteSkillSource { get; init; }
@@ -3865,6 +4035,17 @@ internal static class CombatImpactProjector
     private readonly record struct DamageCriticalRecoveryKey(
         string SourceId,
         string NativeAttributeKey
+    );
+
+    private readonly record struct CriticalTriggerEvidenceKey(string SourceId, int FrameIndex);
+
+    private readonly record struct CriticalTriggerExecutionEvidence(
+        string TriggerSourceId,
+        int FrameIndex,
+        EEffectPriority Priority,
+        string ListenerSourceId,
+        string EffectId,
+        string? ExecutionContextId
     );
 
     private readonly record struct AttributeTransitionResidualKey(

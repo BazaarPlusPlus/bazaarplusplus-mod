@@ -229,7 +229,10 @@ internal static class CombatImpactImplicitPlayerEffectReader
                 candidate.Abilities,
                 candidate.Auras
             ),
-            AbilityAttributeModifiersByEffectId: modifiers
+            AbilityAttributeModifiersByEffectId: modifiers,
+            CriticalTriggerAbilitiesByEffectId: CombatImpactCriticalTriggerReader.Read(
+                candidate.Abilities
+            )
         );
     }
 
