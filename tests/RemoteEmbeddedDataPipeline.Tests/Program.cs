@@ -194,7 +194,7 @@ static async Task TestFetchDataRejectsBadSchemaWithoutChangingCanonicalSet()
         var canonical = Path.Combine(root, "canonical");
         Directory.CreateDirectory(canonical);
         var voicePath = Path.Combine(canonical, "voice-lines.json");
-        var buildsPath = Path.Combine(canonical, "tenwin_builds.json");
+        var buildsPath = Path.Combine(canonical, "builds.json");
         File.WriteAllText(voicePath, "old-voice");
         File.WriteAllText(buildsPath, "old-builds");
         var invalidVoice = "[" + new string(' ', 102398) + "]";

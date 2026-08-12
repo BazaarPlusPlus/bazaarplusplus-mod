@@ -170,7 +170,7 @@ fetch_remote_data() {
                 --project build/RemoteEmbeddedDataFetcher/RemoteEmbeddedDataFetcher.csproj \
                 --no-launch-profile -- \
                 promote "$staging_directory" "$canonical_directory" \
-                voice-lines.json tenwin_builds.json; then
+                voice-lines.json builds.json; then
                 :
             else
                 status=$?

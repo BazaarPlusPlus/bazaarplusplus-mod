@@ -34,7 +34,7 @@ public sealed class BuildRecommendationCorpusLogStateTests : IDisposable
             LiveBuildCorpusSource.Cache,
             12,
             Expired: true,
-            "/Users/example/tenwin_builds.json",
+            "/Users/example/builds.json",
             Exception: null
         );
         var queueFailed = new CorpusDegradation(
@@ -74,7 +74,7 @@ public sealed class BuildRecommendationCorpusLogStateTests : IDisposable
                 LiveBuildCorpusSource.Cache,
                 12,
                 Expired: true,
-                "/tmp/tenwin_builds.json",
+                "/tmp/builds.json",
                 Exception: null
             )
         );
@@ -113,10 +113,10 @@ public sealed class BuildRecommendationCorpusLogStateTests : IDisposable
         var state = new BuildRecommendationCorpusLogState();
         var first = new IOException("write failed");
 
-        state.ReportCacheWriteDegraded("/tmp/tenwin_builds.json", first);
-        state.ReportCacheWriteDegraded("/tmp/tenwin_builds.json", first);
+        state.ReportCacheWriteDegraded("/tmp/builds.json", first);
+        state.ReportCacheWriteDegraded("/tmp/builds.json", first);
         state.ReportCacheWriteRecovered();
-        state.ReportCacheWriteDegraded("/tmp/tenwin_builds.json", first);
+        state.ReportCacheWriteDegraded("/tmp/builds.json", first);
 
         Assert.Equal(2, BppLog.Events.Count);
         Assert.All(
@@ -134,7 +134,7 @@ public sealed class BuildRecommendationCorpusLogStateTests : IDisposable
     public void Debug_observations_are_compile_time_excluded_from_Release()
     {
         var state = new BuildRecommendationCorpusLogState();
-        state.ReportCacheLoaded(10, expired: false, "/tmp/tenwin_builds.json");
+        state.ReportCacheLoaded(10, expired: false, "/tmp/builds.json");
         state.ReportRemoteLoaded(11);
 
 #if DEBUG
