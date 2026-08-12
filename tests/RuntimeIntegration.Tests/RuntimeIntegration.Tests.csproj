@@ -4,28 +4,17 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
-    <AssemblyName>SettingsDockRegistry.Tests</AssemblyName>
-  </PropertyGroup>
-
-  <PropertyGroup>
-    <ProjectRoot>$(MSBuildThisFileDirectory)../../</ProjectRoot>
+    <AssemblyName>RuntimeIntegration.Tests</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="xunit" />
-    <PackageReference Include="xunit.runner.visualstudio">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
-    <PackageReference Include="coverlet.collector">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
+    <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\BazaarPlusPlus\BazaarPlusPlus.csproj" />
+    <ProjectReference Include="../../src/BazaarPlusPlus/BazaarPlusPlus.csproj" />
     <Reference Include="UnityEngine.CoreModule">
       <HintPath>$(ManagedPath)/UnityEngine.CoreModule.dll</HintPath>
     </Reference>
@@ -38,5 +27,12 @@
     <None Include="$(ManagedPath)/UnityEngine.UI.dll" Link="UnityEngine.UI.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="../CompositionRuntime.Tests/*.cs" />
+    <Compile Include="../SettingsDockRegistry.Tests/*.cs" />
+    <Compile Include="../VoiceSubtitles.Tests/*.cs" />
+    <Compile Include="../NativePairedTooltipHost.Tests/*.cs" />
   </ItemGroup>
 </Project>

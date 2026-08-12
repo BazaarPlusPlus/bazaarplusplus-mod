@@ -357,11 +357,7 @@ internal sealed partial class CollectionPanelView
         UiStyle.Radius(button.style, Sizes.CollectionCloseButtonSize / 2f);
 
         var icon = new VisualElement { pickingMode = PickingMode.Ignore };
-        UiStyle.FixedSize(
-            icon.style,
-            Sizes.CollectionCloseIconSize,
-            Sizes.CollectionCloseIconSize
-        );
+        UiStyle.FixedSize(icon.style, Sizes.CollectionCloseIconSize, Sizes.CollectionCloseIconSize);
         icon.style.color = Colors.CollectionChipText;
         icon.generateVisualContent += context => DrawCloseIcon(context, icon);
         button.Add(icon);

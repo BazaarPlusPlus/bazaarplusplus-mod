@@ -259,6 +259,7 @@ internal static partial class HistoryPanelText
             "原生影片錄製器不可用。"
         );
     }
+
     internal static string GhostReplayPayloadUnavailable()
     {
         return FormatSimple(

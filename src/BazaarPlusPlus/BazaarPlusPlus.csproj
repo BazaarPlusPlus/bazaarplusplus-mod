@@ -165,7 +165,7 @@
   <Target
     Name="CopyToBepInExPlugins"
     AfterTargets="Build"
-    Condition="'$(Configuration)' == 'Debug'"
+    Condition="'$(Configuration)' == 'Debug' and '$(BppDeployToGame)' == 'true' and '$(GamePath)' != ''"
   >
     <Message Text="[BazaarPlusPlus] Building for Debug" Importance="high" />
     <ItemGroup>
@@ -454,7 +454,7 @@
     <MSBuild
       Projects="$(MSBuildProjectFile)"
       Targets="Build"
-      Properties="Configuration=Debug;RemoteEmbeddedDataPrepared=true"
+      Properties="Configuration=Debug;RemoteEmbeddedDataPrepared=true;BppDeployToGame=false"
     />
     <MSBuild
       Projects="$(MSBuildProjectFile)"

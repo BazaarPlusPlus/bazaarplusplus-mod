@@ -95,14 +95,16 @@ build() {
     if [[ "$bazaaragent" == "true" ]]; then
         dotnet build src/BazaarPlusPlus.BazaarAgentHost/BazaarPlusPlus.BazaarAgentHost.csproj \
             ${args[@]+"${args[@]}"} ${msbuild_args[@]+"${msbuild_args[@]}"} \
+            -p:BppDeployToGame=true -p:GamePath="$GAME_ROOT" \
             -p:RequireBazaarAgentDashboard=true
         # The main plugin deliberately scrubs optional host DLLs in its own Debug target.
         # Re-run only the host copy target after the dependency graph has fully settled.
         dotnet msbuild src/BazaarPlusPlus.BazaarAgentHost/BazaarPlusPlus.BazaarAgentHost.csproj \
-            -t:CopyHostToBepInExPlugins
+            -t:CopyHostToBepInExPlugins -p:BppDeployToGame=true -p:GamePath="$GAME_ROOT"
     else
         dotnet build src/BazaarPlusPlus/BazaarPlusPlus.csproj \
-            ${args[@]+"${args[@]}"} ${msbuild_args[@]+"${msbuild_args[@]}"}
+            ${args[@]+"${args[@]}"} ${msbuild_args[@]+"${msbuild_args[@]}"} \
+            -p:BppDeployToGame=true -p:GamePath="$GAME_ROOT"
     fi
 }
 
@@ -188,13 +190,15 @@ fetch_remote_data() {
 
 run_seed_gates() {
     echo -e "${CYAN}== Validating ${GREEN}voice subtitle embedded seed${CYAN} ==${RESET}"
-    dotnet test tests/VoiceSubtitles.Tests/VoiceSubtitles.Tests.csproj \
+    dotnet test tests/RuntimeIntegration.Tests/RuntimeIntegration.Tests.csproj \
         -c Release \
-        --filter "FullyQualifiedName~Embedded_seed" \
+        --filter "TestKind=EmbeddedSeed" \
         "$@" || return $?
     echo -e "${CYAN}== Validating ${GREEN}live build recommendation embedded seed${CYAN} ==${RESET}"
-    dotnet run --project tests/LiveBuildRecommendations.Tests/LiveBuildRecommendations.Tests.csproj \
+    dotnet test tests/ScenarioRunner.Tests/ScenarioRunner.Tests.csproj \
         -c Release \
+        --filter "TestKind=EmbeddedSeed" \
+        -p:BppSeedGateOnly=true \
         "$@" || return $?
 }
 
@@ -302,31 +306,126 @@ parse_fetch_data_options() {
     fetch_remote_data ${msbuild_args[@]+"${msbuild_args[@]}"}
 }
 
-test_all() {
-    clear_macos_sqlite_quarantine
+test_common_args() {
+    local remote_data="$SCRIPT_DIR/tests/TestData/remote-data"
+    printf '%s\n' \
+        "-p:BppDeployToGame=false" \
+        "-p:ForceRemoteEmbeddedDataRefresh=false" \
+        "-p:RemoteEmbeddedDataDirectory=$remote_data"
+}
 
-    local project
-    local failures=()
-    while IFS= read -r project; do
-        echo -e "${CYAN}== Testing ${GREEN}${project}${CYAN} ==${RESET}"
-        if grep -q "Microsoft.NET.Test.Sdk" "$project"; then
-            if ! dotnet test "$project"; then
-                failures+=("$project")
-            fi
-        else
-            if ! dotnet run --project "$project"; then
-                failures+=("$project")
-            fi
-        fi
-    done < <(find tests -mindepth 2 -maxdepth 2 -name '*.csproj' | sort)
-
-    clear_macos_sqlite_quarantine
-
-    if ((${#failures[@]} > 0)); then
-        echo -e "${RED}Failed test projects:${RESET}" >&2
-        printf '  %s\n' "${failures[@]}" >&2
+require_managed_for_tests() {
+    if [[ ! -f "$MANAGED/Assembly-CSharp.dll" ]]; then
+        echo -e "${RED}Game assemblies not found at '$MANAGED'.${RESET}" >&2
+        echo -e "${RED}Pass -p:ManagedPath=/absolute/path/to/Managed.${RESET}" >&2
         return 1
     fi
+    echo -e "${CYAN}== Test game assemblies: ${GREEN}${MANAGED}${CYAN} ==${RESET}"
+}
+
+resolve_test_managed_arg() {
+    local arg
+    for arg in "$@"; do
+        case "$arg" in
+            -p:ManagedPath=*|--property:ManagedPath=*)
+                MANAGED="${arg#*=}"
+                ;;
+        esac
+    done
+}
+
+test_all() {
+    resolve_test_managed_arg "$@"
+    require_managed_for_tests || return $?
+    local common_args=()
+    while IFS= read -r arg; do common_args+=("$arg"); done < <(test_common_args)
+
+    dotnet test tests/BazaarPlusPlus.Tests.slnx \
+        "${common_args[@]}" "$@"
+}
+
+test_compat() {
+    resolve_test_managed_arg "$@"
+    local common_args=()
+    while IFS= read -r arg; do common_args+=("$arg"); done < <(test_common_args)
+    local decompiled_root="${BPP_DECOMPILED_SOURCE_ROOT:-$SCRIPT_DIR}"
+    local runnable=0
+    local checked=0
+    local failures=()
+    local requirement label project ready
+
+    echo -e "${CYAN}== Compatibility preflight ==${RESET}"
+    while IFS='|' read -r requirement label project; do
+        [[ -n "$requirement" && "$requirement" != \#* ]] || continue
+        ready=false
+        case "$requirement" in
+            managed)
+                [[ -f "$MANAGED/Assembly-CSharp.dll" ]] && ready=true
+                ;;
+            decompiled-online)
+                [[ -f "$SCRIPT_DIR/decompiled/TheBazaarRuntime/AssetLoader.cs" ]] && ready=true
+                ;;
+            decompiled-any)
+                [[ -d "$decompiled_root/decompiled/TheBazaarRuntime" \
+                    || -d "$decompiled_root/decompiled-vptr/TheBazaarRuntime" ]] && ready=true
+                ;;
+            *)
+                echo -e "${RED}Unknown compatibility requirement '$requirement'.${RESET}" >&2
+                return 1
+                ;;
+        esac
+
+        if [[ "$ready" != "true" ]]; then
+            printf '  SKIPPED %-34s requirement=%s\n' "$label" "$requirement"
+            continue
+        fi
+
+        printf '  CHECKED %-34s project=%s\n' "$label" "$project"
+        ((runnable += 1))
+        if dotnet run --project "$project" "${common_args[@]}" "$@"; then
+            ((checked += 1))
+        else
+            failures+=("$label")
+        fi
+    done < tests/CompatibilityTests.manifest
+
+    if ((runnable == 0)); then
+        echo -e "${RED}No compatibility checks were runnable; nothing was verified.${RESET}" >&2
+        return 2
+    fi
+    if ((${#failures[@]} > 0)); then
+        printf '%s\n' "${failures[@]}" | sed 's/^/  FAILED /' >&2
+        return 1
+    fi
+    echo -e "${GREEN}Compatibility checks passed: ${checked}/${runnable}.${RESET}"
+}
+
+test_corpus() {
+    if (($# < 1 || $# > 2)); then
+        echo -e "${RED}Usage: ./run.sh test-corpus <replay-corpus-path> [report-path]${RESET}" >&2
+        return 2
+    fi
+    local corpus_path="$1"
+    if [[ ! -d "$corpus_path" ]]; then
+        echo -e "${RED}Replay corpus directory not found: '$corpus_path'.${RESET}" >&2
+        return 2
+    fi
+    dotnet run --project tools/PeriodicEffectAttribution.Corpus/PeriodicEffectAttribution.Corpus.csproj \
+        -- "$@"
+}
+
+parse_test_options() {
+    local command="$1"
+    shift
+    local msbuild_args=()
+    while (($# > 0)); do
+        case "$1" in
+            -p:*|--property:*) msbuild_args+=("$1") ;;
+            *) usage; return 2 ;;
+        esac
+        shift
+    done
+    "$command" ${msbuild_args[@]+"${msbuild_args[@]}"}
 }
 
 restore_locks() {
@@ -497,7 +596,11 @@ Usage:
   $0 restore-locked
       Validate those restores in locked mode without rewriting the lock files.
   $0 test
-      Run every project under tests/, dispatching xUnit vs exe-runner per csproj.
+      Run the explicit default xUnit suite without deploying to the live game or fetching seeds.
+  $0 test-compat [-p:ManagedPath=...]
+      Run every compatibility check whose local game/decompiled prerequisites are available.
+  $0 test-corpus <replay-corpus-path> [report-path]
+      Run the retained offline periodic-effect evidence analysis. A corpus is mandatory.
   $0 format
   $0 format-check
       Format, or fail on unformatted files, with the repo-pinned CSharpier.
@@ -535,7 +638,18 @@ case "${1:-}" in
         ;;
     restore-locks)  restore_locks ;;
     restore-locked) restore_locked ;;
-    test)         test_all ;;
+    test)
+        shift
+        parse_test_options test_all "$@"
+        ;;
+    test-compat)
+        shift
+        parse_test_options test_compat "$@"
+        ;;
+    test-corpus)
+        shift
+        test_corpus "$@"
+        ;;
     format)       format ;;
     format-check) format_check ;;
     decompile)

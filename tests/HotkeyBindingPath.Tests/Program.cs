@@ -214,10 +214,10 @@ Check(
 
 if (failures.Count > 0)
 {
-    Console.Error.WriteLine($"FAILED ({failures.Count})");
-    foreach (var failure in failures)
-        Console.Error.WriteLine($"- {failure}");
-    Environment.ExitCode = 1;
+    throw new InvalidOperationException(
+        $"FAILED ({failures.Count}){Environment.NewLine}"
+            + string.Join(Environment.NewLine, failures.Select(failure => $"- {failure}"))
+    );
 }
 else
 {

@@ -51,7 +51,7 @@ Inside the main assembly:
 
 The main project targets `netstandard2.1`, uses C# 12, and publicizes game assemblies, so `internal` game members are accessible. Remote seed data is declared in `RemoteEmbeddedData.targets` and delegates transport to `build/RemoteEmbeddedDataFetcher`; the shared version is `BppVersion` in `Directory.Build.props`.
 
-Architecture tests ratchet these boundaries — `Core/` layering, shared item-board preview ownership, BazaarAgent isolation, voice-subtitle guards, source layout (`tests/Architecture.Tests/`). Composition behavior is pinned by `tests/CompositionRuntime.Tests/`: feature start/stop is fault-isolated, `BppMountableRegistry.MountAll` deliberately is not.
+Architecture tests ratchet dependency boundaries, shared ownership, BazaarAgent isolation, and test/build safety contracts (`tests/Architecture.Tests/`). Concrete composition behavior remains in `tests/CompositionRuntime.Tests/` and is compiled by `RuntimeIntegration.Tests`: feature start/stop is fault-isolated, while `BppMountableRegistry.MountAll` deliberately is not.
 
 ## Shared Seams
 

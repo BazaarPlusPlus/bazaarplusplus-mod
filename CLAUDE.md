@@ -17,10 +17,10 @@ How to work in this repository (`AGENTS.md` is a symlink to this file). This fil
 
 Below is only what `run.sh` cannot tell you:
 
-- Running one test project directly: `dotnet test <csproj>` for xUnit projects, `dotnet run --project <csproj>` for exe-runner ones. Which is which is decided by whether the csproj references `Microsoft.NET.Test.Sdk`.
+- The default suite has 12 xUnit projects in `tests/BazaarPlusPlus.Tests.slnx`. `ScenarioRunner.Tests` owns the closed list of source-shadow executable capsules and runs each in a child process; use `dotnet run --project tests/<Name>/<Name>.csproj` only to diagnose one capsule directly.
 - After changing a direct dependency in `Directory.Packages.props`: run `./run.sh restore-locks`, review the six changed `src/**/packages.lock.json` files, then `./run.sh restore-locked` so graph drift fails locally rather than in the installer build. Test projects get no lock files.
 - Building from an isolated ticket worktree: pass `-p:BPPInstallerSourcePath="<absolute-path>/bazaarplusplus-installer/src-tauri/resources"` to projects referencing the main mod, because the default sibling installer path does not exist beside a worktree.
-- Running the full `./run.sh test` from a worktree: `run.sh` forwards no `-p:` properties and ignores the environment variable, so create a `bazaarplusplus-installer` symlink in the worktree's parent directory plus `ln -sfn <main-checkout>/decompiled <worktree>/decompiled` (`decompiled/` is a gitignored local artifact that `NativeCardPreviewCompatibility.Tests` hard-depends on). A missing link surfaces as MSB3030 or a missing decompiled source file, which reads like a code regression.
+- `./run.sh test` is offline and side-effect free: it uses `tests/TestData/remote-data`, never deploys to the game, and excludes decompiled-source premises. Run `./run.sh test-compat` explicitly for every compatibility premise whose local Managed/decompiled inputs are available; skipped premises are reported. `./run.sh test-corpus <path>` is the opt-in replay evidence lane.
 
 ## Logs & Debugging
 

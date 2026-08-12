@@ -194,24 +194,19 @@ internal static class BPPSupporterAttributionRow
             new("left"),
             new("scale"),
         };
-        button.style.transitionDuration = new List<TimeValue>
-        {
-            new(120f, TimeUnit.Millisecond),
-        };
+        button.style.transitionDuration = new List<TimeValue> { new(120f, TimeUnit.Millisecond) };
         button.style.left = 0f;
         button.style.scale = new Scale(Vector3.one);
         button.RegisterCallback<MouseEnterEvent>(_ =>
         {
             button.style.left = -3f;
             button.style.scale = new Scale(new Vector3(1.06f, 1f, 1f));
-        }
-        );
+        });
         button.RegisterCallback<MouseLeaveEvent>(_ =>
         {
             button.style.left = 0f;
             button.style.scale = new Scale(Vector3.one);
-        }
-        );
+        });
         return button;
     }
 

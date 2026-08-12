@@ -23,7 +23,7 @@ public sealed class OutboundNetworkArchitectureTests
         Assert.Contains("HttpClient", fetcher);
         Assert.Contains("PromoteSeedSet", fetcher);
         Assert.Contains("run_seed_gates", script);
-        Assert.Contains("FullyQualifiedName~Embedded_seed", script);
+        Assert.Contains("TestKind=EmbeddedSeed", script);
         Assert.Contains("promote \"$staging_directory\"", script);
         Assert.Contains("for arg in \"$@\"", script);
         Assert.DoesNotContain("local args=(\"$@\")", script);

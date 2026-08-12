@@ -47,7 +47,9 @@ Thumbs.db
 .build-verify
 .sandbox-home
 report-ui
-tools
+tools/*
+!tools/PeriodicEffectAttribution.Corpus/
+!tools/PeriodicEffectAttribution.Corpus/**
 .claude
 .superpowers/
 *.lscache

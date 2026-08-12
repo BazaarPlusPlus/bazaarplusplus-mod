@@ -72,13 +72,13 @@
     </Reference>
   </ItemGroup>
 
-  <!-- Debug: copy the host + pure-core dlls into the live BepInEx plugins folder.
-       The main project owns the (unconditional) DELETE of these two dlls; this target
-       only re-copies them, and runs after the main build because the host references it. -->
+  <!-- Debug deployment: copy the host + pure-core dlls into the live BepInEx plugins folder.
+       The main project's deployment target owns deletion of these two dlls; this target only
+       re-copies them, and runs after the main build because the host references it. -->
   <Target
     Name="CopyHostToBepInExPlugins"
     AfterTargets="Build"
-    Condition="'$(Configuration)' == 'Debug' and '$(GamePath)' != ''"
+    Condition="'$(Configuration)' == 'Debug' and '$(BppDeployToGame)' == 'true' and '$(GamePath)' != ''"
   >
     <Message Text="[BazaarAgentHost] Copying host plugin to BepInEx plugins" Importance="high" />
     <ItemGroup>
@@ -153,7 +153,11 @@
 
   <!-- Build both Debug and Release of the host (and its main/core deps) in one pass. -->
   <Target Name="BuildAll">
-    <MSBuild Projects="$(MSBuildProjectFile)" Targets="Build" Properties="Configuration=Debug" />
+    <MSBuild
+      Projects="$(MSBuildProjectFile)"
+      Targets="Build"
+      Properties="Configuration=Debug;BppDeployToGame=false"
+    />
     <MSBuild
       Projects="$(MSBuildProjectFile)"
       Targets="Build"

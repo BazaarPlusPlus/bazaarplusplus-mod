@@ -16,8 +16,7 @@ Do not edit a snapshot by hand. Regenerate one from the pinned corpus with:
 ```bash
 BPP_BUNDLE_CORPUS_LIMIT=100 \
 BPP_PERIODIC_EVIDENCE_PATH="tests/PeriodicEffectAttribution.Corpus/evidence/<snapshot>.json" \
-dotnet run --project tests/PeriodicEffectAttribution.Corpus/PeriodicEffectAttribution.Corpus.csproj \
-  -- <corpus-root> <full-report-path>
+./run.sh test-corpus <corpus-root> <full-report-path>
 ```
 
 The full report is intentionally kept outside Git because it contains every periodic frame and is
