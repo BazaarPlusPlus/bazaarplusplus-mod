@@ -35,6 +35,11 @@ internal static class CurrentReplayRecordingText
             CurrentReplayRecordingPhase.Failed => snapshot.CanStart
                 ? T("Recording unavailable", "录制不可用", "錄製不可用")
                 : T("Recording failed", "录像失败", "錄影失敗"),
+            CurrentReplayRecordingPhase.Unavailable => T(
+                "Replay without recording",
+                "普通回放（未录制）",
+                "一般回放（未錄製）"
+            ),
             _ => T("Recording unavailable", "录制不可用", "錄製不可用"),
         };
 

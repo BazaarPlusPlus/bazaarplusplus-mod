@@ -2502,6 +2502,20 @@ public class CoreLayeringTests
         );
         Assert.Contains("GetManagedReplayRecordingSnapshot()", runtimeSource);
         Assert.Contains("_activePlaybackOperation?.RecordVideo == true", runtimeSource);
+        Assert.Contains("operation == null", runtimeSource);
+        Assert.Contains(
+            "ReplayRecordingButtonSnapshotPolicy.OrdinaryManagedReplay(",
+            runtimeSource
+        );
+        Assert.Contains("ReplayRecordingButtonSnapshotPolicy.Resolve(", runtimeSource);
+        Assert.Contains("TryStartManagedReplayRecording(", runtimeSource);
+        Assert.Contains("operation.TryPromoteToRecording()", runtimeSource);
+        Assert.Contains(
+            "publisher.TryPromoteActiveSessionToRecording(operation.BattleId)",
+            runtimeSource
+        );
+        Assert.Contains("invokeNativeReplay();", runtimeSource);
+        Assert.Contains("if (!replay.IsReplaying)", runtimeSource);
         Assert.Contains("_managedRecordingCompleted = completed;", runtimeSource);
         Assert.Contains("var snapshot = GetCurrentReplayRecordingSnapshot();", runtimeSource);
         Assert.Contains("CanStart: false", runtimeSource);
