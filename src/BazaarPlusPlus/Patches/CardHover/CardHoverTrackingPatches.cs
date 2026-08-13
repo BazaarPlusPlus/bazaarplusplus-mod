@@ -4,7 +4,7 @@ using HarmonyLib;
 
 namespace BazaarPlusPlus.Patches.CardHover;
 
-// Postfixes still run when a prefix suppresses the original (e.g. replay-recording hover
+// Postfixes still run when a prefix suppresses the original (e.g. native-tooltip
 // suppression); the tracker tolerates that because reads re-validate IsCursorOverCard,
 // which only the un-suppressed original sets.
 

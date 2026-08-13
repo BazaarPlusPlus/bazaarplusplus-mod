@@ -31,7 +31,7 @@ _Avoid_: RunLoggingController, run logger MonoBehaviour
 The feature-owned query boundary for event cards, encounter-step rewards, and hero level rewards. Callers supply only a stable template id, current level, and native text they already hold; the module owns everything from plan generation to final presentation.
 
 **End-of-Run Capture Workflow**:
-The single run-scoped state machine that owns the end-of-run screenshot flow — readiness, bounded attempts, artifact validation, fail-open terminal outcomes. Harmony patches express only Continue and reveal-start intents through `IEndOfRunCaptureWorkflow`; they never drive capture directly.
+The single run-scoped state machine that owns the end-of-run screenshot flow — readiness, bounded attempts, native-tooltip clean-frame preparation, artifact validation, fail-open terminal outcomes. Summary readiness starts capture automatically; Harmony patches express only Continue and reveal-start intents through `IEndOfRunCaptureWorkflow` and never drive capture directly.
 _Avoid_: screenshot gate
 
 **Ghost Battle**:
