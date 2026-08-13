@@ -51,12 +51,16 @@ public sealed class PackageMerchantIdentityTests
     [Fact]
     public void Rejects_ambiguous_merchant_references()
     {
-        var package = Package(Ability(MerchantId), Ability(Guid.NewGuid()));
+        var otherMerchantId = Guid.NewGuid();
+        var package = Package(Ability(MerchantId), Ability(otherMerchantId));
 
         Assert.False(
             PackageMerchantIdentity.TryResolveMerchantTemplateId(package, out var merchantId)
         );
         Assert.Equal(Guid.Empty, merchantId);
+        Assert.True(PackageMerchantIdentity.MatchesMerchantTemplateId(package, MerchantId));
+        Assert.True(PackageMerchantIdentity.MatchesMerchantTemplateId(package, otherMerchantId));
+        Assert.False(PackageMerchantIdentity.MatchesMerchantTemplateId(package, Guid.NewGuid()));
     }
 
     private static TCardItem Package(params TCardAbility[] abilities) =>

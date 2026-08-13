@@ -21,6 +21,7 @@ using BazaarPlusPlus.Game.Lobby;
 using BazaarPlusPlus.Game.MusicNotes;
 using BazaarPlusPlus.Game.NameOverride;
 using BazaarPlusPlus.Game.OverlayPanels;
+using BazaarPlusPlus.Game.PackageMerchantReminder;
 using BazaarPlusPlus.Game.PostCombatImpact;
 using BazaarPlusPlus.Game.PvpBattles.Persistence;
 using BazaarPlusPlus.Game.QuestPreview;
@@ -280,6 +281,9 @@ internal sealed class BppComposition : IDisposable
         );
         _mountables.Register(new ComponentMount<VoiceLineDisplayDispatcher>());
         _mountables.Register(new ComponentMount<VersionLabelScanner>());
+        _mountables.Register(
+            new ComponentMount<PackageMerchantReminderController>((c, _) => c.Initialize())
+        );
         _mountables.Register(
             new ComponentMount<TooltipModifierRefreshController>(
                 (c, s) => c.Initialize(s.Config, s.EncounterState, _nativeCardPreviewHost)

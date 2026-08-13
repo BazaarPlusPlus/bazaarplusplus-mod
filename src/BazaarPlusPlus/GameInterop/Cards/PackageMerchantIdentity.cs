@@ -11,6 +11,41 @@ namespace BazaarPlusPlus.GameInterop.Cards;
 /// </summary>
 internal static class PackageMerchantIdentity
 {
+    internal static bool MatchesMerchantTemplateId(ITCard? packageTemplate, Guid merchantTemplateId)
+    {
+        if (
+            merchantTemplateId == Guid.Empty
+            || packageTemplate == null
+            || !PackageIdentity.IsPackage(packageTemplate.HiddenTags)
+            || packageTemplate.Abilities == null
+        )
+            return false;
+
+        foreach (var ability in packageTemplate.Abilities.Values)
+        {
+            if (ability?.Prerequisites == null)
+                continue;
+
+            foreach (var prerequisite in ability.Prerequisites)
+            {
+                if (
+                    prerequisite
+                        is TPrerequisiteRun
+                        {
+                            Conditions: TRunConditionalCurrentEncounter
+                            {
+                                Conditions: TCardConditionalId { IsNot: false, Id: var candidate },
+                            },
+                        }
+                    && candidate == merchantTemplateId
+                )
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
     internal static bool TryResolveMerchantTemplateId(
         ITCard? packageTemplate,
         out Guid merchantTemplateId
