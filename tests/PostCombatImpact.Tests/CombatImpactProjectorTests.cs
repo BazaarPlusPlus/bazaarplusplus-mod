@@ -4960,6 +4960,61 @@ public sealed class CombatImpactProjectorTests
     }
 
     [Fact]
+    public void Generic_player_modifier_uses_the_only_transition_not_claimed_by_specific_actions()
+    {
+        var simulation = new CombatSim();
+        simulation
+            .Frames[0]
+            .Events.Add(
+                Executed("source", EActionCommandType.PlayerRegenApply, Player(ECombatantId.Player))
+            );
+        simulation
+            .Frames[0]
+            .Events.Add(
+                Executed(
+                    "source",
+                    EActionCommandType.PlayerModifyAttribute,
+                    Player(ECombatantId.Player)
+                )
+            );
+        simulation.Frames[0].PlayerUpdates = new CombatSimPlayerUpdate
+        {
+            Attributes =
+            {
+                [EPlayerAttributeType.HealthRegen] = new CombatSimPlayerAttributeUpdate
+                {
+                    AttributeType = EPlayerAttributeType.HealthRegen,
+                    PreviousValue = 2,
+                    CurrentValue = 4,
+                },
+                [EPlayerAttributeType.HealthMax] = new CombatSimPlayerAttributeUpdate
+                {
+                    AttributeType = EPlayerAttributeType.HealthMax,
+                    PreviousValue = 780,
+                    CurrentValue = 790,
+                },
+            },
+        };
+
+        var report = CombatImpactProjector.Project(simulation, Entities());
+        var groups = Assert.Single(report.Sources).Groups;
+
+        Assert.Equal(2, groups.Count);
+        Assert.Equal(
+            2,
+            Assert
+                .Single(groups, group => group.NativeAttributeKey == "RegenApplyAmount")
+                .ObservedValue
+        );
+        var maxHealth = Assert.Single(
+            groups,
+            group => group.NativeAttributeKey == EPlayerAttributeType.HealthMax.ToString()
+        );
+        Assert.Equal(10, maxHealth.ObservedValue);
+        Assert.Equal(CombatImpactEventSurface.PlayerAttribute, maxHealth.Surface);
+    }
+
+    [Fact]
     public void Max_health_increase_and_decrease_use_distinct_directional_group_keys()
     {
         var simulation = new CombatSim();

@@ -117,7 +117,8 @@ internal static class CombatImpactMetricFormatter
         CombatImpactGroup group,
         bool chinese,
         string? damageMarker = null,
-        string? shieldMarker = null
+        string? shieldMarker = null,
+        string? healingMarker = null
     )
     {
         var impact = group.PeriodicImpact;
@@ -133,9 +134,11 @@ internal static class CombatImpactMetricFormatter
                 && group.NativeAttributeKey == "RegenApplyAmount";
             parts.Add(
                 isRegen
-                    ? chinese
-                        ? $"治疗 {amount}"
-                        : $"{amount} healed"
+                    ? string.IsNullOrWhiteSpace(healingMarker)
+                        ? chinese
+                            ? $"治疗 {amount}"
+                            : $"{amount} healed"
+                        : $"{healingMarker}{amount}"
                     : string.IsNullOrWhiteSpace(damageMarker)
                         ? chinese
                             ? $"伤害 {amount}"

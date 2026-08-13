@@ -2845,25 +2845,22 @@ internal static class CombatImpactProjector
                     : frame.OpponentUpdates;
             var changes = playerUpdate
                 ?.Attributes.Values.Where(update =>
-                    update.Delta != 0 && IsDisplayableAuraPlayerAttribute(update.AttributeType)
+                    update.Delta != 0
+                    && IsDisplayableAuraPlayerAttribute(update.AttributeType)
+                    && !IsClaimedByAnotherExecution(
+                        executed,
+                        item,
+                        new ImpactTransitionClaim(
+                            ImpactTransitionDomain.PlayerAttribute,
+                            (int)update.AttributeType
+                        )
+                    )
                 )
                 .ToArray();
             if (changes?.Length != 1)
                 return ResolvedImpactValue.Empty(kind, item.ActionType);
 
             var change = changes[0];
-            if (
-                IsClaimedByAnotherExecution(
-                    executed,
-                    item,
-                    new ImpactTransitionClaim(
-                        ImpactTransitionDomain.PlayerAttribute,
-                        (int)change.AttributeType
-                    )
-                )
-            )
-                return ResolvedImpactValue.Empty(kind, item.ActionType);
-
             return new ResolvedImpactValue(
                 change.Delta,
                 UnitFor(change.AttributeType.ToString()),

@@ -8,6 +8,7 @@ public sealed class CombatImpactMetricFormatterTests
     private const string BurnIcon = "<sprite name=Burn>";
     private const string CritIcon = "<sprite name=Crit>";
     private const string DamageIcon = "<sprite name=Damage>";
+    private const string HealingIcon = "<sprite name=Healing>";
 
     private static readonly CombatImpactEntity Target = new("target", "Target", "Item", null, 0);
 
@@ -791,6 +792,37 @@ public sealed class CombatImpactMetricFormatterTests
 
         Assert.Equal("×10 · 69", CombatImpactMetricFormatter.IncomingGroup(group, chinese: false));
         Assert.Equal("×10 · 69", CombatImpactMetricFormatter.IncomingGroup(group, chinese: true));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Regen_realized_healing_uses_the_native_healing_icon(bool chinese)
+    {
+        var group = new CombatImpactGroup(
+            CombatImpactKind.AttributeChange,
+            "RegenApplyAmount",
+            6,
+            12,
+            CombatImpactValueUnit.Amount,
+            CombatImpactCoverage.Exact,
+            null,
+            0,
+            []
+        )
+        {
+            PeriodicImpact = new CombatImpactPeriodicImpact(
+                149,
+                0,
+                CombatImpactPeriodicProof.Exact,
+                PeriodicEffectAttribution.ModelVersion
+            ),
+        };
+
+        Assert.Equal(
+            $"{HealingIcon}149",
+            CombatImpactMetricFormatter.PeriodicImpact(group, chinese, healingMarker: HealingIcon)
+        );
     }
 
     private static CombatImpactGroup Group(

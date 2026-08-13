@@ -758,7 +758,8 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
                 group,
                 IsChinese(),
                 DamageMarker(),
-                ShieldMarker()
+                ShieldMarker(),
+                HealingMarker()
             ),
             preferredHeight: hasTriggerSummary ? 44f : 48f
         );
@@ -1519,6 +1520,8 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
     private static string? DamageMarker() => KeywordMarker("DamageAmount");
 
     private static string? ShieldMarker() => KeywordMarker("ShieldApplyAmount");
+
+    private static string? HealingMarker() => KeywordMarker("HealAmount");
 
     private static string? EffectMarker(CombatImpactKind kind, string nativeAttributeKey) =>
         KeywordMarker(CombatImpactEffectIconKey.Resolve(kind, nativeAttributeKey));

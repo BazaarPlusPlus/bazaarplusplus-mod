@@ -37,7 +37,10 @@ internal static class CombatImpactEffectIconKey
             or "HealthMaxIncrease"
             or "HealthMaxDecrease"
             or "HealAmount"
-            or "HealCrit" => "Healing",
+            // Return a native typography lookup key, not the sprite name. The Healing
+            // sprite is registered under HealAmount; looking up "Healing" silently
+            // returns an empty string and leaves the title without an icon.
+            or "HealCrit" => "HealAmount",
             "HealthRegen" or "RegenApplyAmount" or "RegenRemoveAmount" or "RegenCrit" => "Regen",
             "Rage" or "RageMax" or "RageApplyAmount" or "RageRemoveAmount" => "Rage",
             "Tempo"
@@ -68,7 +71,7 @@ internal static class CombatImpactEffectIconKey
             "Icy" => "Freeze",
             "Mossy" => "Regen",
             "Obsidian" => "Damage",
-            "Restorative" => "Healing",
+            "Restorative" => "HealAmount",
             "Shielded" => "Shield",
             "Toxic" => "Poison",
             "Turbo" => "Haste",
