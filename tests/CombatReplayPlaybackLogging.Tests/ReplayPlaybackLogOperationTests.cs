@@ -44,6 +44,19 @@ public sealed class ReplayPlaybackLogOperationTests
     }
 
     [Fact]
+    public void Ordinary_replay_can_be_promoted_to_recording_before_it_restarts()
+    {
+        var operation = CreateOperation(recordVideo: false);
+        Assert.True(operation.TryMarkStarted(out var initialStart));
+        Assert.False(initialStart.RecordVideo);
+
+        Assert.True(operation.TryPromoteToRecording());
+
+        Assert.True(operation.RecordVideo);
+        Assert.False(operation.TryMarkStarted(out _));
+    }
+
+    [Fact]
     public void Healthy_completion_produces_one_succeeded_terminal()
     {
         var clock = new ManualClock(100);

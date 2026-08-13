@@ -8,6 +8,8 @@ ReplayPersistenceStateIsScopedPerRun();
 ReplayPayloadStoreRoundTripsAndRejectsCorruption();
 CapturedReplayRoutesSeparatePveFromPvpPersistence();
 CurrentNativeReplayBecomesReadyWithoutPersistence();
+OrdinaryManagedReplayKeepsRecordingButtonVisible();
+RecordedManagedReplayTakesDisplayPriority();
 PvpBattleStoreRejectsPveManifests();
 
 Console.WriteLine("Combat replay recording tests passed.");
@@ -97,6 +99,78 @@ static void CurrentNativeReplayBecomesReadyWithoutPersistence()
     Assert(
         snapshot.Phase == CurrentReplayRecordingPhase.Ready,
         "The current-native route should transition directly to ready."
+    );
+}
+
+static void OrdinaryManagedReplayKeepsRecordingButtonVisible()
+{
+    var managed = ReplayRecordingButtonSnapshotPolicy.OrdinaryManagedReplay(
+        "ordinary-replay",
+        recorderReady: true,
+        replayReady: true,
+        unavailableReason: null
+    );
+    var currentNative = default(CurrentReplayRecordingSnapshot);
+
+    var displayed = ReplayRecordingButtonSnapshotPolicy.Resolve(managed, currentNative);
+
+    Assert(displayed.Visible, "An ordinary managed replay should keep the record button visible.");
+    Assert(
+        displayed.BattleId == "ordinary-replay",
+        "The displayed snapshot should retain the active replay identity."
+    );
+    Assert(displayed.CanStart, "A completed ordinary replay should be recordable from the start.");
+    Assert(
+        displayed.Phase == CurrentReplayRecordingPhase.Ready,
+        "A completed ordinary replay should expose the ready recording action."
+    );
+
+    var replaying = ReplayRecordingButtonSnapshotPolicy.OrdinaryManagedReplay(
+        "ordinary-replay",
+        recorderReady: true,
+        replayReady: false,
+        unavailableReason: "Finish the current replay before recording it."
+    );
+    Assert(replaying.Visible, "The record button should remain visible during playback.");
+    Assert(!replaying.CanStart, "Recording must start from the beginning, not mid-replay.");
+    Assert(
+        replaying.Phase == CurrentReplayRecordingPhase.Preparing,
+        "An in-progress replay should keep the action pending until it finishes."
+    );
+}
+
+static void RecordedManagedReplayTakesDisplayPriority()
+{
+    var managed = new CurrentReplayRecordingSnapshot(
+        CurrentReplayRecordingPhase.Recording,
+        "managed-recording",
+        "recording-id",
+        null,
+        null,
+        Visible: true,
+        CanStart: false,
+        CanReveal: false
+    );
+    var currentNative = new CurrentReplayRecordingSnapshot(
+        CurrentReplayRecordingPhase.Ready,
+        "current-native",
+        null,
+        null,
+        null,
+        Visible: true,
+        CanStart: true,
+        CanReveal: false
+    );
+
+    var displayed = ReplayRecordingButtonSnapshotPolicy.Resolve(managed, currentNative);
+
+    Assert(
+        displayed.BattleId == "managed-recording",
+        "The active managed replay should own the recording button state."
+    );
+    Assert(
+        displayed.Phase == CurrentReplayRecordingPhase.Recording,
+        "Recorded managed replay progress must not be hidden by current-native state."
     );
 }
 

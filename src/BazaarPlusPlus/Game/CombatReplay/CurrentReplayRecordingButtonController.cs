@@ -282,8 +282,8 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
                 BppDockButtonSpriteId.ReplayRecording,
             CurrentReplayRecordingPhase.Succeeded or CurrentReplayRecordingPhase.Degraded =>
                 BppDockButtonSpriteId.ReplayView,
-            CurrentReplayRecordingPhase.Failed or CurrentReplayRecordingPhase.Unavailable =>
-                BppDockButtonSpriteId.ReplayRetry,
+            CurrentReplayRecordingPhase.Failed => BppDockButtonSpriteId.ReplayRetry,
+            CurrentReplayRecordingPhase.Unavailable => BppDockButtonSpriteId.ReplayExport,
             _ => BppDockButtonSpriteId.ReplayExport,
         };
 }

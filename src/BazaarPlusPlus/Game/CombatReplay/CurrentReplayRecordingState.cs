@@ -286,3 +286,30 @@ internal sealed class CurrentReplayRecordingState
         Phase = CurrentReplayRecordingPhase.Unavailable;
     }
 }
+
+internal static class ReplayRecordingButtonSnapshotPolicy
+{
+    internal static CurrentReplayRecordingSnapshot OrdinaryManagedReplay(
+        string battleId,
+        bool recorderReady,
+        bool replayReady,
+        string? unavailableReason
+    ) =>
+        new(
+            recorderReady && replayReady
+                ? CurrentReplayRecordingPhase.Ready
+                : CurrentReplayRecordingPhase.Preparing,
+            battleId,
+            RecordingId: null,
+            FinalFilePath: null,
+            Reason: recorderReady && replayReady ? null : unavailableReason,
+            Visible: true,
+            CanStart: recorderReady && replayReady,
+            CanReveal: false
+        );
+
+    internal static CurrentReplayRecordingSnapshot Resolve(
+        CurrentReplayRecordingSnapshot managedSnapshot,
+        CurrentReplayRecordingSnapshot currentNativeSnapshot
+    ) => managedSnapshot.Visible ? managedSnapshot : currentNativeSnapshot;
+}

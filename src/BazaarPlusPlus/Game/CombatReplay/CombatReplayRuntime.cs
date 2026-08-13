@@ -290,21 +290,40 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     {
         RefreshCurrentReplayRecordingAvailability();
         var managedSnapshot = GetManagedReplayRecordingSnapshot();
-        if (managedSnapshot.Visible)
-            return managedSnapshot;
-        return _currentRecording.Snapshot();
+        return ReplayRecordingButtonSnapshotPolicy.Resolve(
+            managedSnapshot,
+            _currentRecording.Snapshot()
+        );
     }
 
     private CurrentReplayRecordingSnapshot GetManagedReplayRecordingSnapshot()
     {
         var operation = _activePlaybackOperation;
         if (
-            operation?.RecordVideo != true
+            operation == null
             || AppState.CurrentState is not ReplayState
             || string.IsNullOrWhiteSpace(operation.BattleId)
         )
         {
             return default;
+        }
+
+        if (!operation.RecordVideo)
+        {
+            var availability = _videoRecorder?.Invoke()?.GetCurrentReplayRecordingAvailability();
+            var replayReady =
+                AppState.CurrentState is ReplayState { IsReplaying: false }
+                && Singleton<BoardManager>.Instance
+                    is { IsRecapViewOpen: false, StorageMoving: false }
+                && !AppState.BlockInput;
+            return ReplayRecordingButtonSnapshotPolicy.OrdinaryManagedReplay(
+                operation.BattleId,
+                availability?.IsReady == true,
+                replayReady,
+                replayReady
+                    ? availability?.Reason
+                    : "Finish the current replay before recording it."
+            );
         }
 
         var started =
@@ -387,6 +406,14 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         if (invokeNativeRecapBack == null)
             throw new ArgumentNullException(nameof(invokeNativeRecapBack));
 
+        var managedSnapshot = GetManagedReplayRecordingSnapshot();
+        if (_activePlaybackOperation?.RecordVideo == false && managedSnapshot.CanStart)
+            return TryStartManagedReplayRecording(
+                invokeNativeReplay,
+                invokeNativeRecap,
+                out reason
+            );
+
         RefreshCurrentReplayRecordingAvailability();
         var snapshot = _currentRecording.Snapshot();
         var manifest = _currentRecordingManifest;
@@ -451,6 +478,76 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         }
 
         return TryInvokeCurrentReplay(recordingId, invokeNativeReplay, out reason);
+    }
+
+    private bool TryStartManagedReplayRecording(
+        Action invokeNativeReplay,
+        Action invokeNativeRecap,
+        out string reason
+    )
+    {
+        var operation = _activePlaybackOperation;
+        var publisher = _playbackPublisher;
+        var replay = AppState.CurrentState as ReplayState;
+        if (
+            operation == null
+            || operation.RecordVideo
+            || publisher == null
+            || replay == null
+            || replay.IsReplaying
+            || publisher.ActiveSessionBattleId != operation.BattleId
+        )
+        {
+            reason = "The active replay cannot be restarted for recording.";
+            return false;
+        }
+
+        var availability = _videoRecorder?.Invoke()?.GetCurrentReplayRecordingAvailability();
+        if (availability?.IsReady != true)
+        {
+            reason = availability?.Reason ?? "Video recording is not ready.";
+            return false;
+        }
+
+        if (
+            !operation.TryPromoteToRecording()
+            || !publisher.TryPromoteActiveSessionToRecording(operation.BattleId)
+        )
+        {
+            reason = "The active replay recording session changed before it could start.";
+            return false;
+        }
+
+        ResetManagedRecordingUi();
+        _invokeRecordedReplayRecap = invokeNativeRecap;
+        var publish = publisher.PublishStarting();
+        if (!publish.Succeeded)
+        {
+            reason = publish.Exception?.Message ?? "Replay recording could not start.";
+            publisher.PublishEnded("recording-restart-publish-failed", failed: true);
+            return false;
+        }
+
+        try
+        {
+            invokeNativeReplay();
+        }
+        catch (Exception ex)
+        {
+            publisher.PublishEnded("recording-restart-invoke-failed", failed: true);
+            reason = ex.Message;
+            return false;
+        }
+
+        if (!replay.IsReplaying)
+        {
+            publisher.PublishEnded("recording-restart-not-started", failed: true);
+            reason = "The native replay did not start.";
+            return false;
+        }
+
+        reason = string.Empty;
+        return true;
     }
 
     private IEnumerator StartCurrentReplayAfterRecapClosed(
