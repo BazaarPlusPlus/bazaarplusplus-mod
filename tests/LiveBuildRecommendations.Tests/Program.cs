@@ -6,11 +6,12 @@ using BazaarPlusPlus.Game.LiveBuildPanel.Recommendations;
 using BazaarPlusPlus.GameInterop.Heroes;
 using BazaarPlusPlus.Infrastructure.RemoteEmbeddedCatalog;
 using BazaarPlusPlus.Infrastructure.UiTokens;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
-// Behavior tests for the analyzer-v4 ten-win build corpus consumed by LiveBuildPanel.
-// The payload is the compact string-table + schema-driven array-row format emitted by
-// bazaarplusplus-analyzers/src/bpp/stages/analyze/mod_builds.py at
-// analyzer-v4/mod/tenwin_builds.json. Every assertion drives the public
+// Behavior tests for the analyzer-v5 ten-win build corpus consumed by LiveBuildPanel.
+// The payload is the compact string-table + schema-driven array-row format published at
+// analyzer-v5/builds/latest.json. Every assertion drives the public
 // BuildRecommendationRepository.FindRecommendations surface (parse + recall + scoring +
 // board projection). Catalog lifecycle is tested through IRemoteEmbeddedCatalog in the dedicated
 // RemoteEmbeddedCatalog.Tests project; this feature project keeps parser/query/summary and manual
@@ -20,6 +21,8 @@ TenWinBuildTests.Run();
 
 internal static class TenWinBuildTests
 {
+    private const string ContractResourceName =
+        "LiveBuildRecommendations.Tests.analyzer-v5-schema2-contract.json";
     private const string GuidA = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
     private const string GuidB = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
     private const string GuidC = "cccccccc-cccc-cccc-cccc-cccccccccccc";
@@ -29,8 +32,15 @@ internal static class TenWinBuildTests
     {
         RegisterAssemblyResolution();
 
+        TestParserAcceptsAnalyzerV5Contract();
+        TestParserEnforcesTopLevelAndExactSchemas();
+        TestParserEnforcesWindowContract();
+        TestParserRejectsIllegalIndexesAndSemanticMismatches();
+        TestParserAcceptsDuplicateCardRefsNullableP75AndEmptyHero();
+        TestRemoteUrlsUseAnalyzerV5Latest();
+        TestOptionalLiveSampleParses();
         TestFindRecommendationsHasNoRatingTierParam();
-        TestDefaultCachePathUsesTenwinBuildsFileName();
+        TestDefaultCachePathUsesBuildsFileName();
         TestSingleCardSelectionResolvesViaCardIndex();
         TestMultiCardSelectionPrefersIntersection();
         TestUnionFallbackWhenIntersectionEmptyButAllCovered();
@@ -38,7 +48,7 @@ internal static class TenWinBuildTests
         TestSelectingOnlyUncoveredCardsReturnsEmpty();
         TestLiveStateRankingOutranksScore();
         TestBoardContractMapsTierEnchantSize();
-        TestNullSlotAndTierDoNotCrash();
+        TestNullEnchantRefAndP75DoNotCrash();
         TestRefreshServicePreservesSessionProductSemantics();
         TestPanelInvalidationRejectsUiContinuationWithoutCancelingCatalogRefresh();
         TestEmbeddedSeedResourceIsBundledAndParses();
@@ -53,6 +63,181 @@ internal static class TenWinBuildTests
     }
 
     // ---- Tests ------------------------------------------------------------
+
+    private static void TestParserAcceptsAnalyzerV5Contract()
+    {
+        var corpus = RequireCorpus(ContractJson());
+        Assert(corpus.HeroCount == 1, "The contract fixture should contain one hero.");
+        Assert(corpus.BuildCount == 1, "The contract fixture should contain one build.");
+        Assert(
+            corpus.GeneratedAtUtc == DateTimeOffset.Parse("2026-08-12T02:00:00Z"),
+            "generated_at should parse as UTC."
+        );
+        Assert(
+            corpus.WindowEndUtc == DateTimeOffset.Parse("2026-08-11T00:00:00Z"),
+            "window.end should parse as the freshness timestamp."
+        );
+
+        var match = corpus
+            .FindBuilds(
+                "Vanessa",
+                [Guid.Parse("11111111-1111-1111-1111-111111111111")],
+                BuildLiveState.Empty
+            )
+            .Single();
+        Assert(match.Build.Layout.Count == 5, "The contract layout should retain five cards.");
+        Assert(match.Build.Stats.CompletedRunCount == 123, "Completed runs should parse.");
+        Assert(match.Build.Stats.TenWinRunCount == 45, "Ten-win runs should parse.");
+        Assert(match.Build.Stats.TenWinRateBps == 3659, "Basis-point rate should parse.");
+        Assert(match.Build.Stats.P75TenWinFinalDay == 13, "p75 day should parse.");
+        Assert(match.Build.Stats.Score == 421037, "Score should parse.");
+        Assert(match.Build.Layout[0].EnchantName == null, "Enchantment ref zero must be null.");
+        Assert(match.Build.Layout[1].EnchantName == "Burn", "Named enchantments should resolve.");
+
+        using var catalog = new StubCatalog(corpus);
+        var summary = new BuildRecommendationRepository(catalog).GetCorpusSummary()!.Value;
+        Assert(
+            summary.WindowEndUtc == DateTimeOffset.Parse("2026-08-11T00:00:00Z"),
+            "Recommendation freshness should project window.end rather than generated_at."
+        );
+    }
+
+    private static void TestParserEnforcesTopLevelAndExactSchemas()
+    {
+        RejectContract(root => root["schema_version"] = 1, "schema_version 1");
+        RejectContract(root => root["schema_version"] = 3, "schema_version 3");
+        RejectContract(root => root["kind"] = "mod_tenwin_builds", "legacy kind");
+        RejectContract(root => root["heroes"] = new JArray(), "heroes array");
+
+        foreach (var schemaName in new[] { "build", "layout", "stats" })
+        {
+            RejectContract(
+                root => ContractSchema(root, schemaName).Add("unexpected"),
+                $"extra {schemaName} column"
+            );
+        }
+
+        RejectContract(
+            root =>
+            {
+                var schema = ContractSchema(root, "build");
+                (schema[0], schema[1]) = (schema[1], schema[0]);
+            },
+            "reordered build columns"
+        );
+    }
+
+    private static void TestParserEnforcesWindowContract()
+    {
+        AcceptWindow("2026-08-11", "2026-08-11", 1);
+        AcceptWindow("2026-08-07", "2026-08-11", 5);
+        AcceptWindow("2026-08-05", "2026-08-11", 7);
+        RejectWindow("2026-08-11", "2026-08-11", 0);
+        RejectWindow("2026-08-04", "2026-08-11", 8);
+        RejectWindow("2026-08-07", "2026-08-11", 4);
+    }
+
+    private static void TestParserRejectsIllegalIndexesAndSemanticMismatches()
+    {
+        RejectContract(root => ContractCardRefs(root)[0] = 99, "card_refs card ref");
+        RejectContract(root => ContractLayoutRow(root, 0)[0] = 99, "layout card ref");
+        RejectContract(root => ContractLayoutRow(root, 0)[3] = 99, "layout enchant ref");
+        RejectContract(root => ContractCardIndexPair(root, 0)[0] = 99, "card_index card ref");
+        RejectContract(
+            root => ((JArray)ContractCardIndexPair(root, 0)[1]!)[0] = 99,
+            "card_index build ID"
+        );
+        RejectContract(
+            root => ((JArray)root["enchantments"]!)[0] = "Burn",
+            "non-null enchantment ref zero"
+        );
+        RejectContract(root => ContractBuildRow(root).Add(new JArray()), "extra build column");
+        RejectContract(root => ContractStatsRow(root).Add(1), "extra stats column");
+        RejectContract(
+            root => ContractLayoutRow(root, 0)[4] = 1,
+            "layout that does not occupy ten slots"
+        );
+        RejectContract(
+            root => ((JArray)ContractHero(root)["card_index"]!).RemoveAt(0),
+            "incomplete card_index"
+        );
+        RejectContract(
+            root =>
+            {
+                var refs = ContractCardRefs(root);
+                (refs[0], refs[1]) = (refs[1], refs[0]);
+            },
+            "unsorted card_refs"
+        );
+        RejectContract(
+            root => ContractCardRefs(root)[0] = ContractCardRefs(root)[1]!.DeepClone(),
+            "card_refs/layout multiset mismatch"
+        );
+    }
+
+    private static void TestParserAcceptsDuplicateCardRefsNullableP75AndEmptyHero()
+    {
+        var root = JObject.Parse(ScorePayload("Vanessa", 333, p75: null));
+        ((JObject)root["heroes"]!)["Dooley"] = new JObject
+        {
+            ["builds"] = new JArray(),
+            ["card_index"] = new JArray(),
+        };
+
+        var corpus = RequireCorpus(root.ToString(Formatting.None));
+        Assert(corpus.HeroCount == 2, "An empty hero should remain represented.");
+        var match = corpus
+            .FindBuilds("Vanessa", [Guid.Parse(GuidA)], BuildLiveState.Empty)
+            .Single();
+        Assert(
+            match.Build.Layout.Count > match.Build.TemplateIdSet.Count,
+            "Repeated copies should remain in layout while recall uses a deduped template set."
+        );
+        Assert(match.Build.Stats.P75TenWinFinalDay == null, "p75 should accept null.");
+        Assert(
+            corpus.FindBuilds("Dooley", [Guid.Parse(GuidA)], BuildLiveState.Empty).Count == 0,
+            "An empty hero should have no recommendations."
+        );
+    }
+
+    private static void TestRemoteUrlsUseAnalyzerV5Latest()
+    {
+        const string expected =
+            "https://bpp-metrics.bazaarplusplus.com/analyzer-v5/builds/latest.json";
+        var root = RepositoryRoot();
+        var factory = File.ReadAllText(
+            Path.Combine(
+                root,
+                "src",
+                "BazaarPlusPlus",
+                "Game",
+                "LiveBuildPanel",
+                "Recommendations",
+                "TenWinBuildCatalogFactory.cs"
+            )
+        );
+        var targets = File.ReadAllText(
+            Path.Combine(root, "src", "BazaarPlusPlus", "RemoteEmbeddedData.targets")
+        );
+        Assert(factory.Contains(expected, StringComparison.Ordinal), "Runtime URL should use v5.");
+        Assert(targets.Contains(expected, StringComparison.Ordinal), "Build URL should use v5.");
+    }
+
+    // Set BPP_TENWIN_SAMPLE_PATH to a downloaded builds/latest.json to validate a live sample.
+    // Without it this remains a no-op so the normal test run is hermetic.
+    private static void TestOptionalLiveSampleParses()
+    {
+        var path = Environment.GetEnvironmentVariable("BPP_TENWIN_SAMPLE_PATH");
+        if (string.IsNullOrWhiteSpace(path))
+            return;
+
+        var corpus = RequireCorpus(File.ReadAllText(path));
+        Assert(corpus.HeroCount > 0, "The live sample should contain heroes.");
+        Assert(corpus.BuildCount > 0, "The live sample should contain builds.");
+        Console.WriteLine(
+            $"Live ten-win sample: heroes={corpus.HeroCount} builds={corpus.BuildCount}"
+        );
+    }
 
     private static void TestFindRecommendationsHasNoRatingTierParam()
     {
@@ -92,13 +277,13 @@ internal static class TenWinBuildTests
         );
     }
 
-    private static void TestDefaultCachePathUsesTenwinBuildsFileName()
+    private static void TestDefaultCachePathUsesBuildsFileName()
     {
         var dataRootPath = Path.Combine(Path.GetTempPath(), $"bpp-data-root-{Guid.NewGuid():N}");
         var cachePath = TenWinBuildCatalogFactory.BuildCacheFilePath(dataRootPath);
 
         Assert(
-            cachePath == Path.Combine(dataRootPath, "tenwin_builds.json"),
+            cachePath == Path.Combine(dataRootPath, "builds.json"),
             "Ten-win build cache should live under the V5 data root."
         );
     }
@@ -333,8 +518,9 @@ internal static class TenWinBuildTests
                 );
 
                 var cards = ((IEnumerable)Prop(board, "Cards")!).Cast<object>().ToList();
-                Assert(cards.Count == 1, "Board should expose the single layout card.");
-                var card = cards[0];
+                var card = cards.Single(candidate =>
+                    Prop(candidate, "SourceSocketId")?.ToString() == "Socket_3"
+                );
                 Assert(
                     Prop(card, "Tier")!.ToString() == "Legendary",
                     "Tier value 5 should map to ETier.Legendary."
@@ -365,14 +551,13 @@ internal static class TenWinBuildTests
         );
     }
 
-    private static void TestNullSlotAndTierDoNotCrash()
+    private static void TestNullEnchantRefAndP75DoNotCrash()
     {
         var payload = Payload(
             cards: $"[\"{GuidA}\"]",
             enchantments: "[null]",
             hero: "Jules",
-            // layout: cardRef0, slot null, tier null, enchantRef0, size1
-            builds: $"[{Build("[0]", "[[0,null,null,0,1]]", 5)}]",
+            builds: $"[{Build("[0]", "[[0,0,1,0,3]]", 5, p75: null)}]",
             cardIndex: "[[0,[0]]]"
         );
         WithCorpus(
@@ -383,14 +568,18 @@ internal static class TenWinBuildTests
                     .Cast<object>()
                     .Single();
                 var board = Prop(recommendation, "Board")!;
-                var card = ((IEnumerable)Prop(board, "Cards")!).Cast<object>().Single();
+                var card = ((IEnumerable)Prop(board, "Cards")!).Cast<object>().First();
                 Assert(
                     Prop(card, "Tier")!.ToString() == "Bronze",
-                    "A null tier should clamp to ETier.Bronze."
+                    "Tier value one should project as Bronze."
                 );
                 Assert(
                     Prop(card, "EnchantmentType") == null,
                     "enchantRef 0 should resolve to no enchantment."
+                );
+                Assert(
+                    Prop(recommendation, "P75TenWinFinalDay") == null,
+                    "A null p75 should remain null in the recommendation."
                 );
             }
         );
@@ -405,21 +594,44 @@ internal static class TenWinBuildTests
         var json = source.ReadAsync(CancellationToken.None).AsTask().GetAwaiter().GetResult();
         Assert(
             !string.IsNullOrWhiteSpace(json),
-            "The bundled tenwin_builds.json seed should be embedded in the assembly."
+            "The bundled builds.json seed should be embedded in the assembly."
         );
 
         var corpus = TenWinBuildCorpus.Parse(json);
         Assert(corpus != null, "The bundled seed should parse with the production corpus parser.");
-        Assert(corpus!.HeroCount > 0, "The bundled seed should contain at least one hero.");
         Assert(
-            corpus.GeneratedAtUtc != null,
-            "The bundled seed should carry a parseable generatedAt timestamp."
+            corpus!.HeroCount == 8,
+            "The bundled seed should contain all eight canonical heroes."
         );
+#if !REMOTE_EMBEDDED_DATA_PREPARED
+        Assert(
+            corpus.GeneratedAtUtc == DateTimeOffset.Parse("2026-08-12T02:00:00Z"),
+            "The bundled seed should carry its deterministic generated_at timestamp."
+        );
+        Assert(
+            corpus.WindowEndUtc == DateTimeOffset.Parse("2026-08-11T00:00:00Z"),
+            "The bundled seed should carry its deterministic window.end timestamp."
+        );
+#endif
         Assert(corpus.BuildCount > 0, "The bundled seed should count at least one build.");
+#if !REMOTE_EMBEDDED_DATA_PREPARED
+        Assert(corpus.BuildCount == 1, "The deterministic fallback should contain one seed build.");
+#endif
         Assert(
             corpus.HeroBuildCounts.All(row => row.Hero != "Hero8"),
             "Any The Dragons data present in the embedded seed must use the canonical summary identity."
         );
+#if !REMOTE_EMBEDDED_DATA_PREPARED
+        Assert(
+            corpus.HeroBuildCounts.Any(row => row.Hero == "TheDragons" && row.BuildCount == 0),
+            "The deterministic fallback should retain an empty canonical TheDragons hero."
+        );
+#else
+        Assert(
+            corpus.HeroBuildCounts.Any(row => row.Hero == "TheDragons"),
+            "Prepared data should retain the canonical TheDragons hero."
+        );
+#endif
     }
 
     private static void TestCorpusSummaryIncludesPerHeroBuildCounts()
@@ -561,7 +773,7 @@ internal static class TenWinBuildTests
     private static void TestHeroStripProjectionAndTooltipsUseCanonicalPresentation()
     {
         var withBuilds = new TenWinCorpusSummary(
-            generatedAtUtc: null,
+            windowEndUtc: null,
             buildCount: 18,
             heroCount: 4,
             [
@@ -578,7 +790,7 @@ internal static class TenWinBuildTests
         );
 
         var emptyDragons = new TenWinCorpusSummary(
-            generatedAtUtc: null,
+            windowEndUtc: null,
             buildCount: 2,
             heroCount: 2,
             [new TenWinHeroBuildCount("TheDragons", 0), new TenWinHeroBuildCount("Vanessa", 2)]
@@ -716,6 +928,103 @@ internal static class TenWinBuildTests
         );
     }
 
+    private static TenWinBuildCorpus RequireCorpus(string json) =>
+        TenWinBuildCorpus.Parse(json)
+        ?? throw new InvalidOperationException("The schema-2 payload was rejected.");
+
+    private static void RejectContract(Action<JObject> mutate, string scenario)
+    {
+        var root = JObject.Parse(ContractJson());
+        mutate(root);
+        Assert(
+            TenWinBuildCorpus.Parse(root.ToString(Formatting.None)) == null,
+            $"{scenario} should be rejected."
+        );
+    }
+
+    private static void AcceptWindow(string start, string end, int days)
+    {
+        var root = JObject.Parse(ContractJson());
+        root["window"] = new JObject
+        {
+            ["start"] = start,
+            ["end"] = end,
+            ["days"] = days,
+        };
+        Assert(
+            TenWinBuildCorpus.Parse(root.ToString(Formatting.None)) != null,
+            $"A {days}-day consistent window should be accepted."
+        );
+    }
+
+    private static void RejectWindow(string start, string end, int days)
+    {
+        var root = JObject.Parse(ContractJson());
+        root["window"] = new JObject
+        {
+            ["start"] = start,
+            ["end"] = end,
+            ["days"] = days,
+        };
+        Assert(
+            TenWinBuildCorpus.Parse(root.ToString(Formatting.None)) == null,
+            $"A {days}-day invalid window should be rejected."
+        );
+    }
+
+    private static string ContractJson()
+    {
+        using var stream = Assembly
+            .GetExecutingAssembly()
+            .GetManifestResourceStream(ContractResourceName);
+        if (stream == null)
+            throw new InvalidOperationException("The analyzer-v5 contract fixture is missing.");
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
+    }
+
+    private static JObject ContractHeroes(JObject root) => (JObject)root["heroes"]!;
+
+    private static JObject ContractHero(JObject root) => (JObject)ContractHeroes(root)["Vanessa"]!;
+
+    private static JArray ContractBuildRow(JObject root) =>
+        (JArray)((JArray)ContractHero(root)["builds"]!)[0]!;
+
+    private static JArray ContractCardRefs(JObject root) => (JArray)ContractBuildRow(root)[0]!;
+
+    private static JArray ContractLayoutRow(JObject root, int index) =>
+        (JArray)((JArray)ContractBuildRow(root)[1]!)[index]!;
+
+    private static JArray ContractStatsRow(JObject root) => (JArray)ContractBuildRow(root)[2]!;
+
+    private static JArray ContractCardIndexPair(JObject root, int index) =>
+        (JArray)((JArray)ContractHero(root)["card_index"]!)[index]!;
+
+    private static JArray ContractSchema(JObject root, string name) =>
+        (JArray)((JObject)root["schemas"]!)[name]!;
+
+    private static string RepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory != null)
+        {
+            if (
+                File.Exists(
+                    Path.Combine(
+                        directory.FullName,
+                        "src",
+                        "BazaarPlusPlus",
+                        "BazaarPlusPlus.csproj"
+                    )
+                )
+            )
+                return directory.FullName;
+            directory = directory.Parent;
+        }
+
+        throw new InvalidOperationException("Repository root not found.");
+    }
+
     // ---- Payload builders -------------------------------------------------
 
     private static string MainRecallPayload(string hero) =>
@@ -730,12 +1039,12 @@ internal static class TenWinBuildTests
             cardIndex: "[[0,[0,1]],[1,[0,2]]]"
         );
 
-    private static string ScorePayload(string hero, long score) =>
+    private static string ScorePayload(string hero, long score, int? p75 = 13) =>
         Payload(
             cards: $"[\"{GuidA}\"]",
             enchantments: "[null]",
             hero: hero,
-            builds: $"[{Build("[0]", "[[0,0,1,0,1]]", score)}]",
+            builds: $"[{Build("[0]", "[[0,0,1,0,1]]", score, p75)}]",
             cardIndex: "[[0,[0]]]"
         );
 
@@ -761,12 +1070,46 @@ internal static class TenWinBuildTests
         );
     }
 
-    private static string Build(
-        string cardRefs,
-        string layout,
-        long score,
-        string selection = "[0,null]"
-    ) => $"[{cardRefs},{layout},[300,80,2667,118,13,21,45,12,2667,112,{score}],{selection}]";
+    private static string Build(string cardRefs, string layout, long score, int? p75 = 13)
+    {
+        var refs = JArray.Parse(cardRefs);
+        var rows = JArray.Parse(layout);
+        var occupied = new bool[10];
+        foreach (var row in rows.Cast<JArray>())
+        {
+            var slot = row[1]!.Value<int>();
+            var size = row[4]!.Value<int>();
+            for (var socket = slot; socket < slot + size; socket++)
+                occupied[socket] = true;
+        }
+
+        var fillerCardRef = refs[0]!.Value<int>();
+        for (var socket = 0; socket < occupied.Length; )
+        {
+            if (occupied[socket])
+            {
+                socket++;
+                continue;
+            }
+
+            var size = 1;
+            while (size < 3 && socket + size < occupied.Length && !occupied[socket + size])
+                size++;
+
+            rows.Add(new JArray(fillerCardRef, socket, 1, 0, size));
+            refs.Add(fillerCardRef);
+            for (var filled = socket; filled < socket + size; filled++)
+                occupied[filled] = true;
+            socket += size;
+        }
+
+        refs = new JArray(refs.OrderBy(token => token.Value<int>()));
+        return new JArray(
+            refs,
+            rows,
+            new JArray(300, 80, 2667, p75.HasValue ? p75.Value : JValue.CreateNull(), score)
+        ).ToString(Formatting.None);
+    }
 
     private static string Payload(
         string cards,
@@ -790,16 +1133,16 @@ internal static class TenWinBuildTests
         $$"""
             {
               "schema_version": 2,
-              "kind": "mod_tenwin_builds",
+              "kind": "ten_win_builds",
+              "generated_at": "2026-08-12T02:00:00Z",
+              "window": { "start": "2026-08-07", "end": "2026-08-11", "days": 5 },
               "cards": {{cards}},
               "enchantments": {{enchantments}},
               "schemas": {
-                "build": ["card_refs", "layout", "stats", "selection"],
+                "build": ["card_refs", "layout", "stats"],
                 "layout": ["card_ref", "slot", "tier", "enchant_ref", "size"],
-                "stats": ["completed_run_count", "ten_win_run_count", "ten_win_rate_bps", "avg_ten_win_final_day_tenth", "p75_ten_win_final_day", "avg_ten_win_final_losses_tenth", "elite_completed_run_count", "elite_ten_win_run_count", "elite_ten_win_rate_bps", "elite_avg_ten_win_final_day_tenth", "score"],
-                "selection": ["reason", "covered_card_ref"]
+                "stats": ["completed_run_count", "ten_win_run_count", "ten_win_rate_bps", "p75_ten_win_final_day", "score"]
               },
-              "selection_reasons": ["core", "coverage"],
               "heroes": {
                 {{heroes}}
               }
@@ -838,7 +1181,7 @@ internal static class TenWinBuildTests
     private static void WithCorpus(string payload, Action<Type, object> body)
     {
         var repositoryType = GetRepositoryType();
-        var corpus = TenWinBuildCorpus.Parse(payload)!;
+        var corpus = RequireCorpus(payload);
         using var catalog = new StubCatalog(corpus);
         body(repositoryType, new BuildRecommendationRepository(catalog));
     }

@@ -822,10 +822,7 @@ internal sealed class CollectionGridVirtualizer
             forceMeasure,
             horizontalScale
         );
-        cell.HoverScale.SetBaseScale(
-            cell.CachedRect.localScale.x,
-            cell.CachedRect.localScale.y
-        );
+        cell.HoverScale.SetBaseScale(cell.CachedRect.localScale.x, cell.CachedRect.localScale.y);
     }
 
     private sealed class RealizedCell

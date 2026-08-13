@@ -73,6 +73,19 @@ Assert(
     "A disabled upgrade preview must stop a pending hover refresh."
 );
 
+Assert(
+    UpgradePreviewCardLatch.ShouldReleaseLatch(isCursorOverCard: false, previewActive: true),
+    "Toggle mode must release the upgrade visual once the cursor leaves the card that entered it."
+);
+Assert(
+    UpgradePreviewCardLatch.ShouldReleaseLatch(isCursorOverCard: true, previewActive: false),
+    "Deactivating upgrade preview must release every latched card visual."
+);
+Assert(
+    !UpgradePreviewCardLatch.ShouldReleaseLatch(isCursorOverCard: true, previewActive: true),
+    "The card under the cursor keeps its upgrade visual while preview stays active."
+);
+
 var candidates = ItemEnchantPreviewCandidateSelector.SelectCandidates(
     currentEnchantment: EEnchantmentType.Heavy,
     allEnchantments: [EEnchantmentType.Heavy, EEnchantmentType.Icy, EEnchantmentType.Turbo]

@@ -297,6 +297,5 @@ static void Assert(bool condition, string message)
     if (condition)
         return;
 
-    Console.Error.WriteLine($"FAILED: {message}");
-    Environment.Exit(1);
+    throw new InvalidOperationException($"FAILED: {message}");
 }

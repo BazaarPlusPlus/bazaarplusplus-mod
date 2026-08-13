@@ -98,9 +98,11 @@ internal static class TooltipPreviewContentRefresh
         {
             case TooltipUpgradePreviewTransition.Enter:
                 controller.EnterUpgradePreview();
+                UpgradePreviewCardLatch.NoteEntered(controller);
                 break;
             case TooltipUpgradePreviewTransition.Exit:
                 controller.ExitUpgradePreview();
+                UpgradePreviewCardLatch.NoteExited(controller);
                 break;
         }
     }

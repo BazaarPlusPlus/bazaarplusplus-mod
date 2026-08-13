@@ -396,8 +396,7 @@ file static class NativeFrameSubmissionPlanTests
             PlanType.GetMethod(
                 "Create",
                 BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
-            )
-            ?? throw new InvalidOperationException("NativeFrameSubmissionPlan.Create not found.");
+            ) ?? throw new InvalidOperationException("NativeFrameSubmissionPlan.Create not found.");
         return method.Invoke(null, new object[] { emit, repeat, dropped })
             ?? throw new InvalidOperationException(
                 "NativeFrameSubmissionPlan.Create returned null."
@@ -425,22 +424,43 @@ file static class VideoEncoderProfileTests
         )!;
         int Target(int width, int height, int fps) =>
             (int)bitrate.Invoke(null, new object[] { width, height, fps })!;
-        TestReflection.Assert(Target(640, 360, 15) == 6000, "Native bitrate must enforce 6 Mbps minimum.");
-        TestReflection.Assert(Target(2742, 1624, 60) == 24000, "Native bitrate must enforce 24 Mbps maximum.");
-
-        var mac = ProfileType.GetMethod(
-            "NativeVideoToolbox",
-            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
-        )!.Invoke(null, new object[] { 1920, 1080, 60 })!;
-        var windows = ProfileType.GetMethod(
-            "NativeMediaFoundation",
-            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
-        )!.Invoke(null, new object[] { 1920, 1080, 60 })!;
-        TestReflection.Assert((string)TestReflection.GetProp(ProfileType, mac, "Codec")! == "h264_videotoolbox", "macOS must select VideoToolbox.");
-        TestReflection.Assert((string)TestReflection.GetProp(ProfileType, windows, "Codec")! == "h264_media_foundation", "Windows must select Media Foundation.");
-        TestReflection.Assert((string)TestReflection.GetProp(ProfileType, mac, "PixelFormat")! == "nv12", "Native video input must be NV12.");
         TestReflection.Assert(
-            (string)TestReflection.GetProp(ProfileType, windows, "RateControlSummary")! == "avg_bitrate=18662k",
+            Target(640, 360, 15) == 6000,
+            "Native bitrate must enforce 6 Mbps minimum."
+        );
+        TestReflection.Assert(
+            Target(2742, 1624, 60) == 24000,
+            "Native bitrate must enforce 24 Mbps maximum."
+        );
+
+        var mac = ProfileType
+            .GetMethod(
+                "NativeVideoToolbox",
+                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
+            )!
+            .Invoke(null, new object[] { 1920, 1080, 60 })!;
+        var windows = ProfileType
+            .GetMethod(
+                "NativeMediaFoundation",
+                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
+            )!
+            .Invoke(null, new object[] { 1920, 1080, 60 })!;
+        TestReflection.Assert(
+            (string)TestReflection.GetProp(ProfileType, mac, "Codec")! == "h264_videotoolbox",
+            "macOS must select VideoToolbox."
+        );
+        TestReflection.Assert(
+            (string)TestReflection.GetProp(ProfileType, windows, "Codec")!
+                == "h264_media_foundation",
+            "Windows must select Media Foundation."
+        );
+        TestReflection.Assert(
+            (string)TestReflection.GetProp(ProfileType, mac, "PixelFormat")! == "nv12",
+            "Native video input must be NV12."
+        );
+        TestReflection.Assert(
+            (string)TestReflection.GetProp(ProfileType, windows, "RateControlSummary")!
+                == "avg_bitrate=18662k",
             "Telemetry must describe the average-bitrate control actually configured natively."
         );
     }

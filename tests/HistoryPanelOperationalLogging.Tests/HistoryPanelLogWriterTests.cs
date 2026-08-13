@@ -166,7 +166,7 @@ public sealed class HistoryPanelLogWriterTests : IDisposable
     }
 
     private static void AssertFields(
-        CapturedHistoryLogEvent captured,
+        CapturedBppLogEvent captured,
         params (string Name, object? Value)[] expected
     )
     {

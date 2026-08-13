@@ -21,7 +21,10 @@ public sealed class MacNativeReplayArchitectureTests
         Assert.DoesNotContain(elements, element => element.Name.LocalName == "MacFfmpegZip");
         Assert.DoesNotContain(elements, element => element.Name.LocalName == "MacFfmpegLicense");
         Assert.DoesNotContain(elements, element => element.Name.LocalName == "WindowsFfmpegZip");
-        Assert.DoesNotContain(elements, element => element.Name.LocalName == "WindowsFfmpegLicense");
+        Assert.DoesNotContain(
+            elements,
+            element => element.Name.LocalName == "WindowsFfmpegLicense"
+        );
         Assert.Contains(elements, element => element.Name.LocalName == "WindowsReplayPlugin");
         Assert.Contains(elements, element => element.Name.LocalName == "IsWindowsHost");
         Assert.Contains(
@@ -71,7 +74,8 @@ public sealed class MacNativeReplayArchitectureTests
             .ToList();
         Assert.Contains(
             staleWindowsFiles,
-            path => path.EndsWith("BepInEx/plugins/ffmpeg.exe", StringComparison.Ordinal)
+            path =>
+                path.EndsWith("BepInEx/plugins/ffmpeg.exe", StringComparison.Ordinal)
                 || path.EndsWith("BepInEx\\plugins\\ffmpeg.exe", StringComparison.Ordinal)
         );
         Assert.Contains(
@@ -83,8 +87,16 @@ public sealed class MacNativeReplayArchitectureTests
             .Where(element => element.Name.LocalName == "Error")
             .Select(element => element.Attribute("Condition")?.Value ?? string.Empty)
             .ToList();
-        Assert.Contains(packageErrors, condition => condition.Contains("InstallerMacReplayPluginBundle", StringComparison.Ordinal));
-        Assert.Contains(packageErrors, condition => condition.Contains("InstallerWindowsReplayPlugin", StringComparison.Ordinal));
+        Assert.Contains(
+            packageErrors,
+            condition =>
+                condition.Contains("InstallerMacReplayPluginBundle", StringComparison.Ordinal)
+        );
+        Assert.Contains(
+            packageErrors,
+            condition =>
+                condition.Contains("InstallerWindowsReplayPlugin", StringComparison.Ordinal)
+        );
     }
 
     [Fact]
@@ -111,6 +123,7 @@ public sealed class MacNativeReplayArchitectureTests
         var nativeRoot = Path.Combine(RepoRoot(), "native", "windows");
         var header = File.ReadAllText(Path.Combine(nativeRoot, "BppReplayMediaFoundation.h"));
         var source = File.ReadAllText(Path.Combine(nativeRoot, "BppReplayMediaFoundation.cpp"));
+        var normalizedSource = source.ReplaceLineEndings("\n");
         var build = File.ReadAllText(Path.Combine(nativeRoot, "build.ps1"));
 
         Assert.Contains("BppMfPrepareRenderEvent", header, StringComparison.Ordinal);
@@ -127,6 +140,22 @@ public sealed class MacNativeReplayArchitectureTests
         Assert.Contains("previousMultithreadProtection", source, StringComparison.Ordinal);
         Assert.Contains("destroyRequested", source, StringComparison.Ordinal);
         Assert.Contains("MF_READWRITE_D3D_OPTIONAL, FALSE", source, StringComparison.Ordinal);
+        Assert.Contains(
+            "outputColor.Nominal_Range = D3D11_VIDEO_PROCESSOR_NOMINAL_RANGE_16_235;",
+            source,
+            StringComparison.Ordinal
+        );
+        Assert.DoesNotContain("outputColor.RGB_Range", source, StringComparison.Ordinal);
+        Assert.Contains(
+            "case DXGI_FORMAT_B8G8R8A8_UNORM_SRGB:\n        processorSourceFormat = DXGI_FORMAT_B8G8R8A8_UNORM;",
+            normalizedSource,
+            StringComparison.Ordinal
+        );
+        Assert.Contains(
+            "case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:\n        processorSourceFormat = DXGI_FORMAT_R8G8B8A8_UNORM;",
+            normalizedSource,
+            StringComparison.Ordinal
+        );
         Assert.DoesNotContain("ffmpeg", source, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("/W4 /WX", build, StringComparison.Ordinal);
     }
@@ -209,11 +238,7 @@ public sealed class MacNativeReplayArchitectureTests
             windowsNativeProbe >= 0,
             $"Missing Windows native availability probe in {sourcePath}."
         );
-        Assert.DoesNotContain(
-            "Task.Run",
-            source,
-            StringComparison.Ordinal
-        );
+        Assert.DoesNotContain("Task.Run", source, StringComparison.Ordinal);
     }
 
     private static string RepoRoot([CallerFilePath] string file = "") =>

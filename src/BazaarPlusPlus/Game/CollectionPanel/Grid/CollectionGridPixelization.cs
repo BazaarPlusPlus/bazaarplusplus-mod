@@ -18,10 +18,7 @@ internal readonly struct CollectionGridPixelization
     public float OriginY { get; }
     public float GridWidth { get; }
 
-    public static CollectionGridPixelization ForViewport(
-        float viewportWidth,
-        int columns
-    )
+    public static CollectionGridPixelization ForViewport(float viewportWidth, int columns)
     {
         var pad = CollectionGridConstants.GridOuterPadding;
         if (viewportWidth <= 0f)

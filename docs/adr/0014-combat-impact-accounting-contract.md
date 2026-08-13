@@ -1,29 +1,31 @@
 # ADR-0014: Combat Impact numbers are ledger entries, reconciled per view
 
-Status: Accepted, consolidated 2026-08-12 (PR #230 and the prerequisite-attribution follow-up, both on master)
+Status: Accepted
 
 ## Context
 
-The triggering report was a Charge group displaying 25 while its visible trigger sources summed to 17. The audit over 197 local replays showed a defect class, not one bug: the UI placed values of different dimensions (effect applications, distinct-frame activation batches, amounts, durations) and different bases (native authoritative totals, exact adjustments, reconstructions, estimates) beside each other as one additive breakdown, and attribution failures were silently dropped during projection.
+Combat Impact used to place effect applications, activation observations, amounts, and durations beside native totals as if they formed one additive breakdown. Values had different dimensions and evidence bases, while failed attribution disappeared during projection.
 
 ## Decision
 
-Combat Impact is an accounting system: every displayed number carries dimension, basis, coverage, and provenance, and the projection journal (`CombatImpactEvent`) was extended with ledger fields — rejected alternatives were relabel-only presentation (cannot prove conservation) and an event-sourced rebuild (the replay producer exposes no stable activation identity).
+Every displayed number carries dimension, basis, coverage, and provenance in the `CombatImpactEvent` ledger.
 
-- **Additive breakdowns require matching dimension and basis.** An incomplete breakdown renders `attributed N / total M` plus every non-zero remainder bucket; a zero-attributed breakdown renders the total plus `breakdown unavailable`, never an invented row.
-- **Conservation is per-view only.** The received view is intentionally filtered (hero/player targets absent), so no caused-vs-received grand total exists; tests assert the per-view equations and forbid the cross-view one ([`CombatImpactAggregatorTests.cs:454`](../../tests/PostCombatImpact.Tests/CombatImpactAggregatorTests.cs#L454)).
-- **Activation evidence is observational.** `ObservedActivationBatchCount` (distinct trigger-source/frame) replaced `TriggerCount` and is never presented as an exact trigger count; application counts and activation batches never share a label ([`CombatImpactModels.cs:453`](../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactModels.cs#L453)).
-- **Trigger provenance is producer-assigned** via the six-member `CombatImpactTriggerScope` (`AttributedExternal`/`AttributedSelf`/`AttributedViaTriggerFallback`/`NoTriggerEvidence`/`Unattributed`/`NotApplicable`, [`CombatImpactModels.cs:58`](../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactModels.cs#L58)); trigger fallback is its own bucket, never relabeled self-trigger. Every rejected trigger/target/source/value survives as a typed residual (`UnresolvedSourceCount`, classified remainder buckets) instead of disappearing.
-- **Amounts keep `AuthoritativeTotal` and `ObservedAmount` separate** with coverage and reconciliation controls (`CombatImpactAmountLedger`, [`CombatImpactModels.cs:315`](../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactModels.cs#L315)); a numeric residual exists only when semantics, unit, and direction are comparable, and a negative difference is an `OverObserved` diagnostic, never a presentable residual.
-- **Periodic attribution returns a report** (combatant-keyed allocations plus residuals). The proof enum is two-valued `Exact`/`Proportional`: the never-emitted `Constrained` member was removed at `periodic-impact-v7`, superseding the unimplemented M1 `Exact/Constrained/Unknown` taxonomy; the surviving rationale lives in the model-invariants header of [`PeriodicEffectAttribution.cs`](../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/PeriodicEffectAttribution.cs).
-- **Pure-self trigger suppression is presentation policy.** Ledger entries are never deleted for presentation reasons; only the 100%-self/no-remainder case hides its breakdown.
+- Additive breakdowns require the same dimension and basis. An incomplete breakdown renders `attributed N / total M` with every non-zero remainder bucket; zero attribution renders the total plus `breakdown unavailable`.
+- Conservation is per view. The received view intentionally omits hero/player targets, so no caused-versus-received grand total exists ([tests](../../tests/PostCombatImpact.Tests/CombatImpactAggregatorTests.cs)).
+- `ObservedActivationBatchCount` is a distinct trigger-source/frame observation, never an exact trigger count or an application count ([models](../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactModels.cs)).
+- Producer-assigned `CombatImpactTriggerScope` distinguishes external, self, trigger-fallback, no-evidence, unattributed, and not-applicable provenance. Rejected trigger, target, source, and value evidence survives as typed residuals.
+- `CombatImpactAmountLedger` keeps authoritative totals and observed amounts separate. A numeric residual exists only for comparable semantics, unit, and direction; a negative difference is an `OverObserved` diagnostic.
+- Periodic attribution returns allocations and residuals with an `Exact` or `Proportional` proof. Presentation may hide a complete pure-self breakdown but never deletes its ledger entries.
 
-## Producer boundary: graph-driven attribution
+## Producer boundary
 
-Journal recovery is driven by the native ability graph, never by card-identity constants. The prerequisite-skill attribution (Music-Note Minors) parses socket-effect abilities through the strict structural gates of [`CombatImpactAttributionRuleReader`](../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactAttributionRuleReader.cs) and reconciles explicit executions against native `UseCount` (reconstructed = `UseCount` − explicit; an excess emits a diagnostic instead of clamping, [`CombatImpactProjector.cs:431`](../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactProjector.cs#L431)). The F-Minor GUID workaround it replaced encoded card identity and silently missed the six structurally identical Minors. Entity snapshots merge runtime+template+enchantment public tags parallel to hidden tags ([`CombatImpactEntityTags.cs`](../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactEntityTags.cs)) because replay rehydration restores tags only through the template. Native `CardStats` metrics stay attached to the instance that produced them; no cross-source additive equation is assumed.
+Attribution follows the native ability graph, never card identity. [`CombatImpactAttributionRuleReader`](../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactAttributionRuleReader.cs) reads structural rules, [`CombatImpactProjector`](../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactProjector.cs) reconciles explicit executions with native metrics, and [`CombatImpactEntityTags`](../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactEntityTags.cs) merges runtime, template, and enchantment tags needed after replay rehydration. Metrics stay attached to the instance that produced them.
+
+Critical attribution is evidence-bounded. A critical outcome requires a native critical health adjustment, an exact unambiguous doubled amount, or an executed `TTriggerOnCardCritted` ability whose source identifies the originating card. The listener path attaches one occurrence to a representative explicit effect and deduplicates stronger evidence. Without one of those proofs, the outcome remains unknown.
 
 ## Guardrails
 
-- Do not reintroduce a caused-vs-received grand-total invariant, a cross-source metric transfer, or a single nullable amount field collapsing authoritative and observed values.
-- Do not present frame-derived activation batches as exact trigger counts until the producer exposes a stable activation identity; upgrading the activity ledger must not change application accounting.
-- Remaining verification (golden checks for non-exact disclosure states, wide mixed-source layout in both locales, final Recap acceptance, and a GUID source-scan ratchet) is tracked in issue #260.
+- Keep per-view conservation; never add a caused-versus-received equation.
+- Keep authoritative and observed amounts separate, and preserve every typed residual.
+- Present frame-derived activation batches as observations until the producer exposes stable activation identity.
+- Extend attribution through ability-graph evidence, never template GUID constants or cross-source metric transfer.

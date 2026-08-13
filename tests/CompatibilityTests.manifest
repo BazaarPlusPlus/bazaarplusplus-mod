@@ -1,0 +1,4 @@
+# requirement|label|project
+decompiled-online|native card preview premises|tests/NativeCardPreviewCompatibility.Tests/NativeCardPreviewCompatibility.Tests.csproj
+decompiled-any|online/PTR source premises|tests/PtrCompatibility.Tests/PtrCompatibility.Tests.csproj
+managed|random hero patch shape|tests/RandomHeroPoolPatchCompatibility.Tests/RandomHeroPoolPatchCompatibility.Tests.csproj

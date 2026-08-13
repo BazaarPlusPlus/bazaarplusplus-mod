@@ -47,7 +47,7 @@ Thumbs.db
 .build-verify
 .sandbox-home
 report-ui
-tools
+tools/*
 .claude
 .superpowers/
 *.lscache

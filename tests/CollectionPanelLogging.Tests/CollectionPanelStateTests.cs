@@ -196,6 +196,6 @@ public sealed class CollectionPanelStateTests
 #endif
     }
 
-    private static object? Value(CapturedCollectionLogEvent logEvent, string fieldName) =>
+    private static object? Value(CapturedBppLogEvent logEvent, string fieldName) =>
         logEvent.Values.Single(value => value.Field.Name == fieldName).Value;
 }
