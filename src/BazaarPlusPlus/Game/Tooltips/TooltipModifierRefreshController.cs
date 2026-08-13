@@ -39,6 +39,7 @@ internal sealed class TooltipModifierRefreshController : MonoBehaviour
         {
             if (Singleton<BoardManager>.Instance?.IsRecapViewOpen == true)
             {
+                UpgradePreviewCardLatch.ReleaseStale(previewActive: false);
                 _hasResolvedInputs = false;
                 return;
             }
@@ -46,9 +47,15 @@ internal sealed class TooltipModifierRefreshController : MonoBehaviour
             // TooltipPreviewModePolicy.Resolve is a pure function of these inputs, so the
             // resolved mode cannot change unless one of them changes. Skip re-resolving
             // (and the downstream refresh check) on frames where the inputs are identical.
+            // The latch sweep still runs on those frames: hover moving off a card changes
+            // no resolve input, and the native hide path skips its upgrade-preview exit
+            // while a card-to-card tooltip transition is active.
             var inputs = ReadResolveInputs();
             if (_hasResolvedInputs && inputs.Equals(_lastInputs))
+            {
+                UpgradePreviewCardLatch.ReleaseStale(_lastMode == TooltipPreviewMode.Upgrade);
                 return;
+            }
 
             _hasResolvedInputs = true;
             _lastInputs = inputs;
@@ -59,6 +66,7 @@ internal sealed class TooltipModifierRefreshController : MonoBehaviour
                 inputs.HoldUpgrade,
                 inputs.HoldEnchant
             );
+            UpgradePreviewCardLatch.ReleaseStale(mode == TooltipPreviewMode.Upgrade);
             if (mode == _lastMode)
                 return;
 
