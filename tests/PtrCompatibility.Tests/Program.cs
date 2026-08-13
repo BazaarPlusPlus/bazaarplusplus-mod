@@ -94,6 +94,8 @@ return;
 
 void CheckNativePoolPremises(string root, string tree)
 {
+    CheckNativeTooltipSuppressionPremises(root, tree);
+
     var cosmeticsList = ReadTreeFile(root, tree, "TheBazaar", "CosmeticsListManager.cs");
     Require(cosmeticsList, "void FetchCosmetics(", "native collectible session boundary");
     Require(cosmeticsList, "void EquipItem(EquipableItem item)", "native collectible click seam");
@@ -121,6 +123,75 @@ void CheckNativePoolPremises(string root, string tree)
         "native programmatic hero-selection marker"
     );
     Require(heroSelect, "void OnHeroPurchased(EHero hero)", "native hero-purchase selection seam");
+}
+
+void CheckNativeTooltipSuppressionPremises(string root, string tree)
+{
+    var parent = ReadTreeFile(root, tree, "TheBazaar.UI.Tooltips", "TooltipParentComponent.cs");
+    Require(
+        parent,
+        "public async void ShowCardTooltipController(",
+        "native primary tooltip high-level gate"
+    );
+    Require(
+        parent,
+        "public async Task ShowSecondaryCardTooltipController(",
+        "native secondary tooltip high-level gate"
+    );
+    Require(
+        parent,
+        "public async void ShowAuxiliaryTooltipController(",
+        "native auxiliary tooltip high-level gate"
+    );
+    Require(
+        parent,
+        "CardTooltipController.ShowTooltipController(",
+        "primary high-level show reaches the low-level late-show seam"
+    );
+    Require(
+        parent,
+        "SecondaryCardTooltipController.ShowTooltipController(",
+        "secondary high-level show reaches the low-level late-show seam"
+    );
+    Require(
+        parent,
+        "AuxiliaryTooltipController.ShowAuxiliaryTooltipController(",
+        "auxiliary high-level show reaches the low-level late-show seam"
+    );
+
+    var card = ReadTreeFile(root, tree, "TheBazaar.UI.Tooltips", "CardTooltipController.cs");
+    Require(
+        card,
+        "public void ShowTooltipController(",
+        "native card tooltip low-level late-show gate"
+    );
+    Require(
+        card,
+        "public CanvasHiderComponent CanvasHiderComponent",
+        "authoritative card-tooltip concealment seam"
+    );
+
+    var auxiliary = ReadTreeFile(
+        root,
+        tree,
+        "TheBazaar.UI.Tooltips",
+        "AuxiliaryTooltipController.cs"
+    );
+    Require(auxiliary, "private GameObject auxParent;", "complete auxiliary-tooltip visual gate");
+    Require(
+        auxiliary,
+        "public void ShowAuxiliaryTooltipController(",
+        "native auxiliary low-level late-show gate"
+    );
+
+    var canvasHider = ReadTreeFile(
+        root,
+        tree,
+        "TheBazaar.SequenceFramework",
+        "CanvasHiderComponent.cs"
+    );
+    Require(canvasHider, "public void SetVisibility(bool visible)", "card conceal command");
+    Require(canvasHider, "public bool IsVisible()", "card visibility audit");
 }
 
 void CheckTree(

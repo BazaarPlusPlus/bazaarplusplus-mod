@@ -24,13 +24,36 @@ internal static class EndOfRunSummaryVisualSnapshotSampler
         out EndOfRunSummaryVisualSnapshot snapshot
     )
     {
+        var observation = CaptureCleanFrameVisual(summaryController, out snapshot);
+        return observation.State == EndOfRunCleanFrameVisualState.Sampled;
+    }
+
+    internal static EndOfRunCleanFrameVisualObservation CaptureCleanFrameVisual(
+        EndOfRunSummaryController? summaryController
+    )
+    {
+        var observation = CaptureCleanFrameVisual(summaryController, out var snapshot);
+        return observation.State == EndOfRunCleanFrameVisualState.Sampled
+            ? EndOfRunCleanFrameVisualObservation.Sampled(
+                snapshot.LoadedCardCount,
+                snapshot.CardSetFingerprint,
+                snapshot.PoseFingerprint
+            )
+            : observation;
+    }
+
+    private static EndOfRunCleanFrameVisualObservation CaptureCleanFrameVisual(
+        EndOfRunSummaryController? summaryController,
+        out EndOfRunSummaryVisualSnapshot snapshot
+    )
+    {
         snapshot = default;
         if (summaryController == null)
-            return false;
+            return EndOfRunCleanFrameVisualObservation.Unavailable;
         if (!TryGetFieldValue(summaryController, LoadedCardsFieldName, out var loadedCardsValue))
-            return false;
+            return EndOfRunCleanFrameVisualObservation.Unavailable;
         if (loadedCardsValue is not IEnumerable loadedCards)
-            return false;
+            return EndOfRunCleanFrameVisualObservation.Unavailable;
 
         var loadedCardCount = 0;
         var cardSetFingerprint = HashOffset;
@@ -40,15 +63,15 @@ internal static class EndOfRunSummaryVisualSnapshotSampler
             if (loadedCard == null)
                 continue;
             if (loadedCard is UnityEngine.Object unityCard && unityCard == null)
-                return false;
+                return EndOfRunCleanFrameVisualObservation.Unavailable;
             if (!TryGetMemberValue(loadedCard, AnimatorMemberName, out var animatorValue))
-                return false;
+                return EndOfRunCleanFrameVisualObservation.Unavailable;
             if (animatorValue is not Animator animator || animator == null)
-                return false;
+                return EndOfRunCleanFrameVisualObservation.Unavailable;
 
             var root = animator.transform;
             if (root == null)
-                return false;
+                return EndOfRunCleanFrameVisualObservation.Unavailable;
 
             loadedCardCount++;
             AddInt(ref cardSetFingerprint, animator.GetInstanceID());
@@ -56,7 +79,7 @@ internal static class EndOfRunSummaryVisualSnapshotSampler
         }
 
         if (loadedCardCount == 0)
-            return false;
+            return EndOfRunCleanFrameVisualObservation.Empty;
 
         AddInt(ref cardSetFingerprint, loadedCardCount);
         snapshot = new EndOfRunSummaryVisualSnapshot(
@@ -64,7 +87,11 @@ internal static class EndOfRunSummaryVisualSnapshotSampler
             cardSetFingerprint,
             poseFingerprint
         );
-        return true;
+        return EndOfRunCleanFrameVisualObservation.Sampled(
+            loadedCardCount,
+            cardSetFingerprint,
+            poseFingerprint
+        );
     }
 
     private static void AddTransformHierarchy(

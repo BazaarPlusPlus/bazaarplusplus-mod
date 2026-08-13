@@ -4,6 +4,7 @@ using BazaarPlusPlus.Game.Screenshots;
 using BazaarPlusPlus.Storage.RunScreenshot;
 
 EndOfRunCaptureWorkflowBehaviorTests.Run();
+EndOfRunCleanFramePreparationTests.Run();
 VerifyReadinessAdapter();
 VerifyVisualStabilityTracker();
 VerifyArtifactMapping();

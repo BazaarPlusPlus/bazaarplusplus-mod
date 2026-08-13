@@ -61,6 +61,7 @@ Each of these is consumed by two or more features. Reaching around one to re-imp
 |---|---|---|
 | Overlay panel lifecycle | `Game/OverlayPanels/OverlayPanelHost.cs` | Collection, History, LiveBuild |
 | Native card preview | `GameInterop/CardPreview/` | Collection, item boards |
+| Native tooltip suppression | `GameInterop/Tooltips/NativeTooltipSuppression` | replay recording, end-of-run capture |
 | Item board rendering | `GameInterop/ItemBoardPreview/` | History, LiveBuild |
 | Day tier resolution | `GameInterop/DayTiers/` | Collection's Day gate, Encounter Preview |
 | Hero portraits | `GameInterop/HeroPortraits/` | History, LiveBuild, ghost rows |

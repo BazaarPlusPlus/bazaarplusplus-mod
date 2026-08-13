@@ -18,6 +18,7 @@ A pure core is effect-free, not necessarily dependency-free. Use the smallest re
 - [`CollectionViewState`](../../src/BazaarPlusPlus/Game/CollectionPanel/CollectionViewState.cs) returns `null` for a same-value no-op. Catalog-driven hero normalization does not write the user's preference; grid unavailability does not trigger normalization write-back or cache invalidation; the run day used by open selection is captured when the panel opens.
 - [`BackgroundUploadPump`](../../src/BazaarPlusPlus/Game/Upload/BackgroundUploadPump.cs) has a two-point shutdown: release arm subscriptions first, then dispose the feed session after the drain callback. This keeps in-flight attempts away from disposed resources.
 - [`BundleSealConvergence`](../../src/BazaarPlusPlus/Game/BundlePipeline/BundleSealConvergence.cs) receives relative time and input facts and returns continue, wait, degradation, or terminal decisions. Storage parses persisted UTC time and the coordinator performs the one relative-time translation.
+- [`EndOfRunCleanFramePreparationCore`](../../src/BazaarPlusPlus/Game/Screenshots/EndOfRunCleanFramePreparationCore.cs) owns the bounded post-tooltip-cleanup pose window and the wait/capture/fail decision. The Unity attempt supplies native visibility audits, structural card snapshots, and relative time; it cannot call `ScreenCapture` before the core returns capture.
 
 ## Evidence
 

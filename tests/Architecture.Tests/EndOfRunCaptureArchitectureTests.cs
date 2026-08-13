@@ -38,9 +38,12 @@ public sealed class EndOfRunCaptureArchitectureTests
 
         Assert.Contains("WaitForEndOfFrame", driver);
         Assert.Contains("BppUiChromeSuppression.Begin", driver);
+        Assert.Contains("NativeTooltipSuppression.Begin", driver);
         Assert.Contains("BeginCaptureCurrentFrame", driver);
         Assert.Contains("EndOfRunSummaryVisualSnapshotSampler.TryCapture", driver);
         Assert.Contains("EndOfRunVisualStabilityTracker", driver);
+        Assert.Contains("EndOfRunCleanFramePreparationCore", driver);
+        Assert.Contains("ResetVisualStability", driver);
         Assert.Contains("IEndOfRunCaptureSurface<EndOfRunScreenController>", driver);
         Assert.DoesNotContain("ResumeContinue", driver);
         Assert.DoesNotContain("EndOfRunNativeContinueVerifier", driver);

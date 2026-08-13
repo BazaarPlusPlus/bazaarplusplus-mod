@@ -11,6 +11,7 @@ using BazaarPlusPlus.Game.PvpBattles;
 using BazaarPlusPlus.Game.PvpBattles.Persistence;
 using BazaarPlusPlus.Game.RunLifecycle;
 using BazaarPlusPlus.GameInterop.Files;
+using BazaarPlusPlus.GameInterop.Tooltips;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Infrastructure.Logging;
 using BazaarPlusPlus.Storage.Paths;
@@ -51,7 +52,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     private TaskCompletionSource<bool>? _currentReplaySimulationCompletion;
     private NetMessageCombatSim? _deferredCurrentReplaySimulation;
     private NetMessageCombatSim? _permittedCurrentReplaySimulation;
-    private IDisposable? _currentReplayPresentationHoverSuppression;
+    private IDisposable? _currentReplayPresentationTooltipSuppression;
     private Action? _invokeRecordedReplayRecap;
     private bool _currentReplayRecapOwnsInputBlock;
     private bool _currentReplayRecapPreviousInputBlock;
@@ -141,7 +142,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         CancelCurrentReplayPresentationGate("Combat replay runtime was destroyed.");
         CancelCurrentReplayRecapHold();
         _invokeRecordedReplayRecap = null;
-        DisposeCurrentReplayPresentationHoverSuppression();
+        DisposeCurrentReplayPresentationTooltipSuppression();
         if (currentReplayWasActive)
         {
             _playbackPublisher?.PublishEnded("runtime-destroyed", failed: true);
@@ -972,7 +973,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     private void BeginCurrentReplayRecordingAtPresentationBoundary()
     {
         var outcome = _playbackPublisher?.PublishStarting();
-        DisposeCurrentReplayPresentationHoverSuppression();
+        DisposeCurrentReplayPresentationTooltipSuppression();
         if (outcome is not { Succeeded: false })
             return;
 
@@ -987,7 +988,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             _videoRecorder?.Invoke()?.CancelArmedCurrentReplay(recordingId, endReason);
         _playbackPublisher?.PublishEnded(endReason, failed: true);
         _currentRecording.MarkReplayEnded("Replay presentation was canceled before recording.");
-        DisposeCurrentReplayPresentationHoverSuppression();
+        DisposeCurrentReplayPresentationTooltipSuppression();
     }
 
     private void CompleteDeferredCurrentReplaySimulation(
@@ -1022,7 +1023,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         _currentReplaySimulationCompletion = null;
         _deferredCurrentReplaySimulation = null;
         _permittedCurrentReplaySimulation = null;
-        DisposeCurrentReplayPresentationHoverSuppression();
+        DisposeCurrentReplayPresentationTooltipSuppression();
         if (
             hadPendingGate
             && _currentRecording.Snapshot().Phase == CurrentReplayRecordingPhase.Armed
@@ -1039,10 +1040,10 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         completion?.TrySetException(new InvalidOperationException(reason));
     }
 
-    private void DisposeCurrentReplayPresentationHoverSuppression()
+    private void DisposeCurrentReplayPresentationTooltipSuppression()
     {
-        _currentReplayPresentationHoverSuppression?.Dispose();
-        _currentReplayPresentationHoverSuppression = null;
+        _currentReplayPresentationTooltipSuppression?.Dispose();
+        _currentReplayPresentationTooltipSuppression = null;
     }
 
     private void LogCurrentReplayPresentationGate(
@@ -1100,8 +1101,10 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         if (!_currentRecording.MarkNativeReplayStarted())
             return;
 
-        DisposeCurrentReplayPresentationHoverSuppression();
-        _currentReplayPresentationHoverSuppression = ReplayRecordingHoverSuppression.Begin();
+        DisposeCurrentReplayPresentationTooltipSuppression();
+        _currentReplayPresentationTooltipSuppression = NativeTooltipSuppression.Begin(
+            NativeTooltipSuppressionOwner.ReplayPresentation
+        );
     }
 
     private void OnNativeReplayEnded()
@@ -1112,7 +1115,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             return;
 
         if (currentNativeRecording)
-            DisposeCurrentReplayPresentationHoverSuppression();
+            DisposeCurrentReplayPresentationTooltipSuppression();
         if (
             currentNativeRecording
             && _currentRecording.Snapshot().Phase == CurrentReplayRecordingPhase.Armed
@@ -1405,7 +1408,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
     private void CompleteCurrentReplayRecording(string endReason, bool failed, string? reason)
     {
-        DisposeCurrentReplayPresentationHoverSuppression();
+        DisposeCurrentReplayPresentationTooltipSuppression();
         _invokeRecordedReplayRecap = null;
         var outcome = _playbackPublisher?.PublishEnded(endReason, failed);
         _currentRecording.MarkReplayEnded(

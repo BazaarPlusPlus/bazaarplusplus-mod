@@ -2,6 +2,7 @@
 #pragma warning disable CS0436
 using BazaarGameClient.Domain.Models.Cards;
 using BazaarPlusPlus.Game.PostCombatImpact;
+using BazaarPlusPlus.GameInterop.Tooltips;
 using HarmonyLib;
 using TheBazaar;
 using TheBazaar.Tooltips;
@@ -21,7 +22,7 @@ internal static class PostCombatImpactRecapShowTooltipPatch
         Vector3 ___tooltipOffset
     )
     {
-        if (___CardData == null)
+        if (NativeTooltipSuppression.IsActive || ___CardData == null)
             return;
 
         BppPatchHost.Features.PostCombatImpact.SetHoveredRecapCard(
@@ -87,6 +88,9 @@ internal static class PostCombatImpactSkillPointerEnterPatch
         Vector3 ____tooltipOffsetWorldSpace
     )
     {
+        if (NativeTooltipSuppression.IsActive)
+            return;
+
         var boardManager = Singleton<BoardManager>.Instance;
         var card = __instance.Card;
         if (card == null || boardManager == null || !boardManager.IsRecapViewOpen)
@@ -132,13 +136,18 @@ internal static class PostCombatImpactAuxiliaryTooltipShowPatch
         Transform worldSpaceTransform,
         string newHeader,
         string newBodyText
-    ) =>
+    )
+    {
+        if (NativeTooltipSuppression.IsActive)
+            return;
+
         BppPatchHost.Features.PostCombatImpact.OnNativeAuxiliaryTooltipShowing(
             __instance,
             worldSpaceTransform,
             newHeader,
             newBodyText
         );
+    }
 }
 
 [HarmonyPatch(
@@ -156,8 +165,14 @@ internal static class PostCombatImpactAuxiliaryTooltipHidePatch
 internal static class PostCombatImpactTooltipPreparePatch
 {
     [HarmonyPrefix]
-    private static void Prefix(CardTooltipController __instance, ITooltipData iTooltipData) =>
-        BppPatchHost.Features.PostCombatImpact.OnNativeTooltipPreparing(__instance, iTooltipData);
+    private static void Prefix(CardTooltipController __instance, ITooltipData iTooltipData)
+    {
+        if (!NativeTooltipSuppression.IsActive)
+            BppPatchHost.Features.PostCombatImpact.OnNativeTooltipPreparing(
+                __instance,
+                iTooltipData
+            );
+    }
 }
 
 [HarmonyPatch(typeof(CardTooltipController), nameof(CardTooltipController.ResetValues))]

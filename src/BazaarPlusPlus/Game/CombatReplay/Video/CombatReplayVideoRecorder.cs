@@ -4,6 +4,7 @@ using System.Collections.Concurrent;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CombatReplay.Audio;
 using BazaarPlusPlus.Game.OverlayPanels;
+using BazaarPlusPlus.GameInterop.Tooltips;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Storage.Paths;
 using UnityEngine;
@@ -1293,7 +1294,10 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
             // to keep them out of the recording.
             return UiSuppressionScope.Begin(
                 () => BppUiChromeSuppression.Begin(BppUiChromeSuppressionMode.ReplayRecording),
-                ReplayRecordingHoverSuppression.Begin
+                () =>
+                    NativeTooltipSuppression.Begin(
+                        NativeTooltipSuppressionOwner.ReplayVideoRecording
+                    )
             );
         }
         catch (Exception ex)

@@ -9,15 +9,18 @@ internal static class EndOfRunCaptureWorkflowBehaviorTests
     {
         Missing_surface_is_fail_open();
         Reveal_and_success_flow();
+        Clean_frame_deadline_fails_open_without_capture_or_retry();
         Capture_timeout_starts_when_capture_is_invoked();
         Retryable_failures_get_one_retry_only();
         Adapter_non_retryable_failure_fails_open();
         Reveal_and_capture_timeouts_fail_open_without_retry();
         Metadata_failure_and_timeout_keep_the_verified_artifact();
         Unexpected_failure_after_capture_preserves_the_verified_artifact();
+        Unexpected_failure_before_capture_releases_the_active_attempt();
         Failed_unblock_is_retried_without_blocking_continue();
         Navigation_after_frame_acquisition_keeps_background_capture();
         Context_expiry_cancels_and_cleans_up_a_late_artifact();
+        Driver_detach_releases_the_active_attempt();
         Reset_cancels_the_old_generation_and_allows_a_new_run();
         Terminal_outcome_is_emitted_once();
     }
@@ -47,6 +50,50 @@ internal static class EndOfRunCaptureWorkflowBehaviorTests
         fixture.Clock.Advance(0.02f);
         fixture.Core.OnFrame(fixture.Context);
         Assert(attempt.CancelCount == 1, "Capture should time out after its own deadline.");
+    }
+
+    private static void Clean_frame_deadline_fails_open_without_capture_or_retry()
+    {
+        using var log = new TestLogCapture();
+        var fixture = new Fixture();
+        fixture.Core.OnEndOfRunInitializing();
+        fixture.Core.ObserveRevealStarted(fixture.Screen);
+        fixture.Screen.Readiness = Readiness(EndOfRunCaptureReadinessState.Ready);
+        fixture.Surface.NextAttemptHasStarted = false;
+
+        fixture.Core.OnFrame(fixture.Context);
+        var attempt = fixture.Surface.LastAttempt!;
+        Assert(
+            fixture.Surface.BeginCount == 1 && attempt.LeaseActive,
+            "Summary readiness should automatically begin clean-frame preparation."
+        );
+        Assert(
+            !attempt.HasCaptureStarted,
+            "Screen capture must remain unstarted while the clean barrier is pending."
+        );
+
+        attempt.Complete(
+            EndOfRunCaptureAttemptOutcome.Failed(ScreenshotCaptureReasonCode.CleanFrameDeadline)
+        );
+        fixture.Core.OnFrame(fixture.Context);
+        fixture.Clock.Advance(30f);
+        fixture.Core.OnFrame(fixture.Context);
+
+        Assert(!attempt.LeaseActive, "Clean-frame failure must release its suppression lease.");
+        Assert(!fixture.Surface.IsBlocked, "Clean-frame deadline must fail open Continue.");
+        Assert(fixture.Surface.BeginCount == 1, "Clean-frame deadline must not retry capture.");
+        Assert(fixture.Persistence.CallCount == 0, "No artifact means no metadata persistence.");
+        Assert(fixture.Files.Deleted.Count == 0, "No capture artifact may exist or be deleted.");
+        var terminals = log
+            .Events.Where(entry =>
+                entry.Contains("event=screenshots.capture.failed", StringComparison.Ordinal)
+            )
+            .ToArray();
+        Assert(terminals.Length == 1, "Clean-frame deadline must emit one terminal outcome.");
+        Assert(
+            terminals[0].Contains("reason_code=clean_frame_deadline", StringComparison.Ordinal),
+            "Clean-frame deadline must have a low-cardinality terminal reason."
+        );
     }
 
     private static void Missing_surface_is_fail_open()
@@ -85,9 +132,14 @@ internal static class EndOfRunCaptureWorkflowBehaviorTests
         Assert(fixture.Surface.IsBlocked, "Capture attempt should block Continue.");
 
         var attempt = fixture.Surface.LastAttempt!;
+        Assert(attempt.LeaseActive, "Suppression must be active before frame acquisition.");
         attempt.AcquireFrame();
         fixture.Core.OnFrame(fixture.Context);
         Assert(attempt.RestoreCount == 1, "Frame acquisition must restore UI immediately.");
+        Assert(
+            !attempt.LeaseActive,
+            "Frame acquisition must release suppression without waiting for PNG encoding."
+        );
         Assert(
             !fixture.Surface.IsBlocked,
             "Continue should release as soon as settled pixels are detached from Unity."
@@ -122,7 +174,8 @@ internal static class EndOfRunCaptureWorkflowBehaviorTests
     private static void Adapter_non_retryable_failure_fails_open()
     {
         var fixture = ReadyFixture();
-        fixture.Surface.LastAttempt!.Complete(
+        var attempt = fixture.Surface.LastAttempt!;
+        attempt.Complete(
             EndOfRunCaptureAttemptOutcome.Failed(ScreenshotCaptureReasonCode.ContextExpired)
         );
 
@@ -132,7 +185,7 @@ internal static class EndOfRunCaptureWorkflowBehaviorTests
 
         Assert(!fixture.Surface.IsBlocked, "Context expiry from the adapter must fail open.");
         Assert(fixture.Surface.BeginCount == 1, "Context expiry from the adapter must not retry.");
-        Assert(fixture.Surface.LastAttempt.RestoreCount == 1, "Failure must restore UI once.");
+        Assert(attempt.RestoreCount == 1, "Failure must restore UI once.");
     }
 
     private static void Retryable_failures_get_one_retry_only()
@@ -153,26 +206,37 @@ internal static class EndOfRunCaptureWorkflowBehaviorTests
         fixture.Core.OnFrame(fixture.Context);
         Assert(fixture.Surface.BeginCount == 2, "First failure should retry exactly once.");
 
-        fixture.Surface.LastAttempt!.Complete(
+        var secondAttempt = fixture.Surface.LastAttempt!;
+        secondAttempt.Complete(
             EndOfRunCaptureAttemptOutcome.Failed(
                 ScreenshotCaptureReasonCode.CaptureTaskFaulted,
                 new InvalidOperationException("task fault")
             )
         );
         fixture.Core.OnFrame(fixture.Context);
+        Assert(!secondAttempt.LeaseActive, "Final attempt failure must release suppression.");
         Assert(!fixture.Surface.IsBlocked, "Second retryable failure must fail open.");
         fixture.Clock.Advance(10f);
         fixture.Core.OnFrame(fixture.Context);
         Assert(fixture.Surface.BeginCount == 2, "Retry budget must be capped at two attempts.");
 
         var nullFixture = ReadyFixture();
-        nullFixture.Surface.LastAttempt!.Complete(
+        var firstNullAttempt = nullFixture.Surface.LastAttempt!;
+        firstNullAttempt.Complete(
             EndOfRunCaptureAttemptOutcome.Failed(ScreenshotCaptureReasonCode.CaptureReturnedNull)
         );
         nullFixture.Core.OnFrame(nullFixture.Context);
+        Assert(
+            !firstNullAttempt.LeaseActive,
+            "A failed attempt must release its independent preparation lease."
+        );
         nullFixture.Clock.Advance(1f);
         nullFixture.Core.OnFrame(nullFixture.Context);
         Assert(nullFixture.Surface.BeginCount == 2, "A pre-frame null capture should retry once.");
+        Assert(
+            nullFixture.Surface.LastAttempt!.LeaseActive,
+            "A retry must acquire a fresh preparation lease before it can capture."
+        );
 
         var unusableFixture = ReadyFixture();
         unusableFixture.Surface.LastAttempt!.AcquireFrame();
@@ -210,6 +274,7 @@ internal static class EndOfRunCaptureWorkflowBehaviorTests
             "Capture timeout should cancel the active adapter attempt."
         );
         Assert(!captureFixture.Surface.IsBlocked, "Capture timeout should immediately fail open.");
+        Assert(!attempt.LeaseActive, "Capture timeout must release suppression.");
         captureFixture.Clock.Advance(100f);
         captureFixture.Core.OnFrame(captureFixture.Context);
         Assert(captureFixture.Surface.BeginCount == 1, "Capture timeout must not retry.");
@@ -275,6 +340,18 @@ internal static class EndOfRunCaptureWorkflowBehaviorTests
         );
     }
 
+    private static void Unexpected_failure_before_capture_releases_the_active_attempt()
+    {
+        var fixture = ReadyFixture();
+        var attempt = fixture.Surface.LastAttempt!;
+
+        fixture.Core.FailOpenUnexpected(new InvalidOperationException("unexpected pre-frame"));
+
+        Assert(attempt.CancelCount == 1, "Unexpected failure should cancel the active attempt.");
+        Assert(!attempt.LeaseActive, "Unexpected failure must release suppression.");
+        Assert(!fixture.Surface.IsBlocked, "Unexpected failure must fail open Continue.");
+    }
+
     private static void Failed_unblock_is_retried_without_blocking_continue()
     {
         var fixture = ReadyFixture();
@@ -323,6 +400,7 @@ internal static class EndOfRunCaptureWorkflowBehaviorTests
         fixture.Surface.ActiveScreen = null;
         fixture.Core.OnFrame(fixture.Context);
         Assert(attempt.CancelCount == 1, "Context expiry should cancel the active attempt.");
+        Assert(!attempt.LeaseActive, "Context expiry must release suppression.");
         Assert(!fixture.Surface.IsBlocked, "Context expiry should release stale blocker.");
         Assert(fixture.Surface.BeginCount == 1, "Context expiry must not retry.");
 
@@ -334,12 +412,25 @@ internal static class EndOfRunCaptureWorkflowBehaviorTests
         );
     }
 
+    private static void Driver_detach_releases_the_active_attempt()
+    {
+        var fixture = ReadyFixture();
+        var attempt = fixture.Surface.LastAttempt!;
+
+        fixture.Core.DetachSurface(fixture.Surface);
+
+        Assert(attempt.CancelCount == 1, "Driver detach should cancel the active attempt.");
+        Assert(!attempt.LeaseActive, "Driver detach must release suppression.");
+        Assert(!fixture.Surface.IsBlocked, "Driver detach must fail open Continue.");
+    }
+
     private static void Reset_cancels_the_old_generation_and_allows_a_new_run()
     {
         var fixture = ReadyFixture();
         var oldAttempt = fixture.Surface.LastAttempt!;
         fixture.Core.OnRunStarted();
         Assert(oldAttempt.CancelCount == 1, "Run reset should cancel the old generation.");
+        Assert(!oldAttempt.LeaseActive, "Run reset must release old-generation suppression.");
         Assert(!fixture.Surface.IsBlocked, "Run reset should release Continue.");
 
         fixture.Core.OnEndOfRunInitializing();
@@ -520,10 +611,19 @@ internal static class EndOfRunCaptureWorkflowBehaviorTests
         public bool HasCaptureStarted { get; set; } = true;
         internal int CancelCount { get; private set; }
         internal int RestoreCount { get; private set; }
+        internal bool LeaseActive { get; private set; } = true;
 
-        public void Cancel() => CancelCount++;
+        public void Cancel()
+        {
+            CancelCount++;
+            LeaseActive = false;
+        }
 
-        public void RestoreUi() => RestoreCount++;
+        public void RestoreUi()
+        {
+            RestoreCount++;
+            LeaseActive = false;
+        }
 
         internal void AcquireFrame() => _frameAcquired.TrySetResult(true);
 

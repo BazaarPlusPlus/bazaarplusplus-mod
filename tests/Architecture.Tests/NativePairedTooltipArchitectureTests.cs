@@ -56,6 +56,114 @@ public sealed class NativePairedTooltipArchitectureTests
         );
     }
 
+    [Fact]
+    public void Native_tooltip_suppression_has_one_shared_owner_and_all_show_gates()
+    {
+        var sourceRoot = Path.Combine(RepoRoot(), "src", "BazaarPlusPlus");
+        var sharedSuppression = Path.Combine(
+            sourceRoot,
+            "GameInterop",
+            "Tooltips",
+            "NativeTooltipSuppression.cs"
+        );
+        var patches = Path.Combine(
+            sourceRoot,
+            "Patches",
+            "Tooltips",
+            "NativeTooltipSuppressionPatches.cs"
+        );
+
+        Assert.True(File.Exists(sharedSuppression));
+        Assert.True(File.Exists(patches));
+        Assert.False(
+            File.Exists(
+                Path.Combine(
+                    sourceRoot,
+                    "Game",
+                    "CombatReplay",
+                    "Video",
+                    "ReplayRecordingHoverSuppression.cs"
+                )
+            )
+        );
+        Assert.False(
+            File.Exists(
+                Path.Combine(sourceRoot, "Patches", "Combat", "ReplayRecordingHoverPatches.cs")
+            )
+        );
+
+        var suppressionSource = File.ReadAllText(sharedSuppression);
+        Assert.Contains("NativeTooltipSuppressionOwnershipCore", suppressionSource);
+        Assert.Contains("NativeTooltipSuppressionOwner.ReplayPresentation", suppressionSource);
+        Assert.Contains("NativeTooltipSuppressionOwner.ReplayVideoRecording", suppressionSource);
+        Assert.Contains("NativeTooltipSuppressionOwner.EndOfRunCapture", suppressionSource);
+        Assert.Contains("auxParent", suppressionSource);
+        Assert.Contains("CanvasHiderComponent", suppressionSource);
+        Assert.Contains("UnlockAllLockedTooltipControllers", suppressionSource);
+        Assert.Contains("HideCardTooltipController", suppressionSource);
+        Assert.Contains("HideSecondaryCardTooltipController", suppressionSource);
+        Assert.Contains("HideAuxiliaryTooltipController", suppressionSource);
+        Assert.Contains("SetLockedFlag(false)", suppressionSource);
+        Assert.Contains("DisableLockModeCanvasPublic", suppressionSource);
+        Assert.Contains("ClearCurrentCard", suppressionSource);
+        Assert.Contains("SetVisibility(false)", suppressionSource);
+        Assert.Contains("AreRequiredShowGatesInstalled", suppressionSource);
+        Assert.Contains("Harmony.GetPatchInfo", suppressionSource);
+
+        var patchSource = File.ReadAllText(patches);
+        Assert.Contains("TooltipParentComponent.ShowCardTooltipController", patchSource);
+        Assert.Contains("TooltipParentComponent.ShowSecondaryCardTooltipController", patchSource);
+        Assert.Contains("TooltipParentComponent.ShowAuxiliaryTooltipController", patchSource);
+        Assert.Contains("CardTooltipController.ShowTooltipController", patchSource);
+        Assert.Contains("AuxiliaryTooltipController.ShowAuxiliaryTooltipController", patchSource);
+
+        var featureOwnedCopies = Directory
+            .EnumerateFiles(Path.Combine(sourceRoot, "Game"), "*.cs", SearchOption.AllDirectories)
+            .Where(file =>
+                Path.GetFileName(file)
+                    .Contains("NativeTooltipSuppression", StringComparison.Ordinal)
+                || File.ReadAllText(file)
+                    .Contains("class ReplayRecordingHoverSuppression", StringComparison.Ordinal)
+            )
+            .Select(file => Path.GetRelativePath(sourceRoot, file).Replace('\\', '/'))
+            .ToArray();
+        Assert.True(
+            featureOwnedCopies.Length == 0,
+            "Features must consume the shared native-tooltip suppression adapter:\n"
+                + string.Join("\n", featureOwnedCopies)
+        );
+
+        var nativeOwnershipTokens = new[]
+        {
+            "UnlockAllLockedTooltipControllers",
+            "HideCardTooltipController",
+            "HideSecondaryCardTooltipController",
+            "HideAuxiliaryTooltipController",
+            "CanvasHiderComponent.SetVisibility",
+            ".auxParent",
+        };
+        var duplicateOwnership = new[]
+        {
+            Path.Combine(sourceRoot, "Game", "Screenshots"),
+            Path.Combine(sourceRoot, "Game", "CombatReplay"),
+        }
+            .SelectMany(root => Directory.EnumerateFiles(root, "*.cs", SearchOption.AllDirectories))
+            .Where(file =>
+            {
+                var source = File.ReadAllText(file);
+                return nativeOwnershipTokens.Any(token =>
+                    source.Contains(token, StringComparison.Ordinal)
+                );
+            })
+            .Select(file => Path.GetRelativePath(sourceRoot, file).Replace('\\', '/'))
+            .ToArray();
+        Assert.True(
+            duplicateOwnership.Length == 0,
+            "Screenshot and replay features must not duplicate native tooltip ownership:\n"
+                + string.Join("\n", duplicateOwnership)
+        );
+    }
+
     private static string RepoRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
