@@ -505,16 +505,16 @@ bool InitializeVideoProcessor(Encoder *encoder, int width, int height)
     switch (sourceDescription.Format)
     {
     case DXGI_FORMAT_B8G8R8A8_TYPELESS:
+    case DXGI_FORMAT_B8G8R8A8_UNORM_SRGB:
         processorSourceFormat = DXGI_FORMAT_B8G8R8A8_UNORM;
         break;
     case DXGI_FORMAT_B8G8R8A8_UNORM:
-    case DXGI_FORMAT_B8G8R8A8_UNORM_SRGB:
         break;
     case DXGI_FORMAT_R8G8B8A8_TYPELESS:
+    case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:
         processorSourceFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
         break;
     case DXGI_FORMAT_R8G8B8A8_UNORM:
-    case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:
         break;
     default:
     {
@@ -656,7 +656,7 @@ bool InitializeVideoProcessor(Encoder *encoder, int width, int height)
     encoder->videoContext->VideoProcessorSetStreamColorSpace(
         encoder->videoProcessor.Get(), 0, &inputColor);
     D3D11_VIDEO_PROCESSOR_COLOR_SPACE outputColor{};
-    outputColor.RGB_Range = 1;
+    outputColor.Nominal_Range = D3D11_VIDEO_PROCESSOR_NOMINAL_RANGE_16_235;
     outputColor.YCbCr_Matrix = 1;
     encoder->videoContext->VideoProcessorSetOutputColorSpace(
         encoder->videoProcessor.Get(), &outputColor);
