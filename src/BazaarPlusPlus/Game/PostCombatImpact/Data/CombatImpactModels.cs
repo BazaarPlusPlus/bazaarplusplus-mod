@@ -255,7 +255,8 @@ internal sealed record CombatImpactEntity(
     IReadOnlyCollection<CombatImpactUseAttributionRule>? UseAttributionRules = null,
     IReadOnlyDictionary<string, TActionCardModifyAttribute>? AbilityAttributeModifiersByEffectId =
         null,
-    IReadOnlyDictionary<string, EEffectPriority>? CriticalTriggerAbilitiesByEffectId = null
+    IReadOnlyDictionary<string, EEffectPriority>? CriticalTriggerAbilitiesByEffectId = null,
+    IReadOnlyCollection<string>? CritCapableEffectIds = null
 );
 
 internal static class CombatImpactTags
@@ -328,6 +329,8 @@ internal sealed record CombatImpactEvent(
     internal int? AlternateNonCriticalValue { get; init; }
 
     internal bool HasCriticalAdjustmentCandidate { get; init; }
+
+    internal bool IsCritCapable { get; init; }
 
     internal string? RawDirectSourceId { get; init; }
 

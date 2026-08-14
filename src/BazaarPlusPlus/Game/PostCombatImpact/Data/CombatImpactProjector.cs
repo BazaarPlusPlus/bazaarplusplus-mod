@@ -121,6 +121,7 @@ internal static class CombatImpactProjector
                     NonCriticalValue = resolved.NonCriticalValue,
                     AlternateNonCriticalValue = resolved.AlternateNonCriticalValue,
                     HasCriticalAdjustmentCandidate = resolved.HasCriticalAdjustmentCandidate,
+                    IsCritCapable = execution.IsCritCapable,
                     RawDirectSourceId = execution.DirectSourceId,
                     TriggerSourceId = execution.TriggerSourceId,
                     TriggerFrameIndex = execution.FrameIndex,
@@ -638,6 +639,12 @@ internal static class CombatImpactProjector
                     item.TriggerSource?.Value,
                     entities
                 );
+                var isCritCapable = IsCritCapable(
+                    item.Source?.Value,
+                    attributedSourceId,
+                    item.EffectId,
+                    entities
+                );
                 var targetId = ResolveTargetId(item.Target);
                 var hasKind = TryResolveKind(item.ActionType, out var kind);
                 var configuredActionValue = default(ResolvedImpactValue);
@@ -697,7 +704,11 @@ internal static class CombatImpactProjector
                         NonCriticalValue = nonCriticalValue,
                         AlternateNonCriticalValue = alternateNonCriticalValue,
                     };
-                    resolved = ResolveConfiguredStatusCriticalOutcome(item.ActionType, resolved);
+                    resolved = ResolveConfiguredStatusCriticalOutcome(
+                        item.ActionType,
+                        resolved,
+                        isCritCapable
+                    );
                 }
                 projections.Add(
                     new ProjectedExecution(
@@ -712,6 +723,9 @@ internal static class CombatImpactProjector
                         item.ActionType,
                         item.ExecutionContextId
                     )
+                    {
+                        IsCritCapable = isCritCapable,
+                    }
                 );
             }
             ReconcileCardAttributeTimeline(frame, cardAttributes, usePreviousValue: false);
@@ -1164,11 +1178,13 @@ internal static class CombatImpactProjector
 
     private static ResolvedImpactValue ResolveConfiguredStatusCriticalOutcome(
         EActionCommandType action,
-        ResolvedImpactValue resolved
+        ResolvedImpactValue resolved,
+        bool isCritCapable
     )
     {
         if (
-            action
+            !isCritCapable
+            || action
                 is not (
                     EActionCommandType.PlayerBurnApply
                     or EActionCommandType.PlayerPoisonApply
@@ -1338,6 +1354,7 @@ internal static class CombatImpactProjector
 
     private static bool CanReceiveCriticalTriggerEvidence(CombatImpactEvent item) =>
         item.Surface == CombatImpactEventSurface.AppliedEffect
+        && item.IsCritCapable
         && item.OccurrenceBasis == CombatImpactOccurrenceBasis.ExplicitExecution;
 
     private static IndexedImpactEvent SelectCriticalTriggerOrigin(
@@ -1413,6 +1430,7 @@ internal static class CombatImpactProjector
 
     private static bool CanReceiveNativeActivationCriticality(CombatImpactEvent item) =>
         item.Surface == CombatImpactEventSurface.AppliedEffect
+        && item.IsCritCapable
         && (
             item.Kind == CombatImpactKind.Burn
                 && string.Equals(
@@ -1465,6 +1483,7 @@ internal static class CombatImpactProjector
                 indexedEvents.Any(item =>
                     item.Event.IsCritical
                     || item.Event.CriticalCount > 0
+                    || !item.Event.IsCritCapable
                     || item.Event.NonCriticalValue is not > 0
                 ) || !authoritative.TryGetValue(group.Key.SourceId, out var sourceMetrics)
             )
@@ -1500,6 +1519,22 @@ internal static class CombatImpactProjector
                 CriticalValue = recovery.Value.CriticalValue,
             };
         }
+    }
+
+    private static bool IsCritCapable(
+        string? directSourceId,
+        string? attributedSourceId,
+        string? effectId,
+        IReadOnlyDictionary<string, CombatImpactEntity> entities
+    )
+    {
+        var capabilitySourceId = IsActivityEntity(directSourceId, entities)
+            ? directSourceId
+            : attributedSourceId;
+        return !string.IsNullOrWhiteSpace(capabilitySourceId)
+            && !string.IsNullOrWhiteSpace(effectId)
+            && entities.TryGetValue(capabilitySourceId!, out var source)
+            && source.CritCapableEffectIds?.Contains(effectId!, StringComparer.Ordinal) == true;
     }
 
     private static bool HasCriticalHealthAdjustment(
@@ -3992,6 +4027,8 @@ internal static class CombatImpactProjector
     )
     {
         internal bool PrerequisiteSkillSource { get; init; }
+
+        internal bool IsCritCapable { get; init; }
     }
 
     private readonly record struct LifestealCandidate(

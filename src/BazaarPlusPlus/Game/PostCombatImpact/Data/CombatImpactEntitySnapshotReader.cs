@@ -147,6 +147,7 @@ internal static class CombatImpactEntitySnapshotReader
         var item = card as ItemCard;
         var effectAttributes = ReadEffectAttributeTypes(card, item);
         var activeEffects = ReadActiveEffects(card);
+        var hiddenTags = CombatImpactEntityTags.ResolveHiddenTags(card);
         var activeAbilities = CombatImpactActiveAbilityReader.Read(item, activeEffects.Abilities);
         var abilityAttributeModifiers = CombatImpactAbilityAttributeModifierReader.Read(
             activeAbilities
@@ -171,7 +172,7 @@ internal static class CombatImpactEntitySnapshotReader
             effectAttributes.Auras,
             effectAttributes.ReferenceValuedAuraEffectIds,
             card.LeftSocketId,
-            CombatImpactEntityTags.ResolveHiddenTags(card),
+            hiddenTags,
             card.Section,
             CombatImpactEntityTags.ResolveTags(card),
             CombatImpactAttributionRuleReader.ReadSourceRules(activeAbilities, activeEffects.Auras),
@@ -179,7 +180,12 @@ internal static class CombatImpactEntitySnapshotReader
                 ? CombatImpactAttributionRuleReader.ReadUseRules(activeAbilities)
                 : null,
             abilityAttributeModifiers,
-            CombatImpactCriticalTriggerReader.Read(activeAbilities)
+            CombatImpactCriticalTriggerReader.Read(activeAbilities),
+            CombatImpactCriticalCapability.ReadCritCapableEffectIds(
+                card.Type,
+                activeAbilities,
+                hiddenTags
+            )
         );
     }
 
