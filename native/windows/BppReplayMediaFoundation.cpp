@@ -501,10 +501,11 @@ bool InitializeVideoProcessor(Encoder *encoder, int width, int height)
         SetFailure(encoder, "The persistent Unity capture texture must not be multisampled.");
         return false;
     }
-    // Unity commonly exposes an sRGB RenderTexture through a typeless resource, and the D3D11
-    // video processor rejects both TYPELESS and _SRGB source views. Map either onto the plain
-    // UNORM twin here; when that changes the format, the block below creates a typed GPU alias
-    // of the same memory rather than converting or copying pixel data.
+    // Recording must hand the encoder Unity's final gamma-encoded bytes unchanged. A TYPELESS
+    // resource cannot be bound as a view at all, and an _SRGB view would be read with
+    // sRGB-to-linear semantics, so both are mapped onto the plain UNORM twin. When that changes
+    // the format, the block below allocates a typed texture of that format and each frame is
+    // bit-copied into it — the same bits reinterpreted, never a color conversion.
     DXGI_FORMAT processorSourceFormat = sourceDescription.Format;
     switch (sourceDescription.Format)
     {
@@ -654,6 +655,13 @@ bool InitializeVideoProcessor(Encoder *encoder, int width, int height)
         encoder->videoProcessor.Get(), 0, TRUE, &targetRect);
     encoder->videoContext->VideoProcessorSetOutputTargetRect(
         encoder->videoProcessor.Get(), TRUE, &targetRect);
+    // The two ends deliberately use different range fields. The input is RGB, whose range lives
+    // in RGB_Range (0 = full 0-255). The NV12 output is YCbCr, whose range must come from
+    // Nominal_Range: putting it in the RGB field on the output side leaves the YCbCr range
+    // unstated and lets the driver default it, which need not agree with the
+    // MFNominalRange_16_235 / BT.709 media type this encoder declares — that mismatch is what
+    // produced black-level and contrast drift on some drivers. YCbCr_Matrix = 1 is BT.709 on
+    // both ends.
     D3D11_VIDEO_PROCESSOR_COLOR_SPACE inputColor{};
     inputColor.RGB_Range = 0;
     inputColor.YCbCr_Matrix = 1;
