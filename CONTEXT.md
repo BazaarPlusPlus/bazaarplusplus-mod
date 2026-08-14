@@ -31,17 +31,17 @@ _Avoid_: RunLoggingController, run logger MonoBehaviour
 The feature-owned query boundary for event cards, encounter-step rewards, and hero level rewards. Callers supply only a stable template id, current level, and native text they already hold; the module owns everything from plan generation to final presentation.
 
 **End-of-Run Capture Workflow**:
-The single run-scoped state machine that owns the end-of-run screenshot flow — readiness, bounded attempts, native-tooltip clean-frame preparation, artifact validation, fail-open terminal outcomes. Summary readiness starts capture automatically; Harmony patches express only Continue and reveal-start intents through `IEndOfRunCaptureWorkflow` and never drive capture directly.
+The single run-scoped state machine that owns the end-of-run screenshot flow — readiness, bounded attempts, clean-frame preparation, artifact validation, fail-open terminal outcomes. Harmony patches express only Continue and reveal-start intents through `IEndOfRunCaptureWorkflow` and never drive capture directly.
 _Avoid_: screenshot gate
 
 **Ghost Battle**:
-A PvP battle fetched from the mod backend in which the local player's uploaded build fought inside another player's run (the game's PvP is asynchronous — opponents are ghosts). The imported manifest keeps the recorder's perspective — the challenger occupies the `Player` side — and only the HistoryPanel list row is projected into local perspective by `GhostBattleLocalProjector`. The stored convention is stamped as `PerspectiveVersion` (see [ADR-0003](docs/adr/0003-bazaaragent-external-replay-video-recording.md)).
+A PvP battle fetched from the mod backend in which the local player's uploaded build fought inside another player's run (the game's PvP is asynchronous — opponents are ghosts). Stored payloads keep the recorder's perspective, stamped as `PerspectiveVersion` (see [ADR-0003](docs/adr/0003-bazaaragent-external-replay-video-recording.md)); only the HistoryPanel list row is projected to local perspective, by `GhostBattleLocalProjector`.
 _Avoid_: remote battle, opponent battle
 
 ## Combat replay
 
 **Saved Replay Lifecycle**:
-The single pure owner (`SavedReplayLifecycle`) of a saved-replay playback session's state algebra — start progress, terminal ownership, the time-bounded duplicate-exit suppression window, and the pending menu-return deadline. The runtime feeds observations (time, state exits, scene readiness) and executes the returned decisions; replay exit itself still flows only through `CombatReplayRuntime.TryContinueReplay` per ADR-0003.
+The single pure owner (`SavedReplayLifecycle`) of a saved-replay playback session's state algebra; the runtime feeds observations and executes the returned decisions. Replay exit itself still flows only through `CombatReplayRuntime.TryContinueReplay` per ADR-0003.
 
 ## Overlay panels
 
@@ -114,7 +114,7 @@ _Avoid_: per-feed upload controller
 ## Collection panel
 
 **Collection View State**:
-The single owner of the Collection Panel's presentable state (`CollectionViewState`) — filter selections, search mode and debounce, catalog acceptance, and the derived render model. Commands and lifecycle events go in; a complete render outcome (view model plus scroll intents) comes out. The panel's Unity surface only forwards commands and applies outcomes; grid read-back goes through the `ICollectionGridPort` projection contract (`Publish`/`Current`, with explicit empty-before-first-publish semantics). Nothing outside the module reads or writes the filter.
+The single owner of the Collection Panel's presentable state (`CollectionViewState`) — filter selections, search, catalog acceptance, and the derived render model. Commands and lifecycle events go in; a complete render outcome comes out; the panel's Unity surface only forwards commands and applies outcomes. Nothing outside the module reads or writes the filter.
 _Avoid_: ApplyFilters/RefreshView pairing
 
 ## Collection sources
@@ -131,7 +131,7 @@ The source category used by CollectionPanel source chips: `Merchant` maps to Ite
 ## Day tiers
 
 **Day Tier Resolver**:
-The shared GameInterop adapter (`GameInterop/DayTiers/GameDataDayTierResolver`) that resolves the current run day's item/skill tier distribution from live GameData into a normalized weight table plus `MaximumTier` — the highest usable Bronze-to-Diamond tier, not the largest probability. Successes are cached only within one game-data manager generation (the game swaps the manager reference after a GameData download); consumers (Collection's Day gate, Event Preview) fail open when the table is unavailable.
+The shared GameInterop adapter (`GameInterop/DayTiers/GameDataDayTierResolver`) that resolves the current run day's item/skill tier distribution from live GameData into a normalized weight table plus `MaximumTier` — the highest usable Bronze-to-Diamond tier, not the largest probability. Consumers (Collection's Day gate, Event Preview) fail open when the table is unavailable.
 _Avoid_: DayTierSchedule, hardcoded tier table
 
 ## Remote embedded data
@@ -141,9 +141,8 @@ The shared runtime lifecycle for data shipped as an embedded seed, cached under 
 _Avoid_: feature repository loader
 
 **Supporter Catalog Module**:
-The composition-owned Remote Embedded Catalog consumer for supporter data. It preserves fixed-list
-bypass, publishes session-stable snapshots through the supporter facade, owns retry/disposal, and
-translates catalog issues into supporter log events.
+The composition-owned Remote Embedded Catalog consumer for supporter data: fixed-list bypass,
+session-stable snapshots through the supporter facade, retry/disposal ownership.
 
 **Release Manifest**:
 The installer-published `{ "version": ... }` document used only for the main-menu update check. Its
