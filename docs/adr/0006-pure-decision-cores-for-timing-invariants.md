@@ -1,4 +1,4 @@
-# ADR-0011: Timing invariants live in pure decision cores, not MonoBehaviour glue
+# ADR-0006: Timing invariants live in pure decision cores, not MonoBehaviour glue
 
 Status: Accepted
 
@@ -14,7 +14,7 @@ A pure core is effect-free, not necessarily dependency-free. Use the smallest re
 
 ## Load-bearing guardrails
 
-- [`SavedReplayLifecycle`](../../src/BazaarPlusPlus/Game/CombatReplay/SavedReplayLifecycle.cs) commits replay start in three stages, decides exit in two phases around the ended publication, and owns one 15-second suppression latch shared by programmatic and native exits. Pending menu return and start progress are parallel states. `CombatReplayRuntime.TryContinueReplay` remains the only programmatic replay exit under ADR-0007.
+- [`SavedReplayLifecycle`](../../src/BazaarPlusPlus/Game/CombatReplay/SavedReplayLifecycle.cs) commits replay start in three stages, decides exit in two phases around the ended publication, and owns one 15-second suppression latch shared by programmatic and native exits. Pending menu return and start progress are parallel states. `CombatReplayRuntime.TryContinueReplay` remains the only programmatic replay exit under ADR-0003.
 - [`CollectionViewState`](../../src/BazaarPlusPlus/Game/CollectionPanel/CollectionViewState.cs) returns `null` for a same-value no-op. Catalog-driven hero normalization does not write the user's preference; grid unavailability does not trigger normalization write-back or cache invalidation; the run day used by open selection is captured when the panel opens.
 - [`BackgroundUploadPump`](../../src/BazaarPlusPlus/Game/Upload/BackgroundUploadPump.cs) has a two-point shutdown: release arm subscriptions first, then dispose the feed session after the drain callback. This keeps in-flight attempts away from disposed resources.
 - [`BundleSealConvergence`](../../src/BazaarPlusPlus/Game/BundlePipeline/BundleSealConvergence.cs) receives relative time and input facts and returns continue, wait, degradation, or terminal decisions. Storage parses persisted UTC time and the coordinator performs the one relative-time translation.

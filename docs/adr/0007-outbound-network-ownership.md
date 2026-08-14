@@ -1,4 +1,4 @@
-# ADR-0012: Outbound Mod API rules have protocol and persistence owners
+# ADR-0007: Outbound Mod API rules have protocol and persistence owners
 
 Status: Accepted
 

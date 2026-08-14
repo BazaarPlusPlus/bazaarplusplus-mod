@@ -1,4 +1,4 @@
-# ADR-0014: Combat Impact numbers are ledger entries, reconciled per view
+# ADR-0009: Combat Impact numbers are ledger entries, reconciled per view
 
 Status: Accepted
 

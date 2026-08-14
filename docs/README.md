@@ -14,22 +14,7 @@ The documentation inventory, and the rules for changing it. When to open each do
 
 ## Decision records
 
-Every record below is accepted; each file's own `Status:` line is authoritative for amendments and absorptions. An ADR keeps the decision, its load-bearing rationale, guardrails, and current code evidence, and may be corrected or compressed when the code drifts. A superseded record is collapsed into the one that absorbed it (0005 lives inside 0006; 0008 inside 0007), and numbers are never reused.
-
-| Path | Topic |
-|---|---|
-| [adr/0001](adr/0001-encounter-status-probe-not-timeline-tracker.md) | encounter status probe, not timeline |
-| [adr/0002](adr/0002-mountable-feature-registry.md) | mountable/feature registry |
-| [adr/0003](adr/0003-history-panel-preview-overlay.md) | HistoryPanel ScreenSpaceOverlay preview |
-| [adr/0004](adr/0004-preview-visibility-three-state-mode.md) | three-state preview visibility |
-| [adr/0006](adr/0006-bazaaragent-as-its-own-plugin.md) | BazaarAgent as its own plugin (absorbs 0005) |
-| [adr/0007](adr/0007-bazaaragent-external-replay-video-recording.md) | explicit replay exit through the agent `Continue` action (absorbs 0008) |
-| [adr/0009](adr/0009-preserve-behavior-specific-boundaries.md) | rejected cosmetic unifications / preserved behavior boundaries |
-| [adr/0010](adr/0010-merged-destroy-collection-filter.md) | one Destroy chip covers the destroy-mechanic cluster |
-| [adr/0011](adr/0011-pure-decision-cores-for-timing-invariants.md) | timing invariants in pure decision cores, not MonoBehaviour glue |
-| [adr/0012](adr/0012-outbound-network-ownership.md) | outbound Mod API protocol and persistence owners |
-| [adr/0013](adr/0013-remote-data-and-release-boundaries.md) | runtime catalogs, release manifest, and build seed fetch are three lifecycles |
-| [adr/0014](adr/0014-combat-impact-accounting-contract.md) | Combat Impact numbers are ledger entries, reconciled per view |
+Every record in [adr/](adr/) is accepted; filenames carry the topic, and [MEMORY.md](MEMORY.md)'s "Architecture decisions" section is the one-line index. An ADR keeps the decision, its load-bearing rationale, guardrails, and current code evidence, and may be corrected or compressed when the code drifts. A record whose decision has become plain system description is retired: its residual value moves into ARCHITECTURE or MEMORY, the file is deleted, and the survivors are renumbered to keep the sequence dense. Retired records and prior numberings live in git history.
 
 ## Document lifecycle
 

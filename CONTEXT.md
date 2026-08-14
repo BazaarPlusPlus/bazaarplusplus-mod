@@ -35,13 +35,13 @@ The single run-scoped state machine that owns the end-of-run screenshot flow —
 _Avoid_: screenshot gate
 
 **Ghost Battle**:
-A PvP battle fetched from the mod backend in which the local player's uploaded build fought inside another player's run (the game's PvP is asynchronous — opponents are ghosts). The imported manifest keeps the recorder's perspective — the challenger occupies the `Player` side — and only the HistoryPanel list row is projected into local perspective by `GhostBattleLocalProjector`. The stored convention is stamped as `PerspectiveVersion` (see [ADR-0007](docs/adr/0007-bazaaragent-external-replay-video-recording.md)).
+A PvP battle fetched from the mod backend in which the local player's uploaded build fought inside another player's run (the game's PvP is asynchronous — opponents are ghosts). The imported manifest keeps the recorder's perspective — the challenger occupies the `Player` side — and only the HistoryPanel list row is projected into local perspective by `GhostBattleLocalProjector`. The stored convention is stamped as `PerspectiveVersion` (see [ADR-0003](docs/adr/0003-bazaaragent-external-replay-video-recording.md)).
 _Avoid_: remote battle, opponent battle
 
 ## Combat replay
 
 **Saved Replay Lifecycle**:
-The single pure owner (`SavedReplayLifecycle`) of a saved-replay playback session's state algebra — start progress, terminal ownership, the time-bounded duplicate-exit suppression window, and the pending menu-return deadline. The runtime feeds observations (time, state exits, scene readiness) and executes the returned decisions; replay exit itself still flows only through `CombatReplayRuntime.TryContinueReplay` per ADR-0007 (which also absorbed ADR-0008's `Continue` agent action).
+The single pure owner (`SavedReplayLifecycle`) of a saved-replay playback session's state algebra — start progress, terminal ownership, the time-bounded duplicate-exit suppression window, and the pending menu-return deadline. The runtime feeds observations (time, state exits, scene readiness) and executes the returned decisions; replay exit itself still flows only through `CombatReplayRuntime.TryContinueReplay` per ADR-0003.
 
 ## Overlay panels
 

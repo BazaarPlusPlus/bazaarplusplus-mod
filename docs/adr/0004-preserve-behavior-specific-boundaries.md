@@ -1,4 +1,4 @@
-# ADR-0009: Preserve behavior-specific boundaries; reject cosmetic unification
+# ADR-0004: Preserve behavior-specific boundaries; reject cosmetic unification
 
 Status: Accepted
 
