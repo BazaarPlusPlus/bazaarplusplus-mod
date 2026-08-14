@@ -1,6 +1,6 @@
-# ADR-0007: Replay exit is explicit through the agent `Continue` action
+# ADR-0003: Replay exit is explicit through the agent `Continue` action
 
-Status: Accepted; absorbs ADR-0008
+Status: Accepted
 
 ## Decision
 
