@@ -141,6 +141,46 @@ resolve_installer_source() {
     echo "$resolved"
 }
 
+resolve_release_platform() {
+    case "$PLATFORM" in
+        macOS) echo "macos" ;;
+        "Windows (Git Bash)") echo "windows" ;;
+        *)
+            echo -e "${RED}Unsupported native release platform: $PLATFORM${RESET}" >&2
+            return 1
+            ;;
+    esac
+}
+
+ensure_native_release_inputs() {
+    local installer_source="$1"
+    local release_platform="$2"
+
+    local installer_root
+    installer_root="$(cd "$installer_source/../.." && pwd)"
+    local coordinator="$installer_root/scripts/release/native-recorder-input.mjs"
+    if [[ ! -f "$coordinator" ]]; then
+        echo -e "${RED}Native input coordinator not found at '$coordinator'.${RESET}" >&2
+        return 1
+    fi
+    if ! command -v node &>/dev/null; then
+        echo -e "${RED}Node.js is required to verify and promote native release inputs.${RESET}" >&2
+        return 1
+    fi
+
+    echo -e "${CYAN}== Verifying ${GREEN}${release_platform}${CYAN} native release inputs ==${RESET}"
+    node "$coordinator" ensure --platform "$release_platform" --source-root "$SCRIPT_DIR"
+}
+
+prepare_installer_resource_archives() {
+    local installer_source="$1"
+    local release_platform="$2"
+    local installer_root
+    installer_root="$(cd "$installer_source/../.." && pwd)"
+    echo -e "${CYAN}== Preparing ${GREEN}${release_platform}${CYAN} installer resource archive ==${RESET}"
+    npm --prefix "$installer_root" run prepare:resources -- --platform "$release_platform"
+}
+
 fetch_remote_data() {
     local canonical_directory="$SCRIPT_DIR/src/BazaarPlusPlus/obj/remote-data"
     local arg
@@ -214,9 +254,13 @@ publish() {
         exit 1
     fi
 
+    local release_platform
+    release_platform=$(resolve_release_platform)
+
     local common_args=(
         ${passthrough_args[@]+"${passthrough_args[@]}"}
         "-p:BPPInstallerSourcePath=$installer_source"
+        "-p:BppReleasePlatform=$release_platform"
     )
 
     local release_managed=""
@@ -229,6 +273,7 @@ publish() {
     fi
 
     print_bazaaragent_mode "$bazaaragent"
+    ensure_native_release_inputs "$installer_source" "$release_platform"
     clear_macos_sqlite_quarantine "$installer_source"
     repair_macos_trampoline "$installer_source"
 
@@ -246,6 +291,7 @@ publish() {
     else
         dotnet build src/BazaarPlusPlus/BazaarPlusPlus.csproj "${build_args[@]}"
     fi
+    prepare_installer_resource_archives "$installer_source" "$release_platform"
     clear_macos_sqlite_quarantine "$installer_source"
 }
 

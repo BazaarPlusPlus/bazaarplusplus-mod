@@ -23,21 +23,21 @@ uses the matching D3D11/Media Foundation native backend in `native/windows`.
 ./build.sh
 ```
 
-The script requires macOS, Apple Silicon, and Xcode Command Line Tools. It emits an ad-hoc signed
-bundle at:
+The script requires macOS, Apple Silicon, Xcode Command Line Tools, and Node.js for the shared
+native artifact catalog. It emits an ad-hoc signed and producer-verified bundle at:
 
 ```text
 build/GfxPluginBppReplayVideoToolbox.bundle
 ```
 
-Ordinary C# contributors do not need the native toolchain. The installer repository consumes a
-reviewed prebuilt generated from these sources. Only contributors changing this directory need to
-rebuild it.
+Ordinary C# contributors do not need the native toolchain. `./run.sh publish` recomputes the macOS
+catalog/input digest, reuses matching installer inputs, or invokes this script in a temporary
+directory and locally promotes the validated result before managed packaging.
 
-To copy the development bundle to an explicit staging directory after building:
+To build into an explicit side-effect-free output directory:
 
 ```bash
-BPP_REPLAY_PLUGIN_DESTINATION=/absolute/staging/path ./build.sh
+./build.sh /absolute/output/directory
 ```
 
 The bundle must be present under `TheBazaar.app/Contents/Plugins` before Unity starts so Unity calls

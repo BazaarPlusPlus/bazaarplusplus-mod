@@ -96,7 +96,7 @@
     />
   </Target>
 
-  <!-- Release: copy the host + pure-core dlls into both installer payload trees. -->
+  <!-- Release: copy the host + pure-core dlls into the selected installer payload tree. -->
   <Target
     Name="CopyHostToInstallerSource"
     AfterTargets="Build"
@@ -109,16 +109,11 @@
     </ItemGroup>
     <Copy
       SourceFiles="@(HostArtifacts)"
-      DestinationFolder="$(BPPInstallerSourcePath)/SourceForBuild/macos/BepInEx/plugins"
-      SkipUnchangedFiles="true"
-    />
-    <Copy
-      SourceFiles="@(HostArtifacts)"
-      DestinationFolder="$(BPPInstallerSourcePath)/SourceForBuild/windows/BepInEx/plugins"
+      DestinationFolder="$(BPPInstallerSourcePath)/SourceForBuild/$(BppReleasePlatform)/BepInEx/plugins"
       SkipUnchangedFiles="true"
     />
     <Message
-      Text="[BazaarAgentHost] Host plugin copied to installer source folders."
+      Text="[BazaarAgentHost] Host plugin copied to the $(BppReleasePlatform) installer source folder."
       Importance="high"
     />
   </Target>
@@ -136,13 +131,8 @@
       Importance="high"
     />
     <ZipDirectory
-      SourceDirectory="$(BPPInstallerSourcePath)/SourceForBuild/macos"
-      DestinationFile="$(BPPInstallerSourcePath)/BepInExSource/macos/BepInEx.zip"
-      Overwrite="true"
-    />
-    <ZipDirectory
-      SourceDirectory="$(BPPInstallerSourcePath)/SourceForBuild/windows"
-      DestinationFile="$(BPPInstallerSourcePath)/BepInExSource/windows/BepInEx.zip"
+      SourceDirectory="$(BPPInstallerSourcePath)/SourceForBuild/$(BppReleasePlatform)"
+      DestinationFile="$(BPPInstallerSourcePath)/BepInExSource/$(BppReleasePlatform)/BepInEx.zip"
       Overwrite="true"
     />
     <Message
@@ -161,7 +151,7 @@
     <MSBuild
       Projects="$(MSBuildProjectFile)"
       Targets="Build"
-      Properties="Configuration=Release;BuildProductionPackage=$(BuildProductionPackage)"
+      Properties="Configuration=Release;BuildProductionPackage=$(BuildProductionPackage);BppReleasePlatform=$(BppReleasePlatform)"
     />
   </Target>
 </Project>
