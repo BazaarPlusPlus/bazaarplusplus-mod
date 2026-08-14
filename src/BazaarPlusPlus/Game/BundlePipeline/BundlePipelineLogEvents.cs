@@ -10,21 +10,18 @@ internal static class BundlePipelineLogEvents
     internal static readonly BppLogFieldDefinition RunId = new(
         0,
         "run_id",
-        BppLogFieldPrivacy.Public,
         BppLogCorrelationPolicy.Short,
         BppLogCardinality.High
     );
     internal static readonly BppLogFieldDefinition BundleId = new(
         1,
         "bundle_id",
-        BppLogFieldPrivacy.Public,
         BppLogCorrelationPolicy.Short,
         BppLogCardinality.High
     );
     internal static readonly BppLogFieldDefinition Category = new(
         1,
         "category",
-        BppLogFieldPrivacy.Public,
         BppLogCorrelationPolicy.None,
         BppLogCardinality.Low
     );

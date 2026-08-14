@@ -27,89 +27,25 @@
 
   <ItemGroup>
     <Compile Remove="FixtureGenerator/**/*.cs" />
+    <!-- The whole Combat Impact accounting engine plus the runtime adapters it reads through.
+         Directory globs rather than a per-file list: splitting or adding a file in these folders
+         is an ordinary refactor and must not require editing this project. -->
     <Compile
-      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactModels.cs"
-      Link="CombatImpactModels.cs"
+      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/*.cs"
+      Link="Data/%(Filename)%(Extension)"
     />
     <Compile
-      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactAbilityAttributeModifierReader.cs"
-      Link="CombatImpactAbilityAttributeModifierReader.cs"
+      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Ui/*.cs"
+      Link="Ui/%(Filename)%(Extension)"
     />
+    <!-- The two files in those folders that bind Assembly-CSharp types this project does not
+         reference: the tooltip view interface (native tooltip controllers) and the entity
+         snapshot reader (the TheBazaar runtime namespace). -->
+    <Compile Remove="../../src/BazaarPlusPlus/Game/PostCombatImpact/Ui/IPostCombatImpactTooltipView.cs" />
+    <Compile Remove="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactEntitySnapshotReader.cs" />
     <Compile
-      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactImplicitPlayerEffectReader.cs"
-      Link="CombatImpactImplicitPlayerEffectReader.cs"
-    />
-    <Compile
-      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactReportRegistry.cs"
-      Link="CombatImpactReportRegistry.cs"
-    />
-    <Compile
-      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactAggregator.cs"
-      Link="CombatImpactAggregator.cs"
-    />
-    <Compile
-      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactProjector.cs"
-      Link="CombatImpactProjector.cs"
-    />
-    <Compile
-      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactTransformLineage.cs"
-      Link="CombatImpactTransformLineage.cs"
-    />
-    <Compile
-      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactTransformedCardSnapshotReader.cs"
-      Link="CombatImpactTransformedCardSnapshotReader.cs"
-    />
-    <Compile
-      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactAttributionRuleReader.cs"
-      Link="CombatImpactAttributionRuleReader.cs"
-    />
-    <Compile
-      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactActiveAbilityReader.cs"
-      Link="CombatImpactActiveAbilityReader.cs"
-    />
-    <Compile
-      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactCriticalTriggerReader.cs"
-      Link="CombatImpactCriticalTriggerReader.cs"
-    />
-    <Compile
-      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactEntityTags.cs"
-      Link="CombatImpactEntityTags.cs"
-    />
-    <Compile
-      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/PeriodicEffectAttribution.cs"
-      Link="PeriodicEffectAttribution.cs"
-    />
-    <Compile
-      Include="../../src/BazaarPlusPlus/GameInterop/CombatSimulation/CardActionCostSpentEventReader.cs"
-      Link="CardActionCostSpentEventReader.cs"
-    />
-    <Compile
-      Include="../../src/BazaarPlusPlus/GameInterop/CombatSimulation/OptionalCombatTempoTypes.cs"
-      Link="OptionalCombatTempoTypes.cs"
-    />
-    <Compile
-      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactMetricFormatter.cs"
-      Link="CombatImpactMetricFormatter.cs"
-    />
-    <Compile
-      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactEntityName.cs"
-      Link="CombatImpactEntityName.cs"
-    />
-    <Compile
-      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Ui/CombatImpactAttributeLabel.cs"
-      Link="CombatImpactAttributeLabel.cs"
-    />
-    <Compile
-      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Ui/CombatImpactEffectIconKey.cs"
-      Link="CombatImpactEffectIconKey.cs"
-    />
-    <Compile
-      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Ui/CombatImpactTargetDetailPolicy.cs"
-      Link="CombatImpactTargetDetailPolicy.cs"
-    />
-    <Compile
-      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Ui/CombatImpactDetailPresentationPolicy.cs"
-      Link="CombatImpactDetailPresentationPolicy.cs"
+      Include="../../src/BazaarPlusPlus/GameInterop/CombatSimulation/*.cs"
+      Link="CombatSimulation/%(Filename)%(Extension)"
     />
   </ItemGroup>
 </Project>

@@ -44,22 +44,17 @@ public sealed class ContentLogEventCatalogTests
         var expected = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["supporters.catalog.degraded"] =
-                "source:Public:Low:None|reason_code:Public:Low:None|cache_path:LocalPath:High:None",
-            ["supporters.catalog.recovered"] =
-                "source:Public:Low:None|entry_count:Public:High:None",
-            ["supporters.catalog.loaded"] = "source:Public:Low:None|entry_count:Public:High:None",
-            ["supporters.cache.write_degraded"] =
-                "path:LocalPath:High:None|reason_code:Public:Low:None",
-            ["supporters.cache.write_recovered"] = "path:LocalPath:High:None",
-            ["bilingual_item_names.catalog.degraded"] =
-                "locale:Public:Low:None|reason_code:Public:Low:None",
-            ["bilingual_item_names.catalog.recovered"] = "locale:Public:Low:None",
-            ["bilingual_item_names.catalog.loaded"] = "locale:Public:Low:None",
-            ["bilingual_item_names.tooltip.degraded"] = "reason_code:Public:Low:None",
-            ["name_override.value.applied"] =
-                "operation:Public:Low:None|reason_code:Public:Low:None",
-            ["name_override.value.skipped"] =
-                "operation:Public:Low:None|reason_code:Public:Low:None",
+                "source:Low:None|reason_code:Low:None|cache_path:High:None",
+            ["supporters.catalog.recovered"] = "source:Low:None|entry_count:High:None",
+            ["supporters.catalog.loaded"] = "source:Low:None|entry_count:High:None",
+            ["supporters.cache.write_degraded"] = "path:High:None|reason_code:Low:None",
+            ["supporters.cache.write_recovered"] = "path:High:None",
+            ["bilingual_item_names.catalog.degraded"] = "locale:Low:None|reason_code:Low:None",
+            ["bilingual_item_names.catalog.recovered"] = "locale:Low:None",
+            ["bilingual_item_names.catalog.loaded"] = "locale:Low:None",
+            ["bilingual_item_names.tooltip.degraded"] = "reason_code:Low:None",
+            ["name_override.value.applied"] = "operation:Low:None|reason_code:Low:None",
+            ["name_override.value.skipped"] = "operation:Low:None|reason_code:Low:None",
         };
 
         foreach (
@@ -73,7 +68,7 @@ public sealed class ContentLogEventCatalogTests
         )
         {
             expected[eventId] =
-                "source:Public:Low:None|reason_code:Public:Low:None|event_count:Public:High:None|level_up_count:Public:High:None|template_count:Public:High:None|event_failure_count:Public:High:None|level_up_failure_count:Public:High:None|unsupported_level_up_part_count:Public:High:None|missing_template_count:Public:High:None|size_bytes:Public:High:None|load_duration_ms:Public:High:None|compile_duration_ms:Public:High:None|write_duration_ms:Public:High:None|cache_path:LocalPath:High:None";
+                "source:Low:None|reason_code:Low:None|event_count:High:None|level_up_count:High:None|template_count:High:None|event_failure_count:High:None|level_up_failure_count:High:None|unsupported_level_up_part_count:High:None|missing_template_count:High:None|size_bytes:High:None|load_duration_ms:High:None|compile_duration_ms:High:None|write_duration_ms:High:None|cache_path:High:None";
         }
 
         Assert.Equal(expected.Count, actual.Count);
@@ -92,7 +87,7 @@ public sealed class ContentLogEventCatalogTests
         string.Join(
             "|",
             definition.Fields.Select(field =>
-                $"{field.Name}:{field.Privacy}:{field.Cardinality}:{field.Correlation}"
+                $"{field.Name}:{field.Cardinality}:{field.Correlation}"
             )
         );
 }

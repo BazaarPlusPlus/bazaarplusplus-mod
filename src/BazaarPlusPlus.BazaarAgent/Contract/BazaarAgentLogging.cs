@@ -11,12 +11,6 @@ public enum BazaarAgentLogSeverity
     Error,
 }
 
-public enum BazaarAgentLogFieldPrivacy
-{
-    Public,
-    UntrustedText,
-}
-
 public enum BazaarAgentLogCardinality
 {
     Low,
@@ -77,19 +71,16 @@ public sealed class BazaarAgentLogFieldDefinition
 {
     internal BazaarAgentLogFieldDefinition(
         string name,
-        BazaarAgentLogFieldPrivacy privacy,
         BazaarAgentLogCardinality cardinality,
         BazaarAgentLogCorrelation correlation
     )
     {
         Name = name;
-        Privacy = privacy;
         Cardinality = cardinality;
         Correlation = correlation;
     }
 
     public string Name { get; }
-    public BazaarAgentLogFieldPrivacy Privacy { get; }
     public BazaarAgentLogCardinality Cardinality { get; }
     public BazaarAgentLogCorrelation Correlation { get; }
 
@@ -234,25 +225,21 @@ public static class BazaarAgentLogRuntimeEvents
 {
     private static readonly BazaarAgentLogFieldDefinition StormSourceEvent = new(
         "source_event",
-        BazaarAgentLogFieldPrivacy.Public,
         BazaarAgentLogCardinality.Low,
         BazaarAgentLogCorrelation.None
     );
     private static readonly BazaarAgentLogFieldDefinition StormSuppressedCount = new(
         "suppressed_count",
-        BazaarAgentLogFieldPrivacy.Public,
         BazaarAgentLogCardinality.High,
         BazaarAgentLogCorrelation.None
     );
     private static readonly BazaarAgentLogFieldDefinition StormWindowMilliseconds = new(
         "window_ms",
-        BazaarAgentLogFieldPrivacy.Public,
         BazaarAgentLogCardinality.Low,
         BazaarAgentLogCorrelation.None
     );
     private static readonly BazaarAgentLogFieldDefinition StormFlushReason = new(
         "flush_reason",
-        BazaarAgentLogFieldPrivacy.Public,
         BazaarAgentLogCardinality.Low,
         BazaarAgentLogCorrelation.None
     );
@@ -286,7 +273,6 @@ public static class BazaarAgentLogEvents
 {
     private static readonly BazaarAgentLogFieldDefinition SnapshotState = new(
         "state",
-        BazaarAgentLogFieldPrivacy.Public,
         BazaarAgentLogCardinality.Low,
         BazaarAgentLogCorrelation.None
     );
@@ -299,19 +285,16 @@ public static class BazaarAgentLogEvents
 
     private static readonly BazaarAgentLogFieldDefinition ActionRequestId = new(
         "request_id",
-        BazaarAgentLogFieldPrivacy.Public,
         BazaarAgentLogCardinality.High,
         BazaarAgentLogCorrelation.Short
     );
     private static readonly BazaarAgentLogFieldDefinition ActionKind = new(
         "action_kind",
-        BazaarAgentLogFieldPrivacy.Public,
         BazaarAgentLogCardinality.Low,
         BazaarAgentLogCorrelation.None
     );
     private static readonly BazaarAgentLogFieldDefinition ActionReasonCode = new(
         "reason_code",
-        BazaarAgentLogFieldPrivacy.Public,
         BazaarAgentLogCardinality.Low,
         BazaarAgentLogCorrelation.None
     );
@@ -327,25 +310,21 @@ public static class BazaarAgentLogEvents
 
     private static readonly BazaarAgentLogFieldDefinition HttpRequestId = new(
         "request_id",
-        BazaarAgentLogFieldPrivacy.Public,
         BazaarAgentLogCardinality.High,
         BazaarAgentLogCorrelation.Short
     );
     private static readonly BazaarAgentLogFieldDefinition HttpRoute = new(
         "route",
-        BazaarAgentLogFieldPrivacy.Public,
         BazaarAgentLogCardinality.Low,
         BazaarAgentLogCorrelation.None
     );
     private static readonly BazaarAgentLogFieldDefinition HttpMethod = new(
         "method",
-        BazaarAgentLogFieldPrivacy.Public,
         BazaarAgentLogCardinality.Low,
         BazaarAgentLogCorrelation.None
     );
     private static readonly BazaarAgentLogFieldDefinition HttpReasonCode = new(
         "reason_code",
-        BazaarAgentLogFieldPrivacy.Public,
         BazaarAgentLogCardinality.Low,
         BazaarAgentLogCorrelation.None
     );
@@ -362,19 +341,16 @@ public static class BazaarAgentLogEvents
 
     private static readonly BazaarAgentLogFieldDefinition HttpResponseCloseRequestId = new(
         "request_id",
-        BazaarAgentLogFieldPrivacy.Public,
         BazaarAgentLogCardinality.High,
         BazaarAgentLogCorrelation.Short
     );
     private static readonly BazaarAgentLogFieldDefinition HttpResponseCloseRoute = new(
         "route",
-        BazaarAgentLogFieldPrivacy.Public,
         BazaarAgentLogCardinality.Low,
         BazaarAgentLogCorrelation.None
     );
     private static readonly BazaarAgentLogFieldDefinition HttpResponseCloseReasonCode = new(
         "reason_code",
-        BazaarAgentLogFieldPrivacy.Public,
         BazaarAgentLogCardinality.Low,
         BazaarAgentLogCorrelation.None
     );
@@ -389,19 +365,16 @@ public static class BazaarAgentLogEvents
 
     private static readonly BazaarAgentLogFieldDefinition RejectedBodyDrainRequestId = new(
         "request_id",
-        BazaarAgentLogFieldPrivacy.Public,
         BazaarAgentLogCardinality.High,
         BazaarAgentLogCorrelation.Short
     );
     private static readonly BazaarAgentLogFieldDefinition RejectedBodyDrainRoute = new(
         "route",
-        BazaarAgentLogFieldPrivacy.Public,
         BazaarAgentLogCardinality.Low,
         BazaarAgentLogCorrelation.None
     );
     private static readonly BazaarAgentLogFieldDefinition RejectedBodyDrainReasonCode = new(
         "reason_code",
-        BazaarAgentLogFieldPrivacy.Public,
         BazaarAgentLogCardinality.Low,
         BazaarAgentLogCorrelation.None
     );
@@ -416,7 +389,6 @@ public static class BazaarAgentLogEvents
 
     private static readonly BazaarAgentLogFieldDefinition HostInitializationReasonCode = new(
         "reason_code",
-        BazaarAgentLogFieldPrivacy.Public,
         BazaarAgentLogCardinality.Low,
         BazaarAgentLogCorrelation.None
     );
@@ -434,25 +406,21 @@ public static class BazaarAgentLogEvents
 
     private static readonly BazaarAgentLogFieldDefinition DecisionLogDecisionId = new(
         "decision_id",
-        BazaarAgentLogFieldPrivacy.Public,
         BazaarAgentLogCardinality.High,
         BazaarAgentLogCorrelation.Short
     );
     private static readonly BazaarAgentLogFieldDefinition DecisionLogRunId = new(
         "run_id",
-        BazaarAgentLogFieldPrivacy.Public,
         BazaarAgentLogCardinality.High,
         BazaarAgentLogCorrelation.Short
     );
     private static readonly BazaarAgentLogFieldDefinition DecisionLogRequestId = new(
         "request_id",
-        BazaarAgentLogFieldPrivacy.Public,
         BazaarAgentLogCardinality.High,
         BazaarAgentLogCorrelation.Short
     );
     private static readonly BazaarAgentLogFieldDefinition DecisionLogReasonCode = new(
         "reason_code",
-        BazaarAgentLogFieldPrivacy.Public,
         BazaarAgentLogCardinality.Low,
         BazaarAgentLogCorrelation.None
     );
@@ -469,19 +437,16 @@ public static class BazaarAgentLogEvents
 
     private static readonly BazaarAgentLogFieldDefinition ContextCaptureTickId = new(
         "tick_id",
-        BazaarAgentLogFieldPrivacy.Public,
         BazaarAgentLogCardinality.High,
         BazaarAgentLogCorrelation.None
     );
     private static readonly BazaarAgentLogFieldDefinition ContextCaptureState = new(
         "state",
-        BazaarAgentLogFieldPrivacy.Public,
         BazaarAgentLogCardinality.Low,
         BazaarAgentLogCorrelation.None
     );
     private static readonly BazaarAgentLogFieldDefinition ContextCaptureReasonCode = new(
         "reason_code",
-        BazaarAgentLogFieldPrivacy.Public,
         BazaarAgentLogCardinality.Low,
         BazaarAgentLogCorrelation.None
     );
@@ -497,7 +462,6 @@ public static class BazaarAgentLogEvents
 
     private static readonly BazaarAgentLogFieldDefinition ContextDegradedReasonCode = new(
         "reason_code",
-        BazaarAgentLogFieldPrivacy.Public,
         BazaarAgentLogCardinality.Low,
         BazaarAgentLogCorrelation.None
     );
@@ -517,25 +481,21 @@ public static class BazaarAgentLogEvents
 
     private static readonly BazaarAgentLogFieldDefinition SceneProbeSceneName = new(
         "scene_name",
-        BazaarAgentLogFieldPrivacy.UntrustedText,
         BazaarAgentLogCardinality.High,
         BazaarAgentLogCorrelation.None
     );
     private static readonly BazaarAgentLogFieldDefinition SceneProbeSceneReady = new(
         "scene_ready",
-        BazaarAgentLogFieldPrivacy.Public,
         BazaarAgentLogCardinality.Low,
         BazaarAgentLogCorrelation.None
     );
     private static readonly BazaarAgentLogFieldDefinition SceneProbeAppStateNull = new(
         "app_state_null",
-        BazaarAgentLogFieldPrivacy.Public,
         BazaarAgentLogCardinality.Low,
         BazaarAgentLogCorrelation.None
     );
     private static readonly BazaarAgentLogFieldDefinition SceneProbeProfileLoaded = new(
         "profile_loaded",
-        BazaarAgentLogFieldPrivacy.Public,
         BazaarAgentLogCardinality.Low,
         BazaarAgentLogCorrelation.None
     );
@@ -551,7 +511,6 @@ public static class BazaarAgentLogEvents
 
     private static readonly BazaarAgentLogFieldDefinition SceneProbeDegradedReasonCode = new(
         "reason_code",
-        BazaarAgentLogFieldPrivacy.Public,
         BazaarAgentLogCardinality.Low,
         BazaarAgentLogCorrelation.None
     );
@@ -571,37 +530,31 @@ public static class BazaarAgentLogEvents
 
     private static readonly BazaarAgentLogFieldDefinition ListenerStartPort = new(
         "port",
-        BazaarAgentLogFieldPrivacy.Public,
         BazaarAgentLogCardinality.Low,
         BazaarAgentLogCorrelation.None
     );
     private static readonly BazaarAgentLogFieldDefinition ListenerRecoveryPort = new(
         "port",
-        BazaarAgentLogFieldPrivacy.Public,
         BazaarAgentLogCardinality.Low,
         BazaarAgentLogCorrelation.None
     );
     private static readonly BazaarAgentLogFieldDefinition ListenerDegradedPort = new(
         "port",
-        BazaarAgentLogFieldPrivacy.Public,
         BazaarAgentLogCardinality.Low,
         BazaarAgentLogCorrelation.None
     );
     private static readonly BazaarAgentLogFieldDefinition ListenerDegradedReasonCode = new(
         "reason_code",
-        BazaarAgentLogFieldPrivacy.Public,
         BazaarAgentLogCardinality.Low,
         BazaarAgentLogCorrelation.None
     );
     private static readonly BazaarAgentLogFieldDefinition ListenerRestartOldPort = new(
         "old_port",
-        BazaarAgentLogFieldPrivacy.Public,
         BazaarAgentLogCardinality.Low,
         BazaarAgentLogCorrelation.None
     );
     private static readonly BazaarAgentLogFieldDefinition ListenerRestartNewPort = new(
         "new_port",
-        BazaarAgentLogFieldPrivacy.Public,
         BazaarAgentLogCardinality.Low,
         BazaarAgentLogCorrelation.None
     );
@@ -636,19 +589,16 @@ public static class BazaarAgentLogEvents
 
     private static readonly BazaarAgentLogFieldDefinition ListenerStopReasonCode = new(
         "reason_code",
-        BazaarAgentLogFieldPrivacy.Public,
         BazaarAgentLogCardinality.Low,
         BazaarAgentLogCorrelation.None
     );
     private static readonly BazaarAgentLogFieldDefinition ListenerStopFailedPhaseCount = new(
         "failed_phase_count",
-        BazaarAgentLogFieldPrivacy.Public,
         BazaarAgentLogCardinality.Low,
         BazaarAgentLogCorrelation.None
     );
     private static readonly BazaarAgentLogFieldDefinition ListenerStopFirstFailedPhase = new(
         "first_failed_phase",
-        BazaarAgentLogFieldPrivacy.Public,
         BazaarAgentLogCardinality.Low,
         BazaarAgentLogCorrelation.None
     );
@@ -664,13 +614,11 @@ public static class BazaarAgentLogEvents
 
     private static readonly BazaarAgentLogFieldDefinition ListenerFailedPort = new(
         "port",
-        BazaarAgentLogFieldPrivacy.Public,
         BazaarAgentLogCardinality.Low,
         BazaarAgentLogCorrelation.None
     );
     private static readonly BazaarAgentLogFieldDefinition ListenerFailedReasonCode = new(
         "reason_code",
-        BazaarAgentLogFieldPrivacy.Public,
         BazaarAgentLogCardinality.Low,
         BazaarAgentLogCorrelation.None
     );

@@ -84,6 +84,8 @@ try
         "V4 sync tables must not exist."
     );
 
+    AssertRecentRunProjection(databasePath);
+
     Console.WriteLine("History panel V5 repository tests passed.");
 }
 finally
@@ -114,6 +116,139 @@ static GhostBattleImportRecord Ghost(
         CombatKind = "PVPCombat",
         Result = "unknown",
     };
+
+// ListRecentRuns projects runs joined to their battles. The recency ordering, the limit, and
+// battle_count's exact eligibility rule (LOCAL source, snapshot row present, all four snapshot
+// documents parseable) are what the panel's list renders from, so they are pinned field by field
+// here — independent of how the query reaches them.
+static void AssertRecentRunProjection(string databasePath)
+{
+    using var connection = new SqliteConnection($"Data Source={databasePath}");
+    connection.Open();
+
+    InsertRun(connection, "run-oldest", started: "2026-01-01T00:00:00Z", ended: null);
+    InsertRun(connection, "run-middle", started: "2026-01-02T00:00:00Z", ended: null);
+    // Ends last despite starting first, so a wrong ordering key surfaces here.
+    InsertRun(
+        connection,
+        "run-newest",
+        started: "2026-01-01T12:00:00Z",
+        ended: "2026-01-03T00:00:00Z"
+    );
+
+    // Two countable battles.
+    InsertLocalBattle(connection, "b-ok-1", "run-newest");
+    InsertSnapshot(connection, "b-ok-1", "[]", "[]", "[]", "[]");
+    InsertLocalBattle(connection, "b-ok-2", "run-newest");
+    InsertSnapshot(connection, "b-ok-2", "[1]", "[2]", "[3]", "[4]");
+    // Malformed snapshot document: present but not countable.
+    InsertLocalBattle(connection, "b-bad-json", "run-newest");
+    InsertSnapshot(connection, "b-bad-json", "[]", "not json", "[]", "[]");
+    // Battle without any snapshot row: not countable.
+    InsertLocalBattle(connection, "b-no-snapshot", "run-newest");
+    // Ghost battles never belong to a run and must never be counted.
+    InsertGhostBattle(connection, "b-ghost");
+    InsertSnapshot(connection, "b-ghost", "[]", "[]", "[]", "[]");
+
+    InsertLocalBattle(connection, "b-middle", "run-middle");
+    InsertSnapshot(connection, "b-middle", "[]", "[]", "[]", "[]");
+
+    var repository = new HistoryPanelRepository(databasePath);
+
+    var all = repository.ListRecentRuns(10);
+    Assert(
+        all.Select(run => run.RunId).SequenceEqual(["run-newest", "run-middle", "run-oldest"]),
+        "Runs must order by ended/last-seen/started recency, newest first."
+    );
+    Assert(
+        all.Single(run => run.RunId == "run-newest").BattleCount == 2,
+        "battle_count must count only LOCAL battles whose snapshot documents all parse."
+    );
+    Assert(
+        all.Single(run => run.RunId == "run-middle").BattleCount == 1,
+        "A run with one countable battle must report exactly one."
+    );
+    Assert(
+        all.Single(run => run.RunId == "run-oldest").BattleCount == 0,
+        "A run with no battles must still be listed, with a zero count."
+    );
+    Assert(
+        all.Single(run => run.RunId == "run-newest").Hero == "Vanessa"
+            && all.Single(run => run.RunId == "run-newest").GameMode == "Ranked",
+        "Run scalar columns must survive the battle join."
+    );
+
+    var limited = repository.ListRecentRuns(2);
+    Assert(
+        limited.Select(run => run.RunId).SequenceEqual(["run-newest", "run-middle"]),
+        "The limit must keep the most recent runs, not an arbitrary pair."
+    );
+    Assert(
+        limited[0].BattleCount == 2,
+        "Limiting the run list must not change any surviving run's battle_count."
+    );
+}
+
+static void InsertRun(SqliteConnection connection, string runId, string started, string? ended)
+{
+    using var command = connection.CreateCommand();
+    command.CommandText = """
+        INSERT INTO runs (
+            run_id, started_at_utc, last_seen_at_utc, status, hero, game_mode, ended_at_utc
+        ) VALUES ($runId, $started, $started, 'ended', 'Vanessa', 'Ranked', $ended);
+        """;
+    command.Parameters.AddWithValue("$runId", runId);
+    command.Parameters.AddWithValue("$started", started);
+    command.Parameters.AddWithValue("$ended", (object?)ended ?? DBNull.Value);
+    command.ExecuteNonQuery();
+}
+
+static void InsertLocalBattle(SqliteConnection connection, string battleId, string runId)
+{
+    using var command = connection.CreateCommand();
+    command.CommandText = """
+        INSERT INTO battles (battle_id, source, run_id, recorded_at_utc, combat_kind)
+        VALUES ($battleId, 'LOCAL', $runId, '2026-01-02T00:00:00Z', 'PVPCombat');
+        """;
+    command.Parameters.AddWithValue("$battleId", battleId);
+    command.Parameters.AddWithValue("$runId", runId);
+    command.ExecuteNonQuery();
+}
+
+static void InsertGhostBattle(SqliteConnection connection, string battleId)
+{
+    using var command = connection.CreateCommand();
+    command.CommandText = """
+        INSERT INTO battles (
+            battle_id, source, remote_battle_id, uploader_account_id, recorded_at_utc, combat_kind
+        ) VALUES ($battleId, 'GHOST', 'remote-1', 'account-uploader', '2026-01-02T00:00:00Z', 'PVPCombat');
+        """;
+    command.Parameters.AddWithValue("$battleId", battleId);
+    command.ExecuteNonQuery();
+}
+
+static void InsertSnapshot(
+    SqliteConnection connection,
+    string battleId,
+    string playerHand,
+    string playerSkills,
+    string opponentHand,
+    string opponentSkills
+)
+{
+    using var command = connection.CreateCommand();
+    command.CommandText = """
+        INSERT INTO battle_snapshots (
+            battle_id, player_hand_json, player_skills_json, opponent_hand_json, opponent_skills_json
+        ) VALUES ($battleId, $playerHand, $playerSkills, $opponentHand, $opponentSkills);
+        """;
+    command.Parameters.AddWithValue("$battleId", battleId);
+    command.Parameters.AddWithValue("$playerHand", playerHand);
+    command.Parameters.AddWithValue("$playerSkills", playerSkills);
+    command.Parameters.AddWithValue("$opponentHand", opponentHand);
+    command.Parameters.AddWithValue("$opponentSkills", opponentSkills);
+    command.ExecuteNonQuery();
+}
 
 static void InsertPendingOutbox(string databasePath, string runId)
 {

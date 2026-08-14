@@ -18,28 +18,23 @@ public sealed class SettingsLogEventCatalogTests
         var actual = definitions.ToDictionary(x => x.EventId, Describe, StringComparer.Ordinal);
         var expected = new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            ["combat_status_bar.config.loaded"] =
-                "enabled:Public:Low:None|speed_multiplier:Public:Low:None",
+            ["combat_status_bar.config.loaded"] = "enabled:Low:None|speed_multiplier:Low:None",
             ["settings.hotkey.degraded"] =
-                "action_id:Public:Low:None|binding_path:UntrustedText:High:Hash|reason_code:Public:Low:None",
+                "action_id:Low:None|binding_path:High:Hash|reason_code:Low:None",
             ["settings.hotkey.modifier_disagreement_observed"] =
-                "binding_path:UntrustedText:High:Hash|legacy_pressed:Public:Low:None|action_pressed:Public:Low:None",
-            ["settings.dock_sprite.degraded"] =
-                "reason_code:Public:Low:None|resource_id:Public:Low:None",
-            ["settings.native_section.degraded"] =
-                "stage:Public:Low:None|reason_code:Public:Low:None",
-            ["settings.native_section.recovered"] = "stage:Public:Low:None",
+                "binding_path:High:Hash|legacy_pressed:Low:None|action_pressed:Low:None",
+            ["settings.dock_sprite.degraded"] = "reason_code:Low:None|resource_id:Low:None",
+            ["settings.native_section.degraded"] = "stage:Low:None|reason_code:Low:None",
+            ["settings.native_section.recovered"] = "stage:Low:None",
             ["settings.native_section.layout_observed"] =
-                "operation:Public:Low:None|outcome:Public:Low:None|affected_count:Public:High:None|growth_units:Public:High:None",
-            ["settings.native_section.layout_degraded"] =
-                "operation:Public:Low:None|reason_code:Public:Low:None",
-            ["settings.native_section.layout_recovered"] = "operation:Public:Low:None",
-            ["settings.native_button.cloned"] = "button_id:Public:Low:None",
-            ["settings.keybind_rows.degraded"] =
-                "stage:Public:Low:None|reason_code:Public:Low:None",
-            ["settings.patch.degraded"] = "operation:Public:Low:None|reason_code:Public:Low:None",
+                "operation:Low:None|outcome:Low:None|affected_count:High:None|growth_units:High:None",
+            ["settings.native_section.layout_degraded"] = "operation:Low:None|reason_code:Low:None",
+            ["settings.native_section.layout_recovered"] = "operation:Low:None",
+            ["settings.native_button.cloned"] = "button_id:Low:None",
+            ["settings.keybind_rows.degraded"] = "stage:Low:None|reason_code:Low:None",
+            ["settings.patch.degraded"] = "operation:Low:None|reason_code:Low:None",
             ["settings.row.layout_applied"] =
-                "layout_mode:Public:Low:None|row_id:Public:Low:None|additional_index:Public:High:None|step_px:Public:High:None|position_x_px:Public:High:None|position_y_px:Public:High:None",
+                "layout_mode:Low:None|row_id:Low:None|additional_index:High:None|step_px:High:None|position_x_px:High:None|position_y_px:High:None",
         };
 
         Assert.Equal(expected.Count, actual.Count);
@@ -89,7 +84,7 @@ public sealed class SettingsLogEventCatalogTests
         string.Join(
             "|",
             definition.Fields.Select(field =>
-                $"{field.Name}:{field.Privacy}:{field.Cardinality}:{field.Correlation}"
+                $"{field.Name}:{field.Cardinality}:{field.Correlation}"
             )
         );
 

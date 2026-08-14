@@ -68,7 +68,6 @@ internal static class PostCombatImpactLogEvents
     internal static readonly BppLogFieldDefinition ReasonCode = new(
         0,
         "reason_code",
-        BppLogFieldPrivacy.Public,
         BppLogCorrelationPolicy.None,
         BppLogCardinality.Low
     );
@@ -76,7 +75,6 @@ internal static class PostCombatImpactLogEvents
     internal static readonly BppLogFieldDefinition ProjectionCategory = new(
         3,
         "projection_category",
-        BppLogFieldPrivacy.Public,
         BppLogCorrelationPolicy.None,
         BppLogCardinality.Low
     );
@@ -97,7 +95,6 @@ internal static class PostCombatImpactLogEvents
     internal static readonly BppLogFieldDefinition Card = new(
         1,
         "card",
-        BppLogFieldPrivacy.Public,
         BppLogCorrelationPolicy.None,
         BppLogCardinality.High
     );
@@ -105,7 +102,6 @@ internal static class PostCombatImpactLogEvents
     internal static readonly BppLogFieldDefinition Detail = new(
         2,
         "detail",
-        BppLogFieldPrivacy.Public,
         BppLogCorrelationPolicy.None,
         BppLogCardinality.Low
     );
@@ -157,11 +153,5 @@ internal static class PostCombatImpactLogEvents
     );
 
     private static BppLogFieldDefinition PublicLow(int order, string name) =>
-        new(
-            order,
-            name,
-            BppLogFieldPrivacy.Public,
-            BppLogCorrelationPolicy.None,
-            BppLogCardinality.Low
-        );
+        new(order, name, BppLogCorrelationPolicy.None, BppLogCardinality.Low);
 }

@@ -93,7 +93,6 @@ internal static class ScreenshotCaptureLogEvents
     internal static readonly BppLogFieldDefinition FilePath = new(
         7,
         "file_path",
-        BppLogFieldPrivacy.LocalPath,
         BppLogCorrelationPolicy.None,
         BppLogCardinality.High
     );
@@ -154,7 +153,6 @@ internal static class ScreenshotCaptureLogEvents
     internal static readonly BppLogFieldDefinition CleanupFailedFilePath = new(
         2,
         "file_path",
-        BppLogFieldPrivacy.LocalPath,
         BppLogCorrelationPolicy.None,
         BppLogCardinality.High
     );
@@ -169,7 +167,7 @@ internal static class ScreenshotCaptureLogEvents
         string name,
         BppLogCardinality cardinality,
         BppLogCorrelationPolicy correlation = BppLogCorrelationPolicy.None
-    ) => new(order, name, BppLogFieldPrivacy.Public, correlation, cardinality);
+    ) => new(order, name, correlation, cardinality);
 }
 
 internal static class ScreenshotCaptureDiagnostics

@@ -31,6 +31,7 @@ internal static class CollectionFilterEngine
         var keywordFilterCount = profile.ShowKeywordFilter ? filter.Keywords.Count : 0;
         var mechanicFilterCount = profile.ShowKeywordFilter ? filter.Mechanics.Count : 0;
         var sizeFilterCount = profile.ShowSizeFilter ? filter.Sizes.Count : 0;
+        var searchTerms = CollectionSearchTerms.From(filter.SearchQuery);
         // In-run only; null disables. Independent of the manual Tier row — both narrow by tier.
         // Fixed-tier sources are exempt: their pool ignores the day's tier ceiling.
         var dayMaximumTier =
@@ -69,7 +70,7 @@ internal static class CollectionFilterEngine
                 continue;
             if (sizeFilterCount > 0 && !filter.Sizes.Contains(card.Size))
                 continue;
-            if (!CollectionCardSearch.Matches(card, filter.SearchQuery))
+            if (!CollectionCardSearch.Matches(card, searchTerms))
                 continue;
             result.Add(card);
         }

@@ -141,7 +141,7 @@ public sealed class VoiceSubtitlesTests
                     string.Join(
                         "|",
                         definition.Fields.Select(field =>
-                            $"{field.Name}:{field.Privacy}:{field.Cardinality}:{field.Correlation}"
+                            $"{field.Name}:{field.Cardinality}:{field.Correlation}"
                         )
                     ),
                 StringComparer.Ordinal
@@ -151,19 +151,17 @@ public sealed class VoiceSubtitlesTests
             new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 ["voice_subtitles.catalog.started"] = "",
-                ["voice_subtitles.catalog.ready"] =
-                    "source:Public:Low:None|line_count:Public:High:None",
+                ["voice_subtitles.catalog.ready"] = "source:Low:None|line_count:High:None",
                 ["voice_subtitles.catalog.degraded"] =
-                    "reason_code:Public:Low:None|source:Public:Low:None|endpoint:Public:Low:None",
-                ["voice_subtitles.catalog.failed"] =
-                    "reason_code:Public:Low:None|source:Public:Low:None",
+                    "reason_code:Low:None|source:Low:None|endpoint:Low:None",
+                ["voice_subtitles.catalog.failed"] = "reason_code:Low:None|source:Low:None",
                 ["voice_subtitles.catalog_refresh.started"] =
-                    "reason_code:Public:Low:None|endpoint:Public:Low:None",
+                    "reason_code:Low:None|endpoint:Low:None",
                 ["voice_subtitles.catalog.recovered"] =
-                    "reason_code:Public:Low:None|source:Public:Low:None|line_count:Public:High:None",
-                ["voice_subtitles.catalog_cache.degraded"] = "reason_code:Public:Low:None",
+                    "reason_code:Low:None|source:Low:None|line_count:High:None",
+                ["voice_subtitles.catalog_cache.degraded"] = "reason_code:Low:None",
                 ["voice_subtitles.catalog_row.skipped"] =
-                    "source:Public:Low:None|row_number:Public:High:None|reason_code:Public:Low:None|stem:UntrustedText:High:None",
+                    "source:Low:None|row_number:High:None|reason_code:Low:None|stem:High:None",
             },
             actual
         );

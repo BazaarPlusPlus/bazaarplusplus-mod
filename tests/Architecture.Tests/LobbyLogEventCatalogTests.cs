@@ -20,15 +20,14 @@ public sealed class LobbyLogEventCatalogTests
         var expected = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["lobby.version_check.degraded"] =
-                "reason_code:Public:Low:None|http_status:Public:Low:None|timeout_ms:Public:Low:None",
+                "reason_code:Low:None|http_status:Low:None|timeout_ms:Low:None",
             ["lobby.version_check.completed"] =
-                "current_version:Public:High:None|latest_version:UntrustedText:High:None|update_available:Public:Low:None",
-            ["lobby.version_label.degraded"] = "reason_code:Public:Low:None",
-            ["lobby.random_pool_preferences.degraded"] =
-                "pool_kind:Public:Low:None|reason_code:Public:Low:None",
-            ["lobby.hero_pool.degraded"] = "operation:Public:Low:None|reason_code:Public:Low:None",
+                "current_version:High:None|latest_version:High:None|update_available:Low:None",
+            ["lobby.version_label.degraded"] = "reason_code:Low:None",
+            ["lobby.random_pool_preferences.degraded"] = "pool_kind:Low:None|reason_code:Low:None",
+            ["lobby.hero_pool.degraded"] = "operation:Low:None|reason_code:Low:None",
             ["lobby.collectible_pool.degraded"] =
-                "operation:Public:Low:None|collection_kind:Public:Low:None|reason_code:Public:Low:None",
+                "operation:Low:None|collection_kind:Low:None|reason_code:Low:None",
         };
 
         Assert.Equal(expected.Count, actual.Count);
@@ -46,7 +45,7 @@ public sealed class LobbyLogEventCatalogTests
         string.Join(
             "|",
             definition.Fields.Select(field =>
-                $"{field.Name}:{field.Privacy}:{field.Cardinality}:{field.Correlation}"
+                $"{field.Name}:{field.Cardinality}:{field.Correlation}"
             )
         );
 }

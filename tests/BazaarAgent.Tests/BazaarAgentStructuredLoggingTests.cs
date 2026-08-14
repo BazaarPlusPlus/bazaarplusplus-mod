@@ -10,35 +10,33 @@ public sealed class BazaarAgentStructuredLoggingTests
     {
         var expected = new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            ["agent.snapshot.ready"] = "Info|state:Public:Low:None",
+            ["agent.snapshot.ready"] = "Info|state:Low:None",
             ["agent.action.failed"] =
-                "Error|request_id:Public:High:Short,action_kind:Public:Low:None,reason_code:Public:Low:None",
-            ["agent.listener.restart_started"] =
-                "Debug|old_port:Public:Low:None,new_port:Public:Low:None",
-            ["agent.listener.started"] = "Info|port:Public:Low:None",
-            ["agent.listener.recovered"] = "Info|port:Public:Low:None",
-            ["agent.listener.degraded"] =
-                "Warning|port:Public:Low:None,reason_code:Public:Low:None",
+                "Error|request_id:High:Short,action_kind:Low:None,reason_code:Low:None",
+            ["agent.listener.restart_started"] = "Debug|old_port:Low:None,new_port:Low:None",
+            ["agent.listener.started"] = "Info|port:Low:None",
+            ["agent.listener.recovered"] = "Info|port:Low:None",
+            ["agent.listener.degraded"] = "Warning|port:Low:None,reason_code:Low:None",
             ["agent.listener.stop_degraded"] =
-                "Warning|reason_code:Public:Low:None,failed_phase_count:Public:Low:None,first_failed_phase:Public:Low:None",
+                "Warning|reason_code:Low:None,failed_phase_count:Low:None,first_failed_phase:Low:None",
             ["agent.decision_log.append_failed"] =
-                "Error|decision_id:Public:High:Short,run_id:Public:High:Short,request_id:Public:High:Short,reason_code:Public:Low:None",
+                "Error|decision_id:High:Short,run_id:High:Short,request_id:High:Short,reason_code:Low:None",
             ["agent.context_capture.failed"] =
-                "Error|tick_id:Public:High:None,state:Public:Low:None,reason_code:Public:Low:None",
-            ["agent.listener.failed"] = "Error|port:Public:Low:None,reason_code:Public:Low:None",
+                "Error|tick_id:High:None,state:Low:None,reason_code:Low:None",
+            ["agent.listener.failed"] = "Error|port:Low:None,reason_code:Low:None",
             ["agent.http_request.failed"] =
-                "Error|request_id:Public:High:Short,route:Public:Low:None,method:Public:Low:None,reason_code:Public:Low:None",
+                "Error|request_id:High:Short,route:Low:None,method:Low:None,reason_code:Low:None",
             ["agent.http_response.close_failed"] =
-                "Debug|request_id:Public:High:Short,route:Public:Low:None,reason_code:Public:Low:None",
+                "Debug|request_id:High:Short,route:Low:None,reason_code:Low:None",
             ["agent.rejected_body_drain.stopped"] =
-                "Debug|request_id:Public:High:Short,route:Public:Low:None,reason_code:Public:Low:None",
-            ["agent.host.initialization_failed"] = "Error|reason_code:Public:Low:None",
+                "Debug|request_id:High:Short,route:Low:None,reason_code:Low:None",
+            ["agent.host.initialization_failed"] = "Error|reason_code:Low:None",
             ["agent.host.initialized"] = "Info|",
-            ["agent.context.degraded"] = "Warning|reason_code:Public:Low:None",
+            ["agent.context.degraded"] = "Warning|reason_code:Low:None",
             ["agent.context.recovered"] = "Info|",
             ["agent.scene_probe.state_changed"] =
-                "Debug|scene_name:UntrustedText:High:None,scene_ready:Public:Low:None,app_state_null:Public:Low:None,profile_loaded:Public:Low:None",
-            ["agent.scene_probe.degraded"] = "Warning|reason_code:Public:Low:None",
+                "Debug|scene_name:High:None,scene_ready:Low:None,app_state_null:Low:None,profile_loaded:Low:None",
+            ["agent.scene_probe.degraded"] = "Warning|reason_code:Low:None",
             ["agent.scene_probe.recovered"] = "Info|",
         };
         var actual = typeof(BazaarAgentLogEvents)
@@ -53,7 +51,7 @@ public sealed class BazaarAgentStructuredLoggingTests
                     + string.Join(
                         ",",
                         definition.Fields.Select(field =>
-                            $"{field.Name}:{field.Privacy}:{field.Cardinality}:{field.Correlation}"
+                            $"{field.Name}:{field.Cardinality}:{field.Correlation}"
                         )
                     ),
                 StringComparer.Ordinal
@@ -99,7 +97,6 @@ public sealed class BazaarAgentStructuredLoggingTests
                 AssertField(
                     field,
                     "request_id",
-                    BazaarAgentLogFieldPrivacy.Public,
                     BazaarAgentLogCardinality.High,
                     BazaarAgentLogCorrelation.Short
                 ),
@@ -107,7 +104,6 @@ public sealed class BazaarAgentStructuredLoggingTests
                 AssertField(
                     field,
                     "action_kind",
-                    BazaarAgentLogFieldPrivacy.Public,
                     BazaarAgentLogCardinality.Low,
                     BazaarAgentLogCorrelation.None
                 ),
@@ -115,7 +111,6 @@ public sealed class BazaarAgentStructuredLoggingTests
                 AssertField(
                     field,
                     "reason_code",
-                    BazaarAgentLogFieldPrivacy.Public,
                     BazaarAgentLogCardinality.Low,
                     BazaarAgentLogCorrelation.None
                 )
@@ -241,13 +236,11 @@ public sealed class BazaarAgentStructuredLoggingTests
     private static void AssertField(
         BazaarAgentLogFieldDefinition field,
         string name,
-        BazaarAgentLogFieldPrivacy privacy,
         BazaarAgentLogCardinality cardinality,
         BazaarAgentLogCorrelation correlation
     )
     {
         Assert.Equal(name, field.Name);
-        Assert.Equal(privacy, field.Privacy);
         Assert.Equal(cardinality, field.Cardinality);
         Assert.Equal(correlation, field.Correlation);
     }

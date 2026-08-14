@@ -81,14 +81,6 @@ public sealed class VoiceObserverLoggingTests
             ["reason_code", "hook"],
             definition.StormPolicy!.KeyFields.Select(field => field.Name)
         );
-        Assert.All(
-            definition.Fields,
-            field =>
-                Assert.DoesNotContain(
-                    field.Privacy,
-                    new[] { BppLogFieldPrivacy.LocalPath, BppLogFieldPrivacy.RemoteUri }
-                )
-        );
     }
 
     [Fact]

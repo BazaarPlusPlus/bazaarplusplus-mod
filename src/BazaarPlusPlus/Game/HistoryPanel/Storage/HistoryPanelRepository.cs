@@ -36,7 +36,19 @@ internal sealed partial class HistoryPanelRepository
         using var connection = OpenConnection(ensureSchema: true);
         using var command = connection.CreateCommand();
         command.CommandTimeout = 2;
+        // The run window is selected before any battle work happens. Joining first would make
+        // every listing parse the snapshot documents of every battle ever recorded — json_valid()
+        // is a real parse, and neither runs nor battles are ever pruned, so that cost grows without
+        // bound over a save's lifetime while the panel only ever renders $limit rows.
         command.CommandText = $"""
+            WITH recent_runs AS (
+                SELECT *
+                FROM {RunLogSchema.RunsTableName}
+                ORDER BY
+                    COALESCE(ended_at_utc, last_seen_at_utc, started_at_utc) DESC,
+                    run_id DESC
+                LIMIT $limit
+            )
             SELECT
                 r.run_id,
                 r.hero,
@@ -59,16 +71,12 @@ internal sealed partial class HistoryPanelRepository
                 r.losses,
                 r.ended_at_utc,
                 COUNT(s.battle_id) AS battle_count
-            FROM {RunLogSchema.RunsTableName} AS r
+            FROM recent_runs AS r
             LEFT JOIN {RunLogSchema.BattlesTableName} AS pb
                 ON pb.run_id = r.run_id
                AND pb.source = 'LOCAL'
             LEFT JOIN {RunLogSchema.BattleSnapshotsTableName} AS s
                 ON s.battle_id = pb.battle_id
-               AND s.player_hand_json IS NOT NULL
-               AND s.player_skills_json IS NOT NULL
-               AND s.opponent_hand_json IS NOT NULL
-               AND s.opponent_skills_json IS NOT NULL
                AND json_valid(s.player_hand_json) = 1
                AND json_valid(s.player_skills_json) = 1
                AND json_valid(s.opponent_hand_json) = 1
@@ -96,8 +104,7 @@ internal sealed partial class HistoryPanelRepository
                 r.ended_at_utc
             ORDER BY
                 COALESCE(r.ended_at_utc, r.last_seen_at_utc, r.started_at_utc) DESC,
-                r.run_id DESC
-            LIMIT $limit;
+                r.run_id DESC;
             """;
         command.Parameters.AddWithValue("$limit", limit);
 

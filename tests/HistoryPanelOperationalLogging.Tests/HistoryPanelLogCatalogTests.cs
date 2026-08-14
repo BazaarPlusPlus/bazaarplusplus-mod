@@ -14,15 +14,14 @@ public sealed class HistoryPanelLogCatalogTests
         var actual = Definitions().ToDictionary(item => item.EventId, Describe);
         var expected = new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            ["history_panel.mount.failed"] =
-                "dependency:Public:Low:None|reason_code:Public:Low:None",
-            ["history_panel.data.load_failed"] = "dataset:Public:Low:None|run_id:Public:High:Short",
+            ["history_panel.mount.failed"] = "dependency:Low:None|reason_code:Low:None",
+            ["history_panel.data.load_failed"] = "dataset:Low:None|run_id:High:Short",
             ["history_panel.replay.preflight_completed"] =
-                "request_id:Public:High:Short|battle_id:Public:High:Short|record_video:Public:Low:None|can_record:Public:Low:None|reason_code:Public:Low:None",
+                "request_id:High:Short|battle_id:High:Short|record_video:Low:None|can_record:Low:None|reason_code:Low:None",
             ["history_panel.replay.failed"] =
-                "request_id:Public:High:Short|battle_id:Public:High:Short|record_video:Public:Low:None|reason_code:Public:Low:None",
+                "request_id:High:Short|battle_id:High:Short|record_video:Low:None|reason_code:Low:None",
             ["history_panel.replay.accepted"] =
-                "request_id:Public:High:Short|battle_id:Public:High:Short|record_video:Public:Low:None",
+                "request_id:High:Short|battle_id:High:Short|record_video:Low:None",
             ["history_panel.run_delete.failed"] = DeleteSchema,
             ["history_panel.run_delete.degraded"] = DeleteSchema,
             ["history_panel.run_delete.succeeded"] = DeleteSchema,
@@ -30,20 +29,19 @@ public sealed class HistoryPanelLogCatalogTests
             ["history_panel.server_health.succeeded"] = HealthSchema,
             ["history_panel.ghost_sync.failed"] = SyncSchema,
             ["history_panel.ghost_sync.succeeded"] = SyncSchema,
-            ["history_panel.ghost_identity.read_failed"] = "reason_code:Public:Low:None",
+            ["history_panel.ghost_identity.read_failed"] = "reason_code:Low:None",
             ["history_panel.preview.socket_effect_degraded"] =
-                "template_id:Public:High:None|reason_code:Public:Low:None",
-            ["history_panel.preview.static_data_degraded"] = "reason_code:Public:Low:None",
+                "template_id:High:None|reason_code:Low:None",
+            ["history_panel.preview.static_data_degraded"] = "reason_code:Low:None",
             ["history_panel.preview.payload_degraded"] =
-                "battle_id:Public:High:Short|reason_code:Public:Low:None",
-            ["history_panel.row.skipped"] =
-                "battle_id:Public:High:Short|reason_code:Public:Low:None",
-            ["history_panel.open.failed"] = "reason_code:Public:Low:None",
-            ["history_panel.open.skipped"] = "reason_code:Public:Low:None",
+                "battle_id:High:Short|reason_code:Low:None",
+            ["history_panel.row.skipped"] = "battle_id:High:Short|reason_code:Low:None",
+            ["history_panel.open.failed"] = "reason_code:Low:None",
+            ["history_panel.open.skipped"] = "reason_code:Low:None",
             ["history_panel.card_preview.degraded"] =
-                "operation:Public:Low:None|reason_code:Public:Low:None|template_id:Public:High:None",
+                "operation:Low:None|reason_code:Low:None|template_id:High:None",
             ["history_panel.item_board_preview.degraded"] =
-                "operation:Public:Low:None|reason_code:Public:Low:None|template_id:Public:High:None",
+                "operation:Low:None|reason_code:Low:None|template_id:High:None",
         };
 
         Assert.Equal(expected.Count, actual.Count);
@@ -104,11 +102,11 @@ public sealed class HistoryPanelLogCatalogTests
     }
 
     private const string DeleteSchema =
-        "request_id:Public:High:Short|run_id:Public:High:Short|battle_count:Public:High:None|cleanup_failed_count:Public:High:None|reason_code:Public:Low:None";
+        "request_id:High:Short|run_id:High:Short|battle_count:High:None|cleanup_failed_count:High:None|reason_code:Low:None";
     private const string HealthSchema =
-        "request_id:Public:High:Short|duration_ms:Public:High:None|reason_code:Public:Low:None";
+        "request_id:High:Short|duration_ms:High:None|reason_code:Low:None";
     private const string SyncSchema =
-        "request_id:Public:High:Short|imported_count:Public:High:None|reason_code:Public:Low:None";
+        "request_id:High:Short|imported_count:High:None|reason_code:Low:None";
 
     private static IEnumerable<BppLogEventDefinition> Definitions() =>
         typeof(HistoryPanelLogEvents)
@@ -120,7 +118,7 @@ public sealed class HistoryPanelLogCatalogTests
         string.Join(
             "|",
             definition.Fields.Select(field =>
-                $"{field.Name}:{field.Privacy}:{field.Cardinality}:{field.Correlation}"
+                $"{field.Name}:{field.Cardinality}:{field.Correlation}"
             )
         );
 }
