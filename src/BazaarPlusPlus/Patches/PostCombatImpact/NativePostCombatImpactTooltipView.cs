@@ -759,7 +759,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
                 IsChinese(),
                 DamageMarker(),
                 ShieldMarker(),
-                HealingMarker()
+                HealingMarker() ?? effectMarker
             ),
             preferredHeight: hasTriggerSummary ? 44f : 48f
         );

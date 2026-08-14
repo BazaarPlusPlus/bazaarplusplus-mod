@@ -825,6 +825,46 @@ public sealed class CombatImpactMetricFormatterTests
         );
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Periodic_impact_never_falls_back_to_textual_effect_terms(bool chinese)
+    {
+        var regen = new CombatImpactGroup(
+            CombatImpactKind.AttributeChange,
+            "RegenApplyAmount",
+            6,
+            12,
+            CombatImpactValueUnit.Amount,
+            CombatImpactCoverage.Exact,
+            null,
+            0,
+            []
+        )
+        {
+            PeriodicImpact = new CombatImpactPeriodicImpact(
+                149,
+                0,
+                CombatImpactPeriodicProof.Exact,
+                PeriodicEffectAttribution.ModelVersion
+            ),
+        };
+        var burn = regen with
+        {
+            Kind = CombatImpactKind.Burn,
+            NativeAttributeKey = "BurnApplyAmount",
+            PeriodicImpact = new CombatImpactPeriodicImpact(
+                73,
+                21,
+                CombatImpactPeriodicProof.Exact,
+                PeriodicEffectAttribution.ModelVersion
+            ),
+        };
+
+        Assert.Equal("149", CombatImpactMetricFormatter.PeriodicImpact(regen, chinese));
+        Assert.Equal("73 · 21", CombatImpactMetricFormatter.PeriodicImpact(burn, chinese));
+    }
+
     private static CombatImpactGroup Group(
         CombatImpactKind kind,
         int count,
