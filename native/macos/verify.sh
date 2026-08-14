@@ -5,7 +5,6 @@ kind="${1:?native artifact kind is required}"
 binary="${2:?native binary path is required}"
 signed_path="${3:-$binary}"
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-deployment_target="12.0"
 catalog_path="$script_dir/../artifacts.json"
 
 catalog_values() {
@@ -19,6 +18,25 @@ if (!artifact) throw new Error(`missing catalog artifact ${artifactId}`);
 process.stdout.write((artifact[property] ?? []).join("\n"));
 ' "$catalog_path" "$kind" "$property"
 }
+
+catalog_platform_value() {
+    local property="$1"
+    node -e '
+const fs = require("node:fs");
+const [catalogPath, property] = process.argv.slice(1);
+const catalog = JSON.parse(fs.readFileSync(catalogPath, "utf8"));
+const value = catalog.platforms.macos[property];
+if (typeof value !== "string" || value === "")
+    throw new Error(`missing catalog macos.${property}`);
+process.stdout.write(value);
+' "$catalog_path" "$property"
+}
+
+# The catalog owns the deployment target so this assertion cannot silently drift away from
+# the value the installer hashes into the input digest. The build scripts still carry the
+# literal -mmacosx-version-min flag, so a catalog edit alone fails the build loudly here
+# instead of passing while producing the old minos.
+deployment_target="$(catalog_platform_value deploymentTarget)"
 
 BPP_NATIVE_REQUIRED_EXPORTS="${BPP_NATIVE_REQUIRED_EXPORTS:-$(catalog_values requiredExports)}"
 BPP_NATIVE_REQUIRED_WEAK_IMPORTS="${BPP_NATIVE_REQUIRED_WEAK_IMPORTS:-$(catalog_values requiredWeakImports)}"
@@ -75,17 +93,17 @@ expected_exports="$(printf '%s\n' "$BPP_NATIVE_REQUIRED_EXPORTS" | sed '/^$/d' |
     exit 1
 }
 
-if [[ "$kind" == "mac-audio" ]]; then
-    undefined_symbols="$(xcrun nm -m -u "$binary")"
-    while IFS= read -r symbol; do
-        [[ -n "$symbol" ]] || continue
-        line="$(printf '%s\n' "$undefined_symbols" | sed -n "/_$symbol[[:space:]]/p")"
-        [[ -n "$line" && ("$line" == *"weak import"* || "$line" == *"weak external"*) ]] || {
-            echo "required weak import is missing or strong: $symbol" >&2
-            exit 1
-        }
-    done <<<"${BPP_NATIVE_REQUIRED_WEAK_IMPORTS:-}"
-fi
+# Driven entirely by the artifact's requiredWeakImports: an empty list is a natural no-op,
+# so a new artifact that declares weak imports is checked without editing this script.
+undefined_symbols="$(xcrun nm -m -u "$binary")"
+while IFS= read -r symbol; do
+    [[ -n "$symbol" ]] || continue
+    line="$(printf '%s\n' "$undefined_symbols" | sed -n "/_$symbol[[:space:]]/p")"
+    [[ -n "$line" && ("$line" == *"weak import"* || "$line" == *"weak external"*) ]] || {
+        echo "required weak import is missing or strong: $symbol" >&2
+        exit 1
+    }
+done <<<"${BPP_NATIVE_REQUIRED_WEAK_IMPORTS:-}"
 
 codesign --verify --strict "$binary"
 signature_details="$(codesign -d --verbose=4 "$signed_path" 2>&1)"

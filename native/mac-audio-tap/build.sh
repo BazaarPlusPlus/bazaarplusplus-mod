@@ -4,7 +4,6 @@ set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 output_dir="${1:-$script_dir/build}"
 output="$output_dir/libBppMacAudio.dylib"
-deployment_target="12.0"
 
 if [[ "$(uname -s)" != "Darwin" ]]; then
   echo "BppMacAudio can only be built on macOS." >&2
