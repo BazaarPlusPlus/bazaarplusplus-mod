@@ -20,14 +20,6 @@ The process-tap APIs are a macOS 14.2+ feature; this module gates itself at macO
 `BppMacAudio_IsSupported` (NSProcessInfo product version) and weak-imports the tap symbols
 so the dylib still loads and degrades cleanly on older systems.
 
-## Files
-
-| File | Role |
-| --- | --- |
-| `BppMacAudio.m` / `.h` | dylib source + C ABI (`BppMacAudio_IsSupported` / `_Start` / `_Read` / `_Stop`) |
-| `build.sh` | builds and validates an ad-hoc signed `libBppMacAudio.dylib` |
-| `build/libBppMacAudio.dylib` | default build output — **gitignored here** (the promoted copy lives in the installer repo) |
-
 ## Build
 
 ```bash
@@ -43,6 +35,9 @@ Every `clang` flag in `build.sh` is load-bearing, and the two whose reasons are 
 the flag itself — the `lib` output prefix and `-mmacosx-version-min=12.0` — carry that reason in a
 comment directly above the command. Read them there before changing the invocation.
 
+Those are producer checks. The final acceptance judgement is not one of them: it remains a
+sample-bearing AAC track with audible in-game audio in the finished recording.
+
 ## Where it ships (two-repo split)
 
 The mod build **never reads the copy in this directory.** It reads the prebuilt from the
@@ -53,17 +48,15 @@ like `libe_sqlite3.dylib`:
 bazaarplusplus-installer/src-tauri/resources/SourceForBuild/macos/BepInEx/plugins/libBppMacAudio.dylib
 ```
 
-`./run.sh publish` compares the current macOS catalog/input digest with the installer manifest.
-When stale, it invokes this script with a temporary output directory and promotes the validated
-artifact into the installer before managed packaging continues. A direct build may choose another
-side-effect-free output directory with its first argument:
+`./run.sh publish` reuses that staged copy only when both the macOS input digest and the staged
+artifacts still match the installer manifest; otherwise it rebuilds through this script and promotes
+the result. The freshness contract and the full promotion sequence are in
+[`docs/architecture/native-artifacts.md`](../../docs/architecture/native-artifacts.md). A direct
+build may choose another side-effect-free output directory with its first argument:
 
 ```bash
 ./build.sh /absolute/output/directory
 ```
-
-The installer manifest records the canonical input digest and exact promoted bytes. Git commit and
-dirty state are provenance only.
 
 ## Naming + packaging
 
@@ -73,12 +66,3 @@ dirty state are provenance only.
 - The csproj mirrors sqlite: a **Debug-target** `<Copy>` into the game's `BepInEx/plugins/`,
   and **no Release-target native `<Copy>`** — the promoted dylib is packed by the installer-owned
   archive preparation step.
-
-## Verify
-
-```bash
-./build.sh
-```
-
-The producer smoke loads the dylib and resolves all four ABI exports. The real product acceptance
-check remains a sample-bearing AAC track with audible in-game audio in the final recording.

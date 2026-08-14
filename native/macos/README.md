@@ -30,9 +30,11 @@ native artifact catalog. It emits an ad-hoc signed and producer-verified bundle 
 build/GfxPluginBppReplayVideoToolbox.bundle
 ```
 
-Ordinary C# contributors do not need the native toolchain. `./run.sh publish` recomputes the macOS
-catalog/input digest, reuses matching installer inputs, or invokes this script in a temporary
-directory and locally promotes the validated result before managed packaging.
+Ordinary C# contributors do not need the native toolchain: `./run.sh publish` reuses the installer's
+staged copy only when both the macOS input digest and the staged artifacts still match the manifest,
+and otherwise rebuilds through this script and promotes the result. The freshness contract and the
+full promotion sequence are in
+[`docs/architecture/native-artifacts.md`](../../docs/architecture/native-artifacts.md).
 
 To build into an explicit side-effect-free output directory:
 
