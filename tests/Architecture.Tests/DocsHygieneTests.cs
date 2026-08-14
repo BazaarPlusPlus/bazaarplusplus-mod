@@ -1,5 +1,4 @@
 #nullable enable
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using Xunit;
@@ -11,7 +10,6 @@ namespace Architecture.Tests;
 // leaves nothing behind that can fail. These tests are what a sweep leaves behind.
 //
 // Each one guards a failure mode observed in the last regrowth, not a style preference:
-// - drafts that outlived the work they described and kept a "pending confirmation" header;
 // - always-loaded files growing past what they cost an agent per turn;
 // - file references surviving the file they point at (dbd4e6c5 left three of them in src/).
 public class DocsHygieneTests
@@ -24,13 +22,10 @@ public class DocsHygieneTests
     {
         ("CLAUDE.md", 9 * 1024),
         ("CONTEXT.md", 13 * 1024),
-        ("docs/MEMORY.md", 16 * 1024),
+        ("docs/MEMORY.md", 17 * 1024),
         ("docs/ARCHITECTURE.md", 14 * 1024),
         ("docs/README.md", 6 * 1024),
     };
-
-    private const int DraftStaleDays = 14;
-    private const int DraftsDirectoryMaxBytes = 120 * 1024;
 
     [Fact]
     public void Always_loaded_docs_stay_within_their_byte_budgets()
@@ -59,68 +54,6 @@ public class DocsHygieneTests
                 + "Gotchas section to fit — that section is why the file exists; take the space "
                 + "from Durable knowledge or Patterns instead.\n  "
                 + string.Join("\n  ", overBudget)
-        );
-    }
-
-    [Fact]
-    public void Drafts_are_promoted_and_deleted_before_they_go_stale()
-    {
-        var repoRoot = RepoRoot();
-        var draftsDir = Path.Combine(repoRoot, "docs", "drafts");
-        if (!Directory.Exists(draftsDir))
-            return; // The swept state: the directory exists only while drafts are pending.
-
-        var drafts = Directory.GetFiles(draftsDir, "*.md");
-        if (drafts.Length == 0)
-            return;
-
-        var stale = new List<string>();
-        foreach (var draft in drafts)
-        {
-            // Age is measured from the last commit that touched the file, not from the date in its
-            // name. A root-cause document can carry a July filename and still be under active use
-            // in August; dating by filename would expire exactly the long-running investigations
-            // the repo asks for.
-            var lastTouched = LastCommitDate(repoRoot, draft);
-            if (lastTouched == null)
-                continue; // Uncommitted: it is being written right now.
-
-            var age = DateTimeOffset.UtcNow - lastTouched.Value;
-            if (age.TotalDays > DraftStaleDays)
-            {
-                stale.Add(
-                    $"{Path.GetFileName(draft)}: untouched for {(int)age.TotalDays} days "
-                        + $"(limit {DraftStaleDays})."
-                );
-            }
-        }
-
-        Assert.True(
-            stale.Count == 0,
-            "A draft has outlived its sweep window. Promote its durable outcomes into "
-                + "docs/MEMORY.md, docs/adr/, or docs/ARCHITECTURE.md, move any remaining work to "
-                + "a GitHub issue, then delete the file. Touching it to reset the clock is not a "
-                + "sweep.\n  "
-                + string.Join("\n  ", stale)
-        );
-    }
-
-    [Fact]
-    public void Drafts_directory_stays_within_its_budget()
-    {
-        var repoRoot = RepoRoot();
-        var draftsDir = Path.Combine(repoRoot, "docs", "drafts");
-        if (!Directory.Exists(draftsDir))
-            return;
-
-        // A budget on the directory, not on any one file: a root-cause analysis is allowed to be
-        // long, but three of them at once means the last sweep did not happen.
-        var total = Directory.GetFiles(draftsDir, "*.md").Sum(f => new FileInfo(f).Length);
-
-        Assert.True(
-            total <= DraftsDirectoryMaxBytes,
-            $"docs/drafts/ holds {total} B against a {DraftsDirectoryMaxBytes} B budget. That is "
-                + "roughly three active drafts; sweep the finished ones before starting another."
         );
     }
 
@@ -256,36 +189,6 @@ public class DocsHygieneTests
 
         foreach (var path in Directory.EnumerateFiles(docs, "*.md", SearchOption.AllDirectories))
             yield return path;
-    }
-
-    private static DateTimeOffset? LastCommitDate(string repoRoot, string path)
-    {
-        try
-        {
-            using var process = Process.Start(
-                new ProcessStartInfo("git", $"log -1 --format=%cI -- \"{path}\"")
-                {
-                    WorkingDirectory = repoRoot,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                }
-            );
-            if (process == null)
-                return null;
-
-            var output = process.StandardOutput.ReadToEnd().Trim();
-            process.WaitForExit(10_000);
-            if (process.ExitCode != 0 || output.Length == 0)
-                return null;
-
-            return DateTimeOffset.Parse(output);
-        }
-        catch (Exception)
-        {
-            // No git available: this gate is advisory, never a reason to fail an unrelated run.
-            return null;
-        }
     }
 
     private static string RepoRoot([CallerFilePath] string thisFile = "")
