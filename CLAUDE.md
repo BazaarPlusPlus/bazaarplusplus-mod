@@ -18,9 +18,9 @@ How to work in this repository (`AGENTS.md` is a symlink to this file). This fil
 Below is only what `run.sh` cannot tell you:
 
 - The default suite has 12 xUnit projects in `tests/BazaarPlusPlus.Tests.slnx`. `ScenarioRunner.Tests` owns the closed list of source-shadow executable capsules and runs each in a child process; use `dotnet run --project tests/<Name>/<Name>.csproj` only to diagnose one capsule directly.
-- After changing a direct dependency in `Directory.Packages.props`: run `./run.sh restore-locks`, review the six changed `src/**/packages.lock.json` files, then `./run.sh restore-locked` so graph drift fails locally rather than in the installer build. Test projects get no lock files.
+- After `./run.sh restore-locks`, review the six changed `src/**/packages.lock.json` files before `./run.sh restore-locked` — the locked restore is what makes graph drift fail locally rather than in the installer build.
 - Building from an isolated ticket worktree: pass `-p:BPPInstallerSourcePath="<absolute-path>/bazaarplusplus-installer/src-tauri/resources"` to projects referencing the main mod, because the default sibling installer path does not exist beside a worktree.
-- `./run.sh test` is offline and side-effect free: it uses `tests/TestData/remote-data`, never deploys to the game, and excludes decompiled-source premises. Run `./run.sh test-compat` explicitly for every compatibility premise whose local Managed/decompiled inputs are available; skipped premises are reported. `./run.sh test-corpus <path>` is the opt-in replay evidence lane.
+- `./run.sh test` resolves remote data from `tests/TestData/remote-data` and excludes the decompiled-source compatibility premises — those run only under `./run.sh test-compat`, which reports any premise it skips.
 
 ## Logs & Debugging
 
@@ -46,14 +46,11 @@ Where new code goes. This is the trap list, not a map of what exists:
 - Run an independent red-team review of a large refactor or design plan before implementing, and revise from it. Keep such a review review-only: it surfaces weaknesses, risks, and bad assumptions with `file:line` evidence and applies no patches. Send the revised plan back for confirmation before implementing.
 - When replacing a subsystem or migrating to a prototype, remove the old implementation entirely and ship only the new version in place. A fallback path or a merged build chain running both is not a migration.
 - Validate a hypothesis with a temporary probe on the main path (the user builds and reloads to verify), or record it as a to-verify item in the design doc and ship. Standalone probe scaffolding is not the way.
-- Include the category field in a degradation event's `BppLogStormPolicy` key whenever the event is categorized; sharing one key lets a single category's failure suppress every later category during the storm window.
 - Touch only the named target of a delete or change request. Widening scope or adjusting unrelated config belongs in its own change.
-- After invoking a native Unity `Button.onClick` programmatically, verify the expected game-state transition before treating the action as successful. Native listeners can return silently through interaction gates such as `AllowInteraction` without throwing.
-- Anchor mod file-write paths on `BepInEx.Paths.GameRootPath` or the `<GameRoot>/BazaarPlusPlusV5/` data dir, which BepInEx special-cases on macOS to the directory containing the `.app`. Building a write path from `Application.dataPath` puts unsealed writes inside the `.app` bundle, which breaks `codesign` re-signing and the trampoline repair — and therefore blocks `./run.sh build` after every game update.
 - A long-running automation task must self-heal: relaunch the game process on crash or exit and continue until the goal is met.
 - Format every Git commit message as Conventional Commits: `<type>(<scope>): <description>`.
 - Keep commits scoped: when `./run.sh format`/csharpier reformats files outside your change, revert those formatter-only edits before committing.
-- On completion: review your own diff, commit, open a PR with `gh pr create`, merge it, then delete branches already merged. `master` is protected, so a direct push to it is rejected. Commit only after reviewing your own diff, and only when the user asked for a commit.
+- Commit only when the user asked for one, and only after reviewing your own diff. The wrap-up flow is then: commit, open a PR with `gh pr create`, merge it, and delete branches already merged — `master` is protected, so a direct push to it is rejected.
 
 ## Rules hygiene
 

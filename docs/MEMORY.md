@@ -15,6 +15,8 @@ Domain constraints that must stay true in the system.
 - Harmony patches apply per patch class — never revert to `PatchAll()`. One broken game target must degrade only its own feature, not abort the whole plugin. [`src/BazaarPlusPlus/Plugin.cs` | ARCHITECTURE.md]
 - CJK text that renders as tofu is routed through `NativeGameTypography`, which applies the game's native serif/sans and extends BPP-owned text with a CJK fallback chain. Fix the font route, not the copy. [`src/BazaarPlusPlus/GameInterop/Fonts/NativeGameTypography.cs`]
 - Mod-authored user-facing strings use `LocalizedTextSet` (en + zh-Hans, optional zh-Hant + de/pt/ko/it; anything else falls back to English). [`src/BazaarPlusPlus.Localization/LocalizedTextSet.cs`]
+- A categorized degradation event includes the category field in its `BppLogStormPolicy` key — a shared key lets one category's failure suppress every later category during the storm window. [`src/BazaarPlusPlus/Infrastructure/Logging/Core/BppLogSchema.cs`]
+- Anchor mod file-write paths on `BepInEx.Paths.GameRootPath` or `<GameRoot>/BazaarPlusPlusV5/`, which BepInEx special-cases on macOS to the directory containing the `.app`. A path built from `Application.dataPath` writes unsealed files inside the `.app` bundle, breaking `codesign` re-signing and the trampoline repair — and therefore `./run.sh build` after every game update. [`src/BazaarPlusPlus/Core/Paths/BepInExPathProvider.cs`]
 
 ## Architecture decisions
 
@@ -55,6 +57,7 @@ Each of these failed silently, or reported something misleading, at least once.
 - Static-data lookup is fallible on degraded and test paths: catch and return a safe default, as the current resolvers do. [`src/BazaarPlusPlus/GameInterop/Encounter/EncounterTypeResolver.cs`]
 - Rendering the reused uGUI card prefab through an offscreen camera into a `RenderTexture` silently yields an empty texture under URP — native board previews stay on the `ScreenSpaceOverlay` canvas; do not re-propose the RT path. [architecture/panels.md]
 - A Harmony postfix on an `async Task` game method runs at the first await suspension, not at completion — bind pre-state in a **prefix**.
+- A programmatic native `Button.onClick` invoke can return silently through interaction gates such as `AllowInteraction` without throwing — verify the expected game-state transition before treating the action as successful.
 - `PublicizeAll` makes `ConfigEntry<T>.SettingChanged` ambiguous (CS0229), so no BPP code subscribes to it; invalidate config-derived caches by raw-value compare. [`src/BazaarPlusPlus/Game/Input/BppHotkeyService.cs`]
 - The BPP hotkey conflict check compares BPP actions only against other BPP actions, never native `Gameplay/*` bindings. [`src/BazaarPlusPlus/Game/Input/BppHotkeyService.cs`]
 - Panel toggle hotkeys are filtered per registration by `HotkeyGuard`, where returning false swallows the press. HistoryPanel deliberately will not close while a text field is focused. [`src/BazaarPlusPlus/Game/OverlayPanels/OverlayPanelHost.cs` | `Game/HistoryPanel/HistoryPanel.cs`]
