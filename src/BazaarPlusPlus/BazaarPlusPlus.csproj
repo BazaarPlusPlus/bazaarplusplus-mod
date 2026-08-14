@@ -294,6 +294,17 @@
 
   <!-- Release build -->
   <Target
+    Name="ValidateProductionReleasePlatform"
+    BeforeTargets="CopyToInstallerSource"
+    Condition="'$(Configuration)' == 'Release' and '$(BuildProductionPackage)' == 'true'"
+  >
+    <Error
+      Condition="'$(BppReleasePlatform)' != 'macos' and '$(BppReleasePlatform)' != 'windows'"
+      Text="BppReleasePlatform must be macos or windows for a production package. Use ./run.sh publish on the target platform."
+    />
+  </Target>
+
+  <Target
     Name="CopyToInstallerSource"
     AfterTargets="Build"
     Condition="'$(Configuration)' == 'Release' and Exists('$(BPPInstallerSourcePath)') and '$(BuildProductionPackage)' == 'true'"
@@ -329,9 +340,14 @@
         Include="$(TargetDir)System.Text.Encoding.CodePages.dll"
         Condition="Exists('$(TargetDir)System.Text.Encoding.CodePages.dll')"
       />
-      <MacSqliteNativeFile Include="$(FixedMacSqliteNativeFile)" />
-      <MacAudioTapNativeFile Include="$(FixedMacAudioTapNativeFile)" />
-      <WindowsSqliteNativeFile Include="$(FixedWindowsSqliteNativeFile)" />
+      <ReleaseSqliteNativeFile
+        Include="$(FixedMacSqliteNativeFile)"
+        Condition="'$(BppReleasePlatform)' == 'macos'"
+      />
+      <ReleaseSqliteNativeFile
+        Include="$(FixedWindowsSqliteNativeFile)"
+        Condition="'$(BppReleasePlatform)' == 'windows'"
+      />
       <PluginManagedRuntimeFiles Include="$(TargetDir)BazaarPlusPlus.ModApi.dll" />
       <PluginManagedRuntimeFiles Include="$(TargetDir)BazaarPlusPlus.Localization.dll" />
       <PluginManagedRuntimeFiles
@@ -340,69 +356,29 @@
       />
     </ItemGroup>
     <ItemGroup>
-      <InstallerFilesToDelete Include="$(BPPInstallerSourcePath)/SourceForBuild/macos/BepInEx/plugins/BazaarPlusPlus.BazaarAgent.dll" />
-      <InstallerFilesToDelete Include="$(BPPInstallerSourcePath)/SourceForBuild/windows/BepInEx/plugins/BazaarPlusPlus.BazaarAgent.dll" />
-      <InstallerFilesToDelete Include="$(BPPInstallerSourcePath)/SourceForBuild/macos/BepInEx/plugins/BazaarPlusPlus.BazaarAgentHost.dll" />
-      <InstallerFilesToDelete Include="$(BPPInstallerSourcePath)/SourceForBuild/windows/BepInEx/plugins/BazaarPlusPlus.BazaarAgentHost.dll" />
+      <InstallerFilesToDelete Include="$(BPPInstallerSourcePath)/SourceForBuild/$(BppReleasePlatform)/BepInEx/plugins/BazaarPlusPlus.BazaarAgent.dll" />
+      <InstallerFilesToDelete Include="$(BPPInstallerSourcePath)/SourceForBuild/$(BppReleasePlatform)/BepInEx/plugins/BazaarPlusPlus.BazaarAgentHost.dll" />
     </ItemGroup>
     <Delete Files="@(InstallerFilesToDelete)" />
     <Copy
       SourceFiles="$(TargetDir)$(TargetName).dll"
-      DestinationFiles="$(BPPInstallerSourcePath)/SourceForBuild/macos/BepInEx/plugins/$(TargetName).dll"
-    />
-    <Copy
-      SourceFiles="$(TargetDir)$(TargetName).dll"
-      DestinationFiles="$(BPPInstallerSourcePath)/SourceForBuild/windows/BepInEx/plugins/$(TargetName).dll"
+      DestinationFiles="$(BPPInstallerSourcePath)/SourceForBuild/$(BppReleasePlatform)/BepInEx/plugins/$(TargetName).dll"
     />
     <Copy
       SourceFiles="$(TargetDir)$(TargetName).version"
-      DestinationFiles="$(BPPInstallerSourcePath)/SourceForBuild/macos/BepInEx/plugins/$(TargetName).version"
-    />
-    <Copy
-      SourceFiles="$(TargetDir)$(TargetName).version"
-      DestinationFiles="$(BPPInstallerSourcePath)/SourceForBuild/windows/BepInEx/plugins/$(TargetName).version"
+      DestinationFiles="$(BPPInstallerSourcePath)/SourceForBuild/$(BppReleasePlatform)/BepInEx/plugins/$(TargetName).version"
     />
     <Copy
       SourceFiles="@(PluginManagedRuntimeFiles)"
-      DestinationFolder="$(BPPInstallerSourcePath)/SourceForBuild/macos/BepInEx/plugins"
+      DestinationFolder="$(BPPInstallerSourcePath)/SourceForBuild/$(BppReleasePlatform)/BepInEx/plugins"
       SkipUnchangedFiles="true"
       Condition="'@(PluginManagedRuntimeFiles)' != ''"
     />
     <Copy
-      SourceFiles="@(PluginManagedRuntimeFiles)"
-      DestinationFolder="$(BPPInstallerSourcePath)/SourceForBuild/windows/BepInEx/plugins"
+      SourceFiles="@(ReleaseSqliteNativeFile)"
+      DestinationFolder="$(BPPInstallerSourcePath)/SourceForBuild/$(BppReleasePlatform)/BepInEx/plugins"
       SkipUnchangedFiles="true"
-      Condition="'@(PluginManagedRuntimeFiles)' != ''"
-    />
-    <Copy
-      SourceFiles="@(MacSqliteNativeFile)"
-      DestinationFolder="$(BPPInstallerSourcePath)/SourceForBuild/macos/BepInEx/plugins"
-      SkipUnchangedFiles="true"
-      Condition="'@(MacSqliteNativeFile)' != ''"
-    />
-    <Copy
-      SourceFiles="@(WindowsSqliteNativeFile)"
-      DestinationFolder="$(BPPInstallerSourcePath)/SourceForBuild/windows/BepInEx/plugins"
-      SkipUnchangedFiles="true"
-      Condition="'@(WindowsSqliteNativeFile)' != ''"
-    />
-    <RemoveDir
-      Directories="$(InstallerMacReplayPluginBundle)"
-      Condition="Exists('$(LocalMacReplayPluginBundle)')"
-    />
-    <Exec
-      Command="/usr/bin/ditto &quot;$(LocalMacReplayPluginBundle)&quot; &quot;$(InstallerMacReplayPluginBundle)&quot;"
-      Condition="Exists('$(LocalMacReplayPluginBundle)')"
-    />
-    <MakeDir
-      Directories="$(BPPInstallerSourcePath)/SourceForBuild/windows/TheBazaar_Data/Plugins/x86_64"
-      Condition="Exists('$(LocalWindowsReplayPlugin)')"
-    />
-    <Copy
-      SourceFiles="$(LocalWindowsReplayPlugin)"
-      DestinationFiles="$(InstallerWindowsReplayPlugin)"
-      SkipUnchangedFiles="true"
-      Condition="Exists('$(LocalWindowsReplayPlugin)')"
+      Condition="'@(ReleaseSqliteNativeFile)' != ''"
     />
     <Message
       Text="[BazaarPlusPlus] Successfully copied Release artifacts to installer source folder."
@@ -416,32 +392,41 @@
     Condition="'$(Configuration)' == 'Release' and Exists('$(BPPInstallerSourcePath)') and '$(BuildProductionPackage)' == 'true'"
   >
     <Message Text="[BazaarPlusPlus] Building production installer package" Importance="high" />
-    <!-- Remove stale FFmpeg files left by older payload staging. Both desktop recorders are native. -->
+    <!-- Remove stale recorder files left by older payload staging. -->
     <ItemGroup>
-      <StaleMacFfmpegFile Include="$(BPPInstallerSourcePath)/SourceForBuild/macos/BepInEx/plugins/ffmpeg" />
-      <StaleMacFfmpegFile Include="$(BPPInstallerSourcePath)/SourceForBuild/macos/BepInEx/plugins/ffmpeg-LICENSE.txt" />
-      <StaleWindowsFfmpegFile Include="$(BPPInstallerSourcePath)/SourceForBuild/windows/BepInEx/plugins/ffmpeg.exe" />
-      <StaleWindowsFfmpegFile Include="$(BPPInstallerSourcePath)/SourceForBuild/windows/BepInEx/plugins/ffmpeg-LICENSE.txt" />
+      <StaleRecorderFile
+        Include="$(BPPInstallerSourcePath)/SourceForBuild/macos/BepInEx/plugins/ffmpeg"
+        Condition="'$(BppReleasePlatform)' == 'macos'"
+      />
+      <StaleRecorderFile
+        Include="$(BPPInstallerSourcePath)/SourceForBuild/macos/BepInEx/plugins/ffmpeg-LICENSE.txt"
+        Condition="'$(BppReleasePlatform)' == 'macos'"
+      />
+      <StaleRecorderFile
+        Include="$(BPPInstallerSourcePath)/SourceForBuild/windows/BepInEx/plugins/ffmpeg.exe"
+        Condition="'$(BppReleasePlatform)' == 'windows'"
+      />
+      <StaleRecorderFile
+        Include="$(BPPInstallerSourcePath)/SourceForBuild/windows/BepInEx/plugins/ffmpeg-LICENSE.txt"
+        Condition="'$(BppReleasePlatform)' == 'windows'"
+      />
     </ItemGroup>
-    <Delete Files="@(StaleMacFfmpegFile)" />
-    <Delete Files="@(StaleWindowsFfmpegFile)" />
-    <RemoveDir Directories="$(BPPInstallerSourcePath)/SourceForBuild/macos/BepInEx/plugins/BppReplayRecorder.app" />
+    <Delete Files="@(StaleRecorderFile)" />
+    <RemoveDir
+      Directories="$(BPPInstallerSourcePath)/SourceForBuild/macos/BepInEx/plugins/BppReplayRecorder.app"
+      Condition="'$(BppReleasePlatform)' == 'macos'"
+    />
     <Error
-      Condition="!Exists('$(InstallerMacReplayPluginBundle)')"
+      Condition="'$(BppReleasePlatform)' == 'macos' and !Exists('$(InstallerMacReplayPluginBundle)')"
       Text="Cannot package macOS: native replay plugin is missing at $(InstallerMacReplayPluginBundle)."
     />
     <Error
-      Condition="!Exists('$(InstallerWindowsReplayPlugin)')"
+      Condition="'$(BppReleasePlatform)' == 'windows' and !Exists('$(InstallerWindowsReplayPlugin)')"
       Text="Cannot package Windows: native replay plugin is missing at $(InstallerWindowsReplayPlugin)."
     />
     <ZipDirectory
-      SourceDirectory="$(BPPInstallerSourcePath)/SourceForBuild/macos"
-      DestinationFile="$(BPPInstallerSourcePath)/BepInExSource/macos/BepInEx.zip"
-      Overwrite="true"
-    />
-    <ZipDirectory
-      SourceDirectory="$(BPPInstallerSourcePath)/SourceForBuild/windows"
-      DestinationFile="$(BPPInstallerSourcePath)/BepInExSource/windows/BepInEx.zip"
+      SourceDirectory="$(BPPInstallerSourcePath)/SourceForBuild/$(BppReleasePlatform)"
+      DestinationFile="$(BPPInstallerSourcePath)/BepInExSource/$(BppReleasePlatform)/BepInEx.zip"
       Overwrite="true"
     />
     <Message
@@ -460,7 +445,7 @@
     <MSBuild
       Projects="$(MSBuildProjectFile)"
       Targets="Build"
-      Properties="Configuration=Release;BuildProductionPackage=$(BuildProductionPackage);RemoteEmbeddedDataPrepared=true"
+      Properties="Configuration=Release;BuildProductionPackage=$(BuildProductionPackage);BppReleasePlatform=$(BppReleasePlatform);RemoteEmbeddedDataPrepared=true"
     />
   </Target>
 </Project>

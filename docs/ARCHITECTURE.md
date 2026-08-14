@@ -102,6 +102,7 @@ The v3 wire protocol — session and revision handshake, delta merge semantics, 
 | Opening or closing an overlay panel, HistoryPanel, LiveBuildPanel, item boards | [architecture/panels.md](architecture/panels.md) |
 | Encounter Preview, native card previews, tooltip presentation | [architecture/previews.md](architecture/previews.md) |
 | Combat replay, video recording, screenshots, bundle sealing, uploads, ghost battles | [architecture/capture.md](architecture/capture.md) |
+| Desktop native build freshness, local promotion, and signing | [architecture/native-artifacts.md](architecture/native-artifacts.md) |
 | Hotkey bindings and settings dock rows | [architecture/input-and-settings.md](architecture/input-and-settings.md) |
 | Fonts, localization, voice subtitles, supporter attribution | [architecture/text.md](architecture/text.md) |
 | The V5 bundle wire format | [contracts/run-payload-v5.md](contracts/run-payload-v5.md) |

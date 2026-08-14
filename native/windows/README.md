@@ -11,5 +11,11 @@ Build on Windows with Visual Studio 2022 and the Windows SDK:
 ./build.ps1
 ```
 
+The script builds into `build/` by default, verifies the x64 PE metadata, exact catalog ABI exports,
+reviewed system dependencies, and unsigned producer policy, then runs the native smoke program.
+Pass `-OutputDirectory` for a side-effect-free staging build. `./run.sh publish` compares the
+canonical Windows input digest with the installer manifest and invokes this build plus local
+promotion only when the current Windows input is stale or damaged.
+
 The DLL must be installed in `TheBazaar_Data/Plugins/x86_64` so Unity loads it before BepInEx
 constructs the managed recording backend.
