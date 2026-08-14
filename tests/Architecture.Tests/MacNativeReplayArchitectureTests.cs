@@ -424,6 +424,82 @@ public sealed class MacNativeReplayArchitectureTests
         );
     }
 
+    [Fact]
+    public void Render_event_packet_ownership_is_documented_and_asymmetric_on_both_backends()
+    {
+        // The compiler cannot tell Cancel from Discard: both take the same opaque pointer and
+        // differ only in how many references they consume. Discard on a queued event is a
+        // use-after-free, Cancel on an unqueued one leaks, so the contract is pinned here.
+        // Both headers carry the same contract; neither may drift away from it alone.
+        foreach (
+            var headerPath in new[]
+            {
+                Path.Combine(RepoRoot(), "native", "macos", "BppReplayVideoToolbox.h"),
+                Path.Combine(RepoRoot(), "native", "windows", "BppReplayMediaFoundation.h"),
+            }
+        )
+        {
+            var header = File.ReadAllText(headerPath);
+            Assert.Contains("releases the caller's reference", header, StringComparison.Ordinal);
+            Assert.Contains("releases BOTH references", header, StringComparison.Ordinal);
+            Assert.Contains("event that WAS queued", header, StringComparison.Ordinal);
+        }
+
+        var macSource = File.ReadAllText(
+                Path.Combine(RepoRoot(), "native", "macos", "BppReplayVideoToolbox.mm")
+            )
+            .ReplaceLineEndings("\n");
+        Assert.Contains(
+            "        CompleteRenderEvent(packet->encoder);\n    }\n    ReleaseRenderEventPacket(packet);",
+            macSource,
+            StringComparison.Ordinal
+        );
+        Assert.Contains(
+            "        CompleteRenderEvent(packet->encoder);\n        ReleaseRenderEventPacket(packet);\n    }\n    ReleaseRenderEventPacket(packet);",
+            macSource,
+            StringComparison.Ordinal
+        );
+
+        var windowsSource = File.ReadAllText(
+                Path.Combine(RepoRoot(), "native", "windows", "BppReplayMediaFoundation.cpp")
+            )
+            .ReplaceLineEndings("\n");
+        Assert.Contains(
+            "        CompleteRenderEvent(packet->encoder);\n    }\n    ReleasePacket(packet);",
+            windowsSource,
+            StringComparison.Ordinal
+        );
+        Assert.Contains(
+            "        CompleteRenderEvent(packet->encoder);\n        ReleasePacket(packet);\n    }\n    ReleasePacket(packet);",
+            windowsSource,
+            StringComparison.Ordinal
+        );
+
+        var session = File.ReadAllText(
+                Path.Combine(
+                    RepoRoot(),
+                    "src",
+                    "BazaarPlusPlus",
+                    "Game",
+                    "CombatReplay",
+                    "Video",
+                    "ReplayVideoCaptureSession.cs"
+                )
+            )
+            .ReplaceLineEndings("\n");
+        // Count rather than Contains: the session has more than one submission path, and a
+        // single correct branch must not vouch for an inverted sibling.
+        var queuedBranches = session.Split("if (eventQueued)").Length - 1;
+        var correctBranches =
+            session
+                .Split(
+                    "if (eventQueued)\n                encoder.CancelRenderEvent(eventData);\n            else\n                encoder.DiscardRenderEvent(eventData);"
+                )
+                .Length - 1;
+        Assert.True(queuedBranches > 0, "No queued-event abandon branch found in the session.");
+        Assert.Equal(queuedBranches, correctBranches);
+    }
+
     private static void AssertNativeProbeIsSynchronous(string sourcePath)
     {
         var source = File.ReadAllText(sourcePath);

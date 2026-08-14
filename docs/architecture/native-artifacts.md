@@ -4,7 +4,7 @@ The mod repository owns the macOS and Windows native recorder sources, build rec
 
 ## Freshness contract
 
-`native/artifacts.json` is the catalog for the desktop artifacts. Each platform entry names its native sources, build scripts, output-affecting policy, native headers, managed `DllImport` consumers, required exports, temporary build-output layout, and installer destination. The current-platform input digest is SHA-256 over a versioned canonical stream containing the normalized platform policy plus every declared input path, length, and exact worktree bytes in sorted path order. Consequently, uncommitted input changes invalidate an artifact immediately; unrelated repository changes do not.
+`native/artifacts.json` is the catalog for the desktop artifacts. Each platform entry names its native sources, build scripts, platform policy, native headers, managed `DllImport` consumers, required exports, temporary build-output layout, and installer destination. Every policy field — architecture, deployment target, signing — is hashed into the input digest and recorded in the manifest; what a field additionally enforces is decided by whichever build or verify script reads it. The current-platform input digest is SHA-256 over a versioned canonical stream containing the normalized platform policy plus every declared input path, length, and exact worktree bytes in sorted path order. Consequently, uncommitted input changes invalidate an artifact immediately; unrelated repository changes do not.
 
 Git commit and dirty state are recorded only as producer provenance. They are never compared for freshness.
 
@@ -24,9 +24,9 @@ Before managed release packaging, `publish` invokes the installer-owned native i
 
 `publish` passes the resolved host platform through the managed build as `BppReleasePlatform`. Production packaging rejects a missing or unknown value, so a macOS publish cannot rewrite the Windows staging tree or archive, and a Windows publish cannot rewrite the macOS equivalents.
 
-Promotion is intentionally local. It does not create qualification records, remote promotion services, or oldest-OS runner requirements. A failed build, validation, copy, or manifest write leaves the previous manifest authoritative and restores the previous selected-platform inputs.
+Promotion is intentionally local. It does not create qualification records, remote promotion services, or oldest-OS runner requirements. A failed build, validation, copy, or manifest write leaves the previous manifest authoritative and restores the previous selected-platform inputs. That automatic restore ends at the manifest transaction: the coordinator re-verifies the promoted platform only after the transaction returns, so a failure in that final check leaves the new manifest in place and needs manual recovery across both repositories.
 
-## Producer gates
+## Producer checks
 
 Both macOS build scripts resolve Clang and the SDK through `xcrun`, pass the SDK explicitly with `-isysroot`, compile arm64 with `-mmacosx-version-min=12.0`, and turn unguarded-availability diagnostics into errors. Post-link checks require arm64, `LC_BUILD_VERSION` platform `MACOS` with `minos 12.0`, reviewed system-only dependencies, the catalog's exact exports, successful local load/symbol resolution, and a valid ad-hoc signature. The Core Audio dylib additionally requires `AudioHardwareCreateProcessTap` and `AudioHardwareDestroyProcessTap` to remain weak imports.
 

@@ -30,6 +30,21 @@ __declspec(dllexport) int __cdecl BppMfCreate(
     void **handle);
 __declspec(dllexport) int __cdecl BppMfGetSlotCount(void *handle);
 __declspec(dllexport) int __cdecl BppMfAcquireSlot(void *handle, int *slotIndex);
+
+// Render-event packet ownership. BppMfPrepareRenderEvent returns a packet holding two
+// references: one owned by the caller, one owned by the render-event callback the caller is
+// about to queue. They are released independently and in no guaranteed order — the callback
+// may run before, during, or after the call that releases the caller's reference.
+//
+//   BppMfCommitRenderEvent  releases the caller's reference. Use once the event is queued.
+//   BppMfCancelRenderEvent  releases the caller's reference and marks the packet so a
+//                           callback that has not run yet returns early. Use to abandon an
+//                           event that WAS queued; the callback still releases its own.
+//   BppMfDiscardRenderEvent releases BOTH references. Use only for an event that was NEVER
+//                           queued, because no callback will ever run to release the second.
+//
+// Swapping the last two is not benign: Discard on a queued event frees the packet while the
+// render thread still holds it, and Cancel on an unqueued event leaks it.
 __declspec(dllexport) void *__cdecl BppMfPrepareRenderEvent(
     void *handle,
     int slotIndex,

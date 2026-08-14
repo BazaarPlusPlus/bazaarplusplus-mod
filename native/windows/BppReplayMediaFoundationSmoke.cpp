@@ -157,8 +157,8 @@ int main()
     description.Height = height;
     description.MipLevels = 1;
     description.ArraySize = 1;
-    // Unity commonly exposes an sRGB RenderTexture through its typeless resource. Keep the
-    // smoke path representative so the native bridge must create a typed GPU alias.
+    // Typeless on purpose: it forces the typed-alias path in InitializeVideoProcessor, which is
+    // what Unity actually hands the plugin.
     description.Format = DXGI_FORMAT_R8G8B8A8_TYPELESS;
     description.SampleDesc.Count = 1;
     description.Usage = D3D11_USAGE_DEFAULT;
