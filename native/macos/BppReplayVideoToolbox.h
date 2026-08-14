@@ -30,6 +30,21 @@ int BppVtCreate(
     void **handle);
 int BppVtGetSlotCount(void *handle);
 int BppVtAcquireSlot(void *handle, int *slotIndex);
+
+// Render-event packet ownership. BppVtPrepareRenderEvent returns a packet holding two
+// references: one owned by the caller, one owned by the render-event callback the caller is
+// about to queue. They are released independently and in no guaranteed order — the callback
+// may run before, during, or after the call that releases the caller's reference.
+//
+//   BppVtCommitRenderEvent  releases the caller's reference. Use once the event is queued.
+//   BppVtCancelRenderEvent  releases the caller's reference and marks the packet so a
+//                           callback that has not run yet returns early. Use to abandon an
+//                           event that WAS queued; the callback still releases its own.
+//   BppVtDiscardRenderEvent releases BOTH references. Use only for an event that was NEVER
+//                           queued, because no callback will ever run to release the second.
+//
+// Swapping the last two is not benign: Discard on a queued event frees the packet while the
+// render thread still holds it, and Cancel on an unqueued event leaks it.
 void *BppVtPrepareRenderEvent(
     void *handle,
     int slotIndex,
