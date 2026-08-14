@@ -321,6 +321,7 @@ public sealed class MacNativeReplayArchitectureTests
         var source = File.ReadAllText(Path.Combine(nativeRoot, "BppReplayMediaFoundation.cpp"));
         var normalizedSource = source.ReplaceLineEndings("\n");
         var build = File.ReadAllText(Path.Combine(nativeRoot, "build.ps1"));
+        var smokeTest = File.ReadAllText(Path.Combine(nativeRoot, "test.ps1"));
 
         Assert.Contains("BppMfPrepareRenderEvent", header, StringComparison.Ordinal);
         Assert.Contains("BppMfDiscardRenderEvent", header, StringComparison.Ordinal);
@@ -354,10 +355,18 @@ public sealed class MacNativeReplayArchitectureTests
         );
         Assert.DoesNotContain("ffmpeg", source, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("/W4 /WX", build, StringComparison.Ordinal);
+        Assert.Contains("/utf-8", build, StringComparison.Ordinal);
+        Assert.Contains("/utf-8", smokeTest, StringComparison.Ordinal);
         Assert.Contains("/Brepro", build, StringComparison.Ordinal);
         Assert.Contains("dumpbin /headers", build, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("dumpbin /exports", build, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("dumpbin /dependents", build, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            "Join-Path $PSHOME 'Modules\\Microsoft.PowerShell.Security\\Microsoft.PowerShell.Security.psd1'",
+            build,
+            StringComparison.Ordinal
+        );
+        Assert.Contains("Import-Module -Name $securityModulePath -ErrorAction Stop", build);
         Assert.Contains("Get-AuthenticodeSignature", build, StringComparison.Ordinal);
         Assert.Contains("test.ps1", build, StringComparison.Ordinal);
     }

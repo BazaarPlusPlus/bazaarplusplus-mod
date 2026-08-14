@@ -20,7 +20,7 @@ $sourceDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $buildDir = $OutputDirectory
 New-Item -ItemType Directory -Force -Path $buildDir | Out-Null
 
-$command = 'call "{0}" && cl /nologo /std:c++17 /EHsc /W4 /WX /O2 /MT /LD /DNOMINMAX /DUNICODE /D_UNICODE "{1}\BppReplayMediaFoundation.cpp" /link /Brepro /OUT:"{2}\GfxPluginBppReplayMediaFoundation.dll" /IMPLIB:"{2}\BppReplayMediaFoundation.lib" d3d11.lib dxgi.lib evr.lib mfplat.lib mfreadwrite.lib mfuuid.lib ole32.lib shlwapi.lib' -f $vcvars, $sourceDir, $buildDir
+$command = 'call "{0}" && cl /nologo /std:c++17 /utf-8 /EHsc /W4 /WX /O2 /MT /LD /DNOMINMAX /DUNICODE /D_UNICODE "{1}\BppReplayMediaFoundation.cpp" /link /Brepro /OUT:"{2}\GfxPluginBppReplayMediaFoundation.dll" /IMPLIB:"{2}\BppReplayMediaFoundation.lib" d3d11.lib dxgi.lib evr.lib mfplat.lib mfreadwrite.lib mfuuid.lib ole32.lib shlwapi.lib' -f $vcvars, $sourceDir, $buildDir
 cmd.exe /d /s /c $command
 if ($LASTEXITCODE -ne 0) {
     throw "Native Windows replay plugin build failed with exit code $LASTEXITCODE."
@@ -87,6 +87,8 @@ if ($unexpectedDependencies.Count -ne 0) {
     throw "Native Windows plugin has unreviewed dependencies: $($unexpectedDependencies -join ', ')"
 }
 
+$securityModulePath = Join-Path $PSHOME 'Modules\Microsoft.PowerShell.Security\Microsoft.PowerShell.Security.psd1'
+Import-Module -Name $securityModulePath -ErrorAction Stop
 $signature = Get-AuthenticodeSignature -LiteralPath $binary
 if ($signature.Status -ne [System.Management.Automation.SignatureStatus]::NotSigned) {
     throw "Windows producer output must be unsigned, got $($signature.Status)."
