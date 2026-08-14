@@ -2,7 +2,7 @@
   <Import Project="$(MSBuildThisFileDirectory)build/ManagedPath.props" />
 
   <PropertyGroup>
-    <BppVersion>5.2.0</BppVersion>
+    <BppVersion>5.2.1</BppVersion>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <!-- Building the assembly graph is side-effect free by default. Only run.sh build opts in to
          writing the live game installation; tests, IDE builds, matrix builds, and publish staging
