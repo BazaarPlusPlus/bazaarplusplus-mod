@@ -9,7 +9,6 @@ public sealed class BppLogPipelineTests
     private static readonly BppLogFieldDefinition WarningReason = new(
         0,
         "reason",
-        BppLogFieldPrivacy.Public,
         BppLogCorrelationPolicy.None,
         BppLogCardinality.Low
     );
@@ -22,7 +21,6 @@ public sealed class BppLogPipelineTests
     private static readonly BppLogFieldDefinition RequestId = new(
         0,
         "request_id",
-        BppLogFieldPrivacy.Public,
         BppLogCorrelationPolicy.Short,
         BppLogCardinality.High
     );

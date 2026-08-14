@@ -14,61 +14,52 @@ public sealed class CollectionPanelLogEventCatalogTests
         var actual = Definitions().ToDictionary(x => x.EventId, Describe, StringComparer.Ordinal);
         var expected = new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            ["collection_panel.mount.failed"] = "reason_code:Public:Low:None",
-            ["collection_panel.open.failed"] = "reason_code:Public:Low:None",
-            ["collection_panel.open.skipped"] = "reason_code:Public:Low:None",
+            ["collection_panel.mount.failed"] = "reason_code:Low:None",
+            ["collection_panel.open.failed"] = "reason_code:Low:None",
+            ["collection_panel.open.skipped"] = "reason_code:Low:None",
             ["collection_panel.selection.resolved"] =
-                "source:Public:Low:None|hero:Public:Low:None|day:Public:Low:None|encounter_id:Public:High:None",
-            ["collection_panel.selection.degraded"] =
-                "probe:Public:Low:None|reason_code:Public:Low:None",
-            ["collection_panel.selection.recovered"] = "probe:Public:Low:None",
+                "source:Low:None|hero:Low:None|day:Low:None|encounter_id:High:None",
+            ["collection_panel.selection.degraded"] = "probe:Low:None|reason_code:Low:None",
+            ["collection_panel.selection.recovered"] = "probe:Low:None",
             ["collection_panel.load.completed"] =
-                "phase:Public:Low:None|outcome:Public:Low:None|reason_code:Public:Low:None|duration_ms:Public:High:None|catalog_acquire_duration_ms:Public:High:None|catalog_duration_ms:Public:High:None|filter_duration_ms:Public:High:None|refresh_duration_ms:Public:High:None|catalog_cache_hit:Public:Low:None|source_template_count:Public:High:None|accepted_count:Public:High:None|rejected_count:Public:High:None|catalog_card_count:Public:High:None|visible_card_count:Public:High:None",
-            ["collection_panel.cleanup.degraded"] = "reason_code:Public:Low:None",
+                "phase:Low:None|outcome:Low:None|reason_code:Low:None|duration_ms:High:None|catalog_acquire_duration_ms:High:None|catalog_duration_ms:High:None|filter_duration_ms:High:None|refresh_duration_ms:High:None|catalog_cache_hit:Low:None|source_template_count:High:None|accepted_count:High:None|rejected_count:High:None|catalog_card_count:High:None|visible_card_count:High:None",
+            ["collection_panel.cleanup.degraded"] = "reason_code:Low:None",
             ["collection_panel.card.bind_degraded"] =
-                "stage:Public:Low:None|template_id:Public:High:None|reason_code:Public:Low:None",
-            ["collection_panel.card.return_skipped"] =
-                "kind:Public:Low:None|reason_code:Public:Low:None",
+                "stage:Low:None|template_id:High:None|reason_code:Low:None",
+            ["collection_panel.card.return_skipped"] = "kind:Low:None|reason_code:Low:None",
             ["collection_panel.dock_button.setup_failed"] =
-                "placement:Public:Low:None|reason_code:Public:Low:None",
-            ["collection_panel.dock_layout.degraded"] =
-                "reason_code:Public:Low:None|blocker:UntrustedText:High:None",
-            ["collection_panel.dock_layout.recovered"] =
-                "reason_code:Public:Low:None|blocker:UntrustedText:High:None",
-            ["collection_panel.card.display_failed"] =
-                "stage:Public:Low:None|template_id:Public:High:None",
+                "placement:Low:None|reason_code:Low:None",
+            ["collection_panel.dock_layout.degraded"] = "reason_code:Low:None|blocker:High:None",
+            ["collection_panel.dock_layout.recovered"] = "reason_code:Low:None|blocker:High:None",
+            ["collection_panel.card.display_failed"] = "stage:Low:None|template_id:High:None",
             ["collection_panel.grid.performance_observed"] =
-                "phase:Public:Low:None|first_index:Public:High:None|last_index:Public:High:None|window_count:Public:High:None|visible_count:Public:High:None|shelf_count:Public:High:None|attempt_count:Public:High:None|bound_count:Public:High:None|failed_bind_count:Public:High:None|bind_duration_ms:Public:High:None|elapsed_ms:Public:High:None|faulted_count:Public:High:None|canceled_count:Public:High:None",
+                "phase:Low:None|first_index:High:None|last_index:High:None|window_count:High:None|visible_count:High:None|shelf_count:High:None|attempt_count:High:None|bound_count:High:None|failed_bind_count:High:None|bind_duration_ms:High:None|elapsed_ms:High:None|faulted_count:High:None|canceled_count:High:None",
             ["collection_panel.card_art.degraded"] =
-                "reason_code:Public:Low:None|status:Public:Low:None|art_key:UntrustedText:High:None",
-            ["collection_panel.tier_tooltip.degraded"] =
-                "tier_field:Public:Low:None|reason_code:Public:Low:None",
-            ["collection_panel.hero_portrait.degraded"] =
-                "hero:Public:Low:None|reason_code:Public:Low:None",
+                "reason_code:Low:None|status:Low:None|art_key:High:None",
+            ["collection_panel.tier_tooltip.degraded"] = "tier_field:Low:None|reason_code:Low:None",
+            ["collection_panel.hero_portrait.degraded"] = "hero:Low:None|reason_code:Low:None",
             ["collection_panel.hero_portrait.fallback_observed"] =
-                "hero:Public:Low:None|reason_code:Public:Low:None",
+                "hero:Low:None|reason_code:Low:None",
             ["collection_panel.encounter_portrait.degraded"] =
-                "template_id:Public:High:None|reason_code:Public:Low:None|art_key:UntrustedText:High:None",
-            ["collection_panel.keyword_icon.degraded"] =
-                "reason_code:Public:Low:None|icon_name:UntrustedText:High:None",
-            ["collection_panel.tag_typography.degraded"] = "reason_code:Public:Low:None",
+                "template_id:High:None|reason_code:Low:None|art_key:High:None",
+            ["collection_panel.keyword_icon.degraded"] = "reason_code:Low:None|icon_name:High:None",
+            ["collection_panel.tag_typography.degraded"] = "reason_code:Low:None",
             ["collection_panel.cache.cleanup_failed"] =
-                "cache:Public:Low:None|stage:Public:Low:None|art_key:UntrustedText:High:None",
-            ["collection_panel.hover.invoke_failed"] = "operation:Public:Low:None",
-            ["collection_panel.hero_preference.degraded"] =
-                "reason_code:Public:Low:None|hero:Public:Low:None",
-            ["collection_panel.hero_preference.scope_degraded"] = "reason_code:Public:Low:None",
+                "cache:Low:None|stage:Low:None|art_key:High:None",
+            ["collection_panel.hover.invoke_failed"] = "operation:Low:None",
+            ["collection_panel.hero_preference.degraded"] = "reason_code:Low:None|hero:Low:None",
+            ["collection_panel.hero_preference.scope_degraded"] = "reason_code:Low:None",
             ["collection_panel.source_catalog.loaded"] =
-                "entry_count:Public:High:None|source_template_count:Public:High:None",
+                "entry_count:High:None|source_template_count:High:None",
             ["collection_panel.source_catalog.load_failed"] =
-                "reason_code:Public:Low:None|resource_suffix:Public:Low:None",
-            ["collection_panel.catalog.build_deferred"] = "reason_code:Public:Low:None",
-            ["collection_panel.catalog.degraded"] = "reason_code:Public:Low:None",
+                "reason_code:Low:None|resource_suffix:Low:None",
+            ["collection_panel.catalog.build_deferred"] = "reason_code:Low:None",
+            ["collection_panel.catalog.degraded"] = "reason_code:Low:None",
             ["collection_panel.catalog.ready"] =
-                "accepted_count:Public:High:None|rejected_count:Public:High:None|source_template_count:Public:High:None",
+                "accepted_count:High:None|rejected_count:High:None|source_template_count:High:None",
             ["collection_panel.catalog.recovered"] =
-                "accepted_count:Public:High:None|rejected_count:Public:High:None|source_template_count:Public:High:None",
-            ["collection_panel.catalog.invalidated"] = "reason_code:Public:Low:None",
+                "accepted_count:High:None|rejected_count:High:None|source_template_count:High:None",
+            ["collection_panel.catalog.invalidated"] = "reason_code:Low:None",
         };
 
         Assert.Equal(expected.Count, actual.Count);
@@ -150,7 +141,6 @@ public sealed class CollectionPanelLogEventCatalogTests
             field =>
             {
                 Assert.Equal(BppLogCardinality.Low, field.Cardinality);
-                Assert.Equal(BppLogFieldPrivacy.Public, field.Privacy);
                 Assert.Equal(BppLogCorrelationPolicy.None, field.Correlation);
             }
         );
@@ -166,7 +156,7 @@ public sealed class CollectionPanelLogEventCatalogTests
         string.Join(
             "|",
             definition.Fields.Select(field =>
-                $"{field.Name}:{field.Privacy}:{field.Cardinality}:{field.Correlation}"
+                $"{field.Name}:{field.Cardinality}:{field.Correlation}"
             )
         );
 }

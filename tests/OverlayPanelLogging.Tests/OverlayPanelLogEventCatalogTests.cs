@@ -15,12 +15,11 @@ public sealed class OverlayPanelLogEventCatalogTests
             .ToDictionary(definition => definition.EventId, DescribeFields, StringComparer.Ordinal);
         var expected = new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            ["overlay_panels.host.tick_degraded"] =
-                "panel_id:Public:Low:None|reason_code:Public:Low:None",
-            ["overlay_panels.host.tick_recovered"] = "panel_id:Public:Low:None",
+            ["overlay_panels.host.tick_degraded"] = "panel_id:Low:None|reason_code:Low:None",
+            ["overlay_panels.host.tick_recovered"] = "panel_id:Low:None",
             ["overlay_panels.directive.failed"] =
-                "request_id:Public:High:Short|panel_id:Public:Low:None|directive:Public:Low:None|reason_code:Public:Low:None",
-            ["overlay_panels.combat_probe.degraded"] = "reason_code:Public:Low:None",
+                "request_id:High:Short|panel_id:Low:None|directive:Low:None|reason_code:Low:None",
+            ["overlay_panels.combat_probe.degraded"] = "reason_code:Low:None",
             ["overlay_panels.combat_probe.recovered"] = "",
         };
 
@@ -63,7 +62,7 @@ public sealed class OverlayPanelLogEventCatalogTests
         string.Join(
             "|",
             definition.Fields.Select(field =>
-                string.Join(":", field.Name, field.Privacy, field.Cardinality, field.Correlation)
+                string.Join(":", field.Name, field.Cardinality, field.Correlation)
             )
         );
 }

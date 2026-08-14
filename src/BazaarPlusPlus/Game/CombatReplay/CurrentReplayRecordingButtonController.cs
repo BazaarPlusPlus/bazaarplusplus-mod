@@ -5,6 +5,7 @@ using TheBazaar.Cues;
 using TheBazaar.SequenceFramework;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 namespace BazaarPlusPlus.Game.CombatReplay;
@@ -16,6 +17,8 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
     // This is the blue hexagonal Cue sequence used by the main-menu Merchandise button.
     private const string MerchandiseCueAssetGuid = "8f41781147786fa4cb695e5768582615";
     private const float DockButtonGap = BppSettingsDockPlacement.DefaultSiblingGap;
+    private const int ScreenResizeSyncFrameCount = 6;
+    private const int LayoutImmediateSyncFrameCount = 2;
     private Button? _settingsButton;
     private Button? _nativeReplayButton;
     private Button? _nativeRecapButton;
@@ -28,7 +31,10 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
     private BppDockButtonSpriteId? _lastSpriteId;
     private readonly BppDockButtonScreenLayout _screenLayout = new();
     private readonly CurrentReplayRecordingUiLogState _uiLogState = new();
+    private readonly BppScreenResizeSyncTracker _screenResizeSync = new(ScreenResizeSyncFrameCount);
+    private readonly BppDockLayoutSyncTracker _layoutSync = new(LayoutImmediateSyncFrameCount);
     private bool _layoutAvailable;
+    private bool _anchorWasActive;
     private CurrentReplayRecordingUiLayoutReasonCode _layoutReasonCode;
 
     internal static CurrentReplayRecordingButtonController? Attach(Button settingsButton)
@@ -113,8 +119,32 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
 
     private void LateUpdate()
     {
-        SyncLayout();
+        // SyncLayout() sweeps every Button in the scene, so it is gated the same way the sibling
+        // CollectionPanelDockButtonController gates its own placement sync. The anchor-activity
+        // check is the extra trigger this controller needs: it docks against the collection button,
+        // which screenshot suppression toggles inactive outside of any scene or resolution change.
+        var anchorIsActive = IsDockAnchorActive();
+        var shouldSync = _layoutSync.ShouldSync(
+            SceneManager.GetActiveScene().name,
+            Time.realtimeSinceStartup
+        );
+        shouldSync |= _screenResizeSync.ShouldSync(Screen.width, Screen.height);
+        shouldSync |= anchorIsActive != _anchorWasActive;
+        _anchorWasActive = anchorIsActive;
+        if (shouldSync)
+            SyncLayout();
         Refresh();
+    }
+
+    private bool IsDockAnchorActive()
+    {
+        if (_settingsButton == null)
+            return false;
+
+        var collectionRect = _settingsButton
+            .GetComponent<CollectionPanelDockButtonController>()
+            ?.DockButtonRect;
+        return collectionRect != null && collectionRect.gameObject.activeInHierarchy;
     }
 
     private void OnDisable()

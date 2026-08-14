@@ -148,34 +148,6 @@ public sealed class AccountLinkLogRequestTests
     }
 
     [Fact]
-    public void Exception_projection_redacts_labeled_account_code_token_and_body_values()
-    {
-        const string account = "account-secret";
-        const string code = "link-code-secret";
-        const string token = "token-secret";
-        const string body = "response-body-secret";
-        var exception = new InvalidOperationException(
-            $"account_id={account} link_code={code} token={token} response_body={body}"
-        );
-        var sink = new CapturingSink();
-        var request = new AccountLinkLogRequest(RequestId, AccountLinkMethod.Redeem, sink);
-
-        request.Failed(AccountLinkReason.UnexpectedException, exception);
-
-        var captured = Assert.Single(sink.Events);
-        var rendered = new BppLogEventRenderer().Render(
-            captured.Definition,
-            captured.Values,
-            captured.Exception
-        );
-        Assert.Contains("request_id=01JABCDE", rendered, StringComparison.Ordinal);
-        Assert.DoesNotContain(account, rendered, StringComparison.Ordinal);
-        Assert.DoesNotContain(code, rendered, StringComparison.Ordinal);
-        Assert.DoesNotContain(token, rendered, StringComparison.Ordinal);
-        Assert.DoesNotContain(body, rendered, StringComparison.Ordinal);
-    }
-
-    [Fact]
     public void Event_schemas_are_closed_to_the_manifest_fields()
     {
         Assert.Equal(
@@ -192,25 +164,21 @@ public sealed class AccountLinkLogRequestTests
         );
         AssertField(
             HistoryPanelAccountLinkLogEvents.RequestId,
-            BppLogFieldPrivacy.Public,
             BppLogCardinality.High,
             BppLogCorrelationPolicy.Short
         );
         AssertField(
             HistoryPanelAccountLinkLogEvents.Method,
-            BppLogFieldPrivacy.Public,
             BppLogCardinality.Low,
             BppLogCorrelationPolicy.None
         );
         AssertField(
             HistoryPanelAccountLinkLogEvents.FailureReasonCode,
-            BppLogFieldPrivacy.Public,
             BppLogCardinality.Low,
             BppLogCorrelationPolicy.None
         );
         AssertField(
             HistoryPanelAccountLinkLogEvents.SkippedReasonCode,
-            BppLogFieldPrivacy.Public,
             BppLogCardinality.Low,
             BppLogCorrelationPolicy.None
         );
@@ -218,12 +186,10 @@ public sealed class AccountLinkLogRequestTests
 
     private static void AssertField(
         BppLogFieldDefinition field,
-        BppLogFieldPrivacy privacy,
         BppLogCardinality cardinality,
         BppLogCorrelationPolicy correlation
     )
     {
-        Assert.Equal(privacy, field.Privacy);
         Assert.Equal(cardinality, field.Cardinality);
         Assert.Equal(correlation, field.Correlation);
     }

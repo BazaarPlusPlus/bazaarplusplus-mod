@@ -8,7 +8,6 @@ public sealed class BppLogPipelineReliabilityTests
     private static readonly BppLogFieldDefinition ValueField = new(
         0,
         "value",
-        BppLogFieldPrivacy.Public,
         BppLogCorrelationPolicy.None,
         BppLogCardinality.Low
     );

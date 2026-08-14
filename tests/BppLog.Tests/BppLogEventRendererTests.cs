@@ -92,7 +92,7 @@ public sealed class BppLogEventRendererTests
     {
         var fields = Enumerable
             .Range(0, 12)
-            .Select(index => Field(index, $"field_{index}", BppLogFieldPrivacy.UntrustedText))
+            .Select(index => Field(index, $"field_{index}"))
             .ToArray();
         var values = fields
             .Select(field => field.Bind(new string('\u0001', 300) + "secret-tail"))
@@ -154,19 +154,13 @@ public sealed class BppLogEventRendererTests
     }
 
     [Theory]
-    [InlineData(999, 0, 0)]
-    [InlineData(0, 999, 0)]
-    [InlineData(0, 0, 999)]
-    public void Render_fails_closed_for_invalid_field_governance(
-        int privacy,
-        int correlation,
-        int cardinality
-    )
+    [InlineData(999, 0)]
+    [InlineData(0, 999)]
+    public void Render_fails_closed_for_invalid_field_governance(int correlation, int cardinality)
     {
         var field = Field(
             0,
             "value",
-            (BppLogFieldPrivacy)privacy,
             (BppLogCorrelationPolicy)correlation,
             (BppLogCardinality)cardinality
         );
@@ -196,7 +190,7 @@ public sealed class BppLogEventRendererTests
     public void Render_ignores_values_not_declared_by_the_event_schema()
     {
         var approved = Field(0, "approved");
-        var undeclared = Field(0, "token", BppLogFieldPrivacy.Public);
+        var undeclared = Field(0, "token");
 
         var rendered = Renderer()
             .Render(Define(approved), undeclared.Bind("must-not-appear"), approved.Bind("ok"));
@@ -220,15 +214,7 @@ public sealed class BppLogEventRendererTests
         Assert.EndsWith(" value=<unrenderable>", rendered);
     }
 
-    private static BppLogEventRenderer Renderer() =>
-        new(
-            new BppLogRedactionRoots(
-                gameRoot: "/Users/alice/Games/The Bazaar",
-                dataRoot: "/Users/alice/Games/The Bazaar/BazaarPlusPlusV5",
-                pluginRoot: "/Users/alice/Games/The Bazaar/BepInEx/plugins",
-                homeRoot: "/Users/alice"
-            )
-        );
+    private static BppLogEventRenderer Renderer() => new();
 
     private static BppLogEventDefinition Define(params BppLogFieldDefinition[] fields) =>
         new(
@@ -241,10 +227,9 @@ public sealed class BppLogEventRendererTests
     private static BppLogFieldDefinition Field(
         int order,
         string name,
-        BppLogFieldPrivacy privacy = BppLogFieldPrivacy.Public,
         BppLogCorrelationPolicy correlation = BppLogCorrelationPolicy.None,
         BppLogCardinality cardinality = BppLogCardinality.Low
-    ) => new(order, name, privacy, correlation, cardinality);
+    ) => new(order, name, correlation, cardinality);
 
     private enum RenderState
     {

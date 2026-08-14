@@ -15,31 +15,26 @@ public sealed class LiveBuildPanelLogEventCatalogTests
             .ToDictionary(definition => definition.EventId, DescribeFields, StringComparer.Ordinal);
         var expected = new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            ["live_build_panel.mount.failed"] = "reason_code:Public:Low:None",
-            ["live_build_panel.refresh.succeeded"] =
-                "request_id:Public:High:Short|result:Public:Low:None",
-            ["live_build_panel.refresh.failed"] =
-                "request_id:Public:High:Short|reason_code:Public:Low:None",
+            ["live_build_panel.mount.failed"] = "reason_code:Low:None",
+            ["live_build_panel.refresh.succeeded"] = "request_id:High:Short|result:Low:None",
+            ["live_build_panel.refresh.failed"] = "request_id:High:Short|reason_code:Low:None",
             ["live_build_panel.corpus.warmup_started"] = "",
             ["live_build_panel.corpus.degraded"] =
-                "reason_code:Public:Low:None|source:Public:Low:None|build_count:Public:High:None|expired:Public:Low:None|cache_path:LocalPath:High:None",
-            ["live_build_panel.corpus.ready"] =
-                "source:Public:Low:None|build_count:Public:High:None",
-            ["live_build_panel.corpus.refresh_queued"] = "reason_code:Public:Low:None",
-            ["live_build_panel.corpus.recovered"] =
-                "source:Public:Low:None|build_count:Public:High:None",
+                "reason_code:Low:None|source:Low:None|build_count:High:None|expired:Low:None|cache_path:High:None",
+            ["live_build_panel.corpus.ready"] = "source:Low:None|build_count:High:None",
+            ["live_build_panel.corpus.refresh_queued"] = "reason_code:Low:None",
+            ["live_build_panel.corpus.recovered"] = "source:Low:None|build_count:High:None",
             ["live_build_panel.corpus.cache_loaded"] =
-                "build_count:Public:High:None|expired:Public:Low:None|cache_path:LocalPath:High:None",
-            ["live_build_panel.corpus.remote_loaded"] =
-                "endpoint:Public:Low:None|build_count:Public:High:None",
+                "build_count:High:None|expired:Low:None|cache_path:High:None",
+            ["live_build_panel.corpus.remote_loaded"] = "endpoint:Low:None|build_count:High:None",
             ["live_build_panel.corpus.cache_write_degraded"] =
-                "path:LocalPath:High:None|reason_code:Public:Low:None",
+                "path:High:None|reason_code:Low:None",
             ["live_build_panel.live_snapshot.degraded"] =
-                "section:Public:Low:None|reason_code:Public:Low:None|template_id:Public:High:None|socket_id:Public:High:None|item_size:Public:Low:None",
+                "section:Low:None|reason_code:Low:None|template_id:High:None|socket_id:High:None|item_size:Low:None",
             ["live_build_panel.card_preview.degraded"] =
-                "operation:Public:Low:None|reason_code:Public:Low:None|template_id:Public:High:None",
+                "operation:Low:None|reason_code:Low:None|template_id:High:None",
             ["live_build_panel.item_board_preview.degraded"] =
-                "operation:Public:Low:None|reason_code:Public:Low:None|template_id:Public:High:None",
+                "operation:Low:None|reason_code:Low:None|template_id:High:None",
         };
 
         Assert.Equal(expected, actual);
@@ -98,7 +93,7 @@ public sealed class LiveBuildPanelLogEventCatalogTests
         string.Join(
             "|",
             definition.Fields.Select(field =>
-                string.Join(":", field.Name, field.Privacy, field.Cardinality, field.Correlation)
+                string.Join(":", field.Name, field.Cardinality, field.Correlation)
             )
         );
 }

@@ -82,15 +82,15 @@ public sealed class RunLogStoreLoggerBridgeTests
 
         Assert.Equal(3, definitions.Count);
         Assert.Equal(
-            "timeout_ms:Public:Low:None|pending_count:Public:High:None|reason_code:Public:Low:None",
+            "timeout_ms:Low:None|pending_count:High:None|reason_code:Low:None",
             Describe(definitions["run_logging.queue.shutdown_degraded"])
         );
         Assert.Equal(
-            "run_id:Public:High:Short|operation:Public:Low:None|reason_code:Public:Low:None",
+            "run_id:High:Short|operation:Low:None|reason_code:Low:None",
             Describe(definitions["run_logging.queue.write_failed"])
         );
         Assert.Equal(
-            "pending_count:Public:High:None|reason_code:Public:Low:None",
+            "pending_count:High:None|reason_code:Low:None",
             Describe(definitions["run_logging.queue.worker_failed"])
         );
         Assert.All(
@@ -130,7 +130,7 @@ public sealed class RunLogStoreLoggerBridgeTests
         string.Join(
             "|",
             definition.Fields.Select(field =>
-                $"{field.Name}:{field.Privacy}:{field.Cardinality}:{field.Correlation}"
+                $"{field.Name}:{field.Cardinality}:{field.Correlation}"
             )
         );
 }

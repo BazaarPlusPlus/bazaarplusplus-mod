@@ -116,51 +116,6 @@ public sealed class BazaarAgentBepInExLoggerTests
         Assert.DoesNotContain('\n', text);
     }
 
-    [Fact]
-    public void Adapter_redacts_secret_shaped_exception_text_and_raw_locations()
-    {
-        using var source = new ManualLogSource("test");
-        LogEventArgs? captured = null;
-        source.LogEvent += (_, args) => captured = args;
-        var adapter = new BazaarAgentBepInExLogger(source);
-        var exception = new ProjectedException(
-            "Authorization: Bearer bearer-secret\n"
-                + "token=token-secret account_id=account-secret\n"
-                + "https://example.com/fail?token=url-secret#fragment\n"
-                + "/Users/alice/private.txt\n"
-                + "request_body={\"password\":\"body-secret\"}",
-            "at /Users/alice/Games/TheBazaar/private.cs:42"
-        );
-
-        adapter.Emit(
-            BazaarAgentLogEvents.ActionFailed(
-                "01JABCDEFGHJKMNPQRSTVWXYZ",
-                BazaarAgentActionKind.Continue,
-                BazaarAgentLogReasonCode.ActionProcessingException,
-                exception
-            )
-        );
-
-        Assert.NotNull(captured);
-        var text = Assert.IsType<string>(captured!.Data);
-        foreach (
-            var secret in new[]
-            {
-                "bearer-secret",
-                "token-secret",
-                "account-secret",
-                "body-secret",
-                "url-secret",
-                "fragment",
-                "/Users/alice",
-            }
-        )
-            Assert.DoesNotContain(secret, text, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("<redacted>", text);
-        Assert.Contains("https://example.com/fail", text);
-        Assert.Contains("<absolute-path>", text);
-    }
-
     [Theory]
     [InlineData(BazaarAgentLogSeverity.Debug, LogLevel.Debug)]
     [InlineData(BazaarAgentLogSeverity.Info, LogLevel.Info)]

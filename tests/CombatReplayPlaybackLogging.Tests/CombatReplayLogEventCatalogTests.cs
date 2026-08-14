@@ -9,7 +9,7 @@ namespace CombatReplayPlaybackLogging.Tests;
 public sealed class CombatReplayLogEventCatalogTests
 {
     private const string PlaybackTerminalSchema =
-        "battle_id:Public:High:Short|source:Public:Low:None|end_reason_code:Public:Low:None|duration_ms:Public:High:None|reason_code:Public:Low:None|degradation_count:Public:Low:None|rollback_status:Public:Low:None";
+        "battle_id:High:Short|source:Low:None|end_reason_code:Low:None|duration_ms:High:None|reason_code:Low:None|degradation_count:Low:None|rollback_status:Low:None";
 
     [Fact]
     public void Playback_persistence_and_warmup_events_match_the_locked_manifest_schemas()
@@ -18,36 +18,35 @@ public sealed class CombatReplayLogEventCatalogTests
             .ToDictionary(definition => definition.EventId, DescribeFields, StringComparer.Ordinal);
         var expected = new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            ["combat_replay.capture.failed"] =
-                "run_id:Public:High:Short|reason_code:Public:Low:None",
+            ["combat_replay.capture.failed"] = "run_id:High:Short|reason_code:Low:None",
             ["combat_replay.current_recording_ui.observed"] =
-                "phase:Public:Low:None|snapshot_visible:Public:Low:None|layout_available:Public:Low:None|layout_reason_code:Public:Low:None|clone_active:Public:Low:None|native_replay_bound:Public:Low:None|icon_available:Public:Low:None",
+                "phase:Low:None|snapshot_visible:Low:None|layout_available:Low:None|layout_reason_code:Low:None|clone_active:Low:None|native_replay_bound:Low:None|icon_available:Low:None",
             ["combat_replay.current_recording.presentation_gate_resolved"] =
-                "recording_id:Public:High:Short|outcome:Public:Low:None|expected_items:Public:Low:None|visible_items:Public:Low:None|face_up_items:Public:Low:None|settled_items:Public:Low:None|expected_skills:Public:Low:None|registered_skills:Public:Low:None|ready_skills:Public:Low:None|elapsed_ms:Public:High:None",
+                "recording_id:High:Short|outcome:Low:None|expected_items:Low:None|visible_items:Low:None|face_up_items:Low:None|settled_items:Low:None|expected_skills:Low:None|registered_skills:Low:None|ready_skills:Low:None|elapsed_ms:High:None",
             ["combat_replay.playback.request_rejected"] =
-                "source:Public:Low:None|reason_code:Public:Low:None|battle_id:Public:High:Short",
+                "source:Low:None|reason_code:Low:None|battle_id:High:Short",
             ["combat_replay.external_record.accepted"] =
-                "request_id:Public:High:Short|battle_id:Public:High:Short|source:Public:Low:None",
+                "request_id:High:Short|battle_id:High:Short|source:Low:None",
             ["combat_replay.playback.started"] =
-                "battle_id:Public:High:Short|source:Public:Low:None|record_video:Public:Low:None",
+                "battle_id:High:Short|source:Low:None|record_video:Low:None",
             ["combat_replay.playback.succeeded"] = PlaybackTerminalSchema,
             ["combat_replay.playback.degraded"] = PlaybackTerminalSchema,
             ["combat_replay.playback.failed"] = PlaybackTerminalSchema,
             ["combat_replay.persistence.failed"] =
-                "battle_id:Public:High:Short|run_id:Public:High:Short|reason_code:Public:Low:None",
+                "battle_id:High:Short|run_id:High:Short|reason_code:Low:None",
             ["combat_replay.persistence.succeeded"] =
-                "battle_id:Public:High:Short|run_id:Public:High:Short|reason_code:Public:Low:None",
+                "battle_id:High:Short|run_id:High:Short|reason_code:Low:None",
             ["combat_replay.persistence.orphan_cleanup_degraded"] =
-                "reason_code:Public:Low:None|failed_count:Public:High:None",
+                "reason_code:Low:None|failed_count:High:None",
             ["combat_replay.persistence.shutdown_incomplete"] =
-                "pending_count:Public:High:None|in_flight:Public:Low:None|timeout_ms:Public:High:None",
-            ["combat_replay.persistence.rollback_cleanup_failed"] = "battle_id:Public:High:Short",
+                "pending_count:High:None|in_flight:Low:None|timeout_ms:High:None",
+            ["combat_replay.persistence.rollback_cleanup_failed"] = "battle_id:High:Short",
             ["combat_replay.playback.cleanup_observed"] =
-                "stage:Public:Low:None|removed_count:Public:High:None|battle_id:Public:High:Short",
+                "stage:Low:None|removed_count:High:None|battle_id:High:Short",
             ["combat_replay.warmup.completed"] =
-                "stage:Public:Low:None|battle_id:Public:High:Short|duration_ms:Public:High:None|board_bank_loaded_count:Public:High:None|board_bank_already_loaded_count:Public:High:None|board_bank_failed_count:Public:High:None|board_bank_skipped_count:Public:High:None|soundtrack_bank_loaded_count:Public:High:None|soundtrack_bank_already_loaded_count:Public:High:None|soundtrack_bank_failed_count:Public:High:None|soundtrack_bank_skipped_count:Public:High:None|shared_asset_preloaded_count:Public:High:None|shared_asset_skipped_count:Public:High:None|card_preloaded_count:Public:High:None|card_skipped_count:Public:High:None|card_failed_count:Public:High:None|override_asset_preloaded_count:Public:High:None|override_asset_skipped_count:Public:High:None|override_asset_failed_count:Public:High:None|vfx_prewarmed_count:Public:High:None|vfx_skipped_count:Public:High:None|vfx_failed_count:Public:High:None",
+                "stage:Low:None|battle_id:High:Short|duration_ms:High:None|board_bank_loaded_count:High:None|board_bank_already_loaded_count:High:None|board_bank_failed_count:High:None|board_bank_skipped_count:High:None|soundtrack_bank_loaded_count:High:None|soundtrack_bank_already_loaded_count:High:None|soundtrack_bank_failed_count:High:None|soundtrack_bank_skipped_count:High:None|shared_asset_preloaded_count:High:None|shared_asset_skipped_count:High:None|card_preloaded_count:High:None|card_skipped_count:High:None|card_failed_count:High:None|override_asset_preloaded_count:High:None|override_asset_skipped_count:High:None|override_asset_failed_count:High:None|vfx_prewarmed_count:High:None|vfx_skipped_count:High:None|vfx_failed_count:High:None",
             ["combat_replay.warmup.asset_skipped"] =
-                "stage:Public:Low:None|asset_key:UntrustedText:High:None|reason_code:Public:Low:None",
+                "stage:Low:None|asset_key:High:None|reason_code:Low:None",
         };
 
         Assert.Equal(expected.Count, actual.Count);
@@ -112,7 +111,7 @@ public sealed class CombatReplayLogEventCatalogTests
         string.Join(
             "|",
             definition.Fields.Select(field =>
-                string.Join(":", field.Name, field.Privacy, field.Cardinality, field.Correlation)
+                string.Join(":", field.Name, field.Cardinality, field.Correlation)
             )
         );
 }

@@ -96,15 +96,6 @@ internal sealed class BppLogFeatureScope
     }
 }
 
-internal enum BppLogFieldPrivacy
-{
-    Public,
-    UntrustedText,
-    Sensitive,
-    LocalPath,
-    RemoteUri,
-}
-
 internal enum BppLogCorrelationPolicy
 {
     None,
@@ -121,21 +112,19 @@ internal enum BppLogCardinality
 
 /// <summary>
 /// Defines one ordered field. The definition token owns its name and governance metadata; runtime
-/// values bind to this exact token so callers cannot override privacy or correlation policy.
+/// values bind to this exact token so callers cannot override correlation policy.
 /// </summary>
 internal sealed class BppLogFieldDefinition
 {
     internal BppLogFieldDefinition(
         int order,
         string name,
-        BppLogFieldPrivacy privacy,
         BppLogCorrelationPolicy correlation,
         BppLogCardinality cardinality
     )
     {
         Order = order;
         Name = name;
-        Privacy = privacy;
         Correlation = correlation;
         Cardinality = cardinality;
     }
@@ -143,8 +132,6 @@ internal sealed class BppLogFieldDefinition
     internal int Order { get; }
 
     internal string Name { get; }
-
-    internal BppLogFieldPrivacy Privacy { get; }
 
     internal BppLogCorrelationPolicy Correlation { get; }
 

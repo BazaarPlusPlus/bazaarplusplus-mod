@@ -48,6 +48,10 @@
       Link="CollectionCardSearch.cs"
     />
     <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionCardVm.Search.cs"
+      Link="CollectionCardVm.Search.cs"
+    />
+    <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionSearchRefreshGate.cs"
       Link="CollectionSearchRefreshGate.cs"
     />

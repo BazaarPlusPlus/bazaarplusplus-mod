@@ -970,10 +970,6 @@ file static class RecordingOperationContractTests
                 !logs.Joined.Contains("recording-race-00000004", StringComparison.Ordinal),
                 "Rendered correlation must not expose the full recording id."
             );
-            TestReflection.Assert(
-                !logs.Joined.Contains(root, StringComparison.Ordinal),
-                "Rendered output paths must not expose the absolute temp root."
-            );
 
             ShutdownSweepClosesOrphanOnce(root, logs);
             TrackedShutdownSweepRejectsLateCompletion(root, logs);
@@ -1577,27 +1573,27 @@ file static class MediaEventCatalogTests
         ["combat_replay.video_recording.succeeded"] = TerminalSchema,
         ["combat_replay.video_recording.degraded"] = TerminalSchema,
         ["combat_replay.video_recording.failed"] =
-            TerminalSchema + "|exit_code:Public:Low:None|stderr_tail:UntrustedText:High:None",
+            TerminalSchema + "|exit_code:Low:None|stderr_tail:High:None",
         ["combat_replay.audio_capture.started"] =
-            "recording_id:Public:High:Short|backend:Public:Low:None|sample_rate_hz:Public:High:None|channels:Public:Low:None|sample_format:Public:Low:None",
+            "recording_id:High:Short|backend:Low:None|sample_rate_hz:High:None|channels:Low:None|sample_format:Low:None",
         ["combat_replay.audio_capture.completed"] =
-            "recording_id:Public:High:Short|backend:Public:Low:None|usable:Public:Low:None|sample_float_count:Public:High:None|rms_db:Public:High:None|peak_db:Public:High:None|size_bytes:Public:High:None|wav_path:LocalPath:High:None",
+            "recording_id:High:Short|backend:Low:None|usable:Low:None|sample_float_count:High:None|rms_db:High:None|peak_db:High:None|size_bytes:High:None|wav_path:High:None",
         ["combat_replay.video_recording.lifecycle_observed"] =
-            "stage:Public:Low:None|recording_id:Public:High:Short|battle_id:Public:High:Short|pending_count:Public:High:None",
+            "stage:Low:None|recording_id:High:Short|battle_id:High:Short|pending_count:High:None",
         ["combat_replay.video_capture.stats_observed"] =
-            "recording_id:Public:High:Short|stage:Public:Low:None|width:Public:High:None|height:Public:High:None|fps:Public:Low:None|captured_frames:Public:High:None|repeated_frames:Public:High:None|dropped_frames:Public:High:None|duration_ms:Public:High:None|size_bytes:Public:High:None|output_path:LocalPath:High:None|codec:Public:Low:None|rate_control:Public:Low:None|frame_bytes:Public:High:None|pool_capacity:Public:Low:None|queue_capacity:Public:Low:None|pool_payload_bytes:Public:High:None|pool_budget_exceeded:Public:Low:None|readback_backpressure_skips:Public:High:None|max_outstanding_readbacks:Public:Low:None|readback_copy_p95_us:Public:High:None|cfr_copy_p95_us:Public:High:None|staging_buffer_bytes:Public:High:None|max_readback_payload_bytes:Public:High:None|render_texture_estimated_bytes:Public:High:None",
+            "recording_id:High:Short|stage:Low:None|width:High:None|height:High:None|fps:Low:None|captured_frames:High:None|repeated_frames:High:None|dropped_frames:High:None|duration_ms:High:None|size_bytes:High:None|output_path:High:None|codec:Low:None|rate_control:Low:None|frame_bytes:High:None|pool_capacity:Low:None|queue_capacity:Low:None|pool_payload_bytes:High:None|pool_budget_exceeded:Low:None|readback_backpressure_skips:High:None|max_outstanding_readbacks:Low:None|readback_copy_p95_us:High:None|cfr_copy_p95_us:High:None|staging_buffer_bytes:High:None|max_readback_payload_bytes:High:None|render_texture_estimated_bytes:High:None",
         ["combat_replay.video_capture.native_pipeline_observed"] =
-            "recording_id:Public:High:Short|stage:Public:Low:None|backpressure_dropped_frames:Public:High:None|dropped_frames:Public:High:None|lease_misses:Public:High:None|enqueue_rejects:Public:High:None|pacer_resync_dropped_frames:Public:High:None|max_in_flight:Public:Low:None|native_frames_written:Public:High:None|render_frame_p50_us:Public:High:None|render_frame_p95_us:Public:High:None|render_frame_p99_us:Public:High:None|texture_copy_p50_us:Public:High:None|texture_copy_p95_us:Public:High:None|texture_copy_p99_us:Public:High:None|battle_id:Public:High:Short|encoder_name:Public:Low:None",
+            "recording_id:High:Short|stage:Low:None|backpressure_dropped_frames:High:None|dropped_frames:High:None|lease_misses:High:None|enqueue_rejects:High:None|pacer_resync_dropped_frames:High:None|max_in_flight:Low:None|native_frames_written:High:None|render_frame_p50_us:High:None|render_frame_p95_us:High:None|render_frame_p99_us:High:None|texture_copy_p50_us:High:None|texture_copy_p95_us:High:None|texture_copy_p99_us:High:None|battle_id:High:Short|encoder_name:Low:None",
         ["combat_replay.video_capture.frame_degraded"] =
-            "recording_id:Public:High:Short|stage:Public:Low:None|reason_code:Public:Low:None|sequence:Public:High:None",
+            "recording_id:High:Short|stage:Low:None|reason_code:Low:None|sequence:High:None",
         ["combat_replay.video_recording.cleanup_failed"] =
-            "recording_id:Public:High:Short|stage:Public:Low:None|path:LocalPath:High:None",
+            "recording_id:High:Short|stage:Low:None|path:High:None",
         ["combat_replay.video_mux.diagnostic_observed"] =
-            "recording_id:Public:High:Short|stage:Public:Low:None|reason_code:Public:Low:None|path:LocalPath:High:None|pending_count:Public:High:None",
+            "recording_id:High:Short|stage:Low:None|reason_code:Low:None|path:High:None|pending_count:High:None",
     };
 
     private const string TerminalSchema =
-        "recording_id:Public:High:Short|battle_id:Public:High:Short|source:Public:Low:None|reason_code:Public:Low:None|duration_ms:Public:High:None|captured_frames:Public:High:None|dropped_frames:Public:High:None|size_bytes:Public:High:None|audio_status:Public:Low:None|metadata_status:Public:Low:None|output_path:LocalPath:High:None";
+        "recording_id:High:Short|battle_id:High:Short|source:Low:None|reason_code:Low:None|duration_ms:High:None|captured_frames:High:None|dropped_frames:High:None|size_bytes:High:None|audio_status:Low:None|metadata_status:Low:None|output_path:High:None";
 
     public static void Run()
     {
@@ -1698,7 +1694,7 @@ file static class MediaEventCatalogTests
             fields
                 .Cast<object>()
                 .Select(field =>
-                    $"{TestReflection.GetProp(field.GetType(), field, "Name")}:{TestReflection.GetProp(field.GetType(), field, "Privacy")}:{TestReflection.GetProp(field.GetType(), field, "Cardinality")}:{TestReflection.GetProp(field.GetType(), field, "Correlation")}"
+                    $"{TestReflection.GetProp(field.GetType(), field, "Name")}:{TestReflection.GetProp(field.GetType(), field, "Cardinality")}:{TestReflection.GetProp(field.GetType(), field, "Correlation")}"
                 )
         );
     }

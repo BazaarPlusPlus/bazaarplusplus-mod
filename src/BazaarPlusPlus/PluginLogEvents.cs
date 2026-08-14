@@ -264,14 +264,8 @@ internal static class PluginLogEvents
         int order,
         string name,
         BppLogCardinality cardinality
-    ) => new(order, name, BppLogFieldPrivacy.Public, BppLogCorrelationPolicy.None, cardinality);
+    ) => new(order, name, BppLogCorrelationPolicy.None, cardinality);
 
     private static BppLogFieldDefinition Untrusted(int order, string name) =>
-        new(
-            order,
-            name,
-            BppLogFieldPrivacy.UntrustedText,
-            BppLogCorrelationPolicy.None,
-            BppLogCardinality.High
-        );
+        new(order, name, BppLogCorrelationPolicy.None, BppLogCardinality.High);
 }

@@ -45,7 +45,6 @@ internal static class CombatReplayVideoLogEvents
     internal static readonly BppLogFieldDefinition OutputPath = new(
         10,
         "output_path",
-        BppLogFieldPrivacy.LocalPath,
         BppLogCorrelationPolicy.None,
         BppLogCardinality.High
     );
@@ -53,7 +52,6 @@ internal static class CombatReplayVideoLogEvents
     internal static readonly BppLogFieldDefinition StderrTail = new(
         12,
         "stderr_tail",
-        BppLogFieldPrivacy.UntrustedText,
         BppLogCorrelationPolicy.None,
         BppLogCardinality.High
     );
@@ -172,7 +170,6 @@ internal static class CombatReplayVideoLogEvents
     internal static readonly BppLogFieldDefinition AudioCompletedWavPath = new(
         7,
         "wav_path",
-        BppLogFieldPrivacy.LocalPath,
         BppLogCorrelationPolicy.None,
         BppLogCardinality.High
     );
@@ -261,7 +258,6 @@ internal static class CombatReplayVideoLogEvents
     internal static readonly BppLogFieldDefinition StatsOutputPath = new(
         10,
         "output_path",
-        BppLogFieldPrivacy.LocalPath,
         BppLogCorrelationPolicy.None,
         BppLogCardinality.High
     );
@@ -483,7 +479,6 @@ internal static class CombatReplayVideoLogEvents
     internal static readonly BppLogFieldDefinition CleanupPath = new(
         2,
         "path",
-        BppLogFieldPrivacy.LocalPath,
         BppLogCorrelationPolicy.None,
         BppLogCardinality.High
     );
@@ -504,7 +499,6 @@ internal static class CombatReplayVideoLogEvents
     internal static readonly BppLogFieldDefinition MuxPath = new(
         3,
         "path",
-        BppLogFieldPrivacy.LocalPath,
         BppLogCorrelationPolicy.None,
         BppLogCardinality.High
     );
@@ -524,5 +518,5 @@ internal static class CombatReplayVideoLogEvents
         string name,
         BppLogCardinality cardinality = BppLogCardinality.Low,
         BppLogCorrelationPolicy correlation = BppLogCorrelationPolicy.None
-    ) => new(order, name, BppLogFieldPrivacy.Public, correlation, cardinality);
+    ) => new(order, name, correlation, cardinality);
 }

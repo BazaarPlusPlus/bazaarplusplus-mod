@@ -598,7 +598,6 @@ internal static class CombatReplayLogEvents
     internal static readonly BppLogFieldDefinition WarmupAssetKey = new(
         1,
         "asset_key",
-        BppLogFieldPrivacy.UntrustedText,
         BppLogCorrelationPolicy.None,
         BppLogCardinality.High
     );
@@ -618,5 +617,5 @@ internal static class CombatReplayLogEvents
         string name,
         BppLogCardinality cardinality,
         BppLogCorrelationPolicy correlation = BppLogCorrelationPolicy.None
-    ) => new(order, name, BppLogFieldPrivacy.Public, correlation, cardinality);
+    ) => new(order, name, correlation, cardinality);
 }

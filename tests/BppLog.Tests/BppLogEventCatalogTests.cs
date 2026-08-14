@@ -88,11 +88,9 @@ public sealed class BppLogEventCatalogTests
     }
 
     [Theory]
-    [InlineData(999, 0, 0, (int)BppLogCatalogViolationKind.InvalidPrivacy)]
-    [InlineData(0, 999, 0, (int)BppLogCatalogViolationKind.InvalidCorrelation)]
-    [InlineData(0, 0, 999, (int)BppLogCatalogViolationKind.InvalidCardinality)]
+    [InlineData(999, 0, (int)BppLogCatalogViolationKind.InvalidCorrelation)]
+    [InlineData(0, 999, (int)BppLogCatalogViolationKind.InvalidCardinality)]
     public void Validate_reports_invalid_field_governance(
-        int privacy,
         int correlation,
         int cardinality,
         int expected
@@ -101,7 +99,6 @@ public sealed class BppLogEventCatalogTests
         var field = Field(
             0,
             "value",
-            (BppLogFieldPrivacy)privacy,
             (BppLogCorrelationPolicy)correlation,
             (BppLogCardinality)cardinality
         );
@@ -133,11 +130,9 @@ public sealed class BppLogEventCatalogTests
     }
 
     [Theory]
-    [InlineData(0, 0, 1, (int)BppLogCatalogViolationKind.StormKeyNotLowCardinality)]
-    [InlineData(0, 1, 0, (int)BppLogCatalogViolationKind.StormKeyCorrelated)]
-    [InlineData(2, 0, 0, (int)BppLogCatalogViolationKind.StormKeySensitive)]
+    [InlineData(0, 1, (int)BppLogCatalogViolationKind.StormKeyNotLowCardinality)]
+    [InlineData(1, 0, (int)BppLogCatalogViolationKind.StormKeyCorrelated)]
     public void Validate_reports_unsafe_storm_key_governance(
-        int privacy,
         int correlation,
         int cardinality,
         int expected
@@ -146,7 +141,6 @@ public sealed class BppLogEventCatalogTests
         var key = Field(
             0,
             "key",
-            (BppLogFieldPrivacy)privacy,
             (BppLogCorrelationPolicy)correlation,
             (BppLogCardinality)cardinality
         );
@@ -213,8 +207,7 @@ public sealed class BppLogEventCatalogTests
     private static BppLogFieldDefinition Field(
         int order,
         string name,
-        BppLogFieldPrivacy privacy = BppLogFieldPrivacy.Public,
         BppLogCorrelationPolicy correlation = BppLogCorrelationPolicy.None,
         BppLogCardinality cardinality = BppLogCardinality.Low
-    ) => new(order, name, privacy, correlation, cardinality);
+    ) => new(order, name, correlation, cardinality);
 }

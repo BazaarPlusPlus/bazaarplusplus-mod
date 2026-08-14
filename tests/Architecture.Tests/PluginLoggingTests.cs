@@ -15,32 +15,25 @@ public sealed class PluginLoggingTests
         var expected = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["plugin.initialization.succeeded"] =
-                "plugin_version:Public:High:None|game_build:UntrustedText:High:None|build_channel:Public:Low:None",
+                "plugin_version:High:None|game_build:High:None|build_channel:Low:None",
             ["plugin.game_build.degraded"] =
-                "game_build:UntrustedText:High:None|build_channel:Public:Low:None|reason_code:Public:Low:None",
-            ["plugin.initialization.failed"] = "phase:Public:Low:None|reason_code:Public:Low:None",
+                "game_build:High:None|build_channel:Low:None|reason_code:Low:None",
+            ["plugin.initialization.failed"] = "phase:Low:None|reason_code:Low:None",
             ["plugin.shutdown.degraded"] =
-                "failed_step_count:Public:Low:None|first_failed_step:Public:Low:None|reason_code:Public:Low:None",
-            ["plugin.online_services.degraded"] =
-                "reason_code:Public:Low:None|endpoint:Public:Low:None",
-            ["plugin.patch.apply_failed"] =
-                "patch_type:UntrustedText:High:None|reason_code:Public:Low:None",
-            ["plugin.patches.degraded"] =
-                "failed_patch_count:Public:Low:None|reason_code:Public:Low:None",
+                "failed_step_count:Low:None|first_failed_step:Low:None|reason_code:Low:None",
+            ["plugin.online_services.degraded"] = "reason_code:Low:None|endpoint:Low:None",
+            ["plugin.patch.apply_failed"] = "patch_type:High:None|reason_code:Low:None",
+            ["plugin.patches.degraded"] = "failed_patch_count:Low:None|reason_code:Low:None",
             ["plugin.event_handler.degraded"] =
-                "event_id:Public:Low:None|handler_id:Public:Low:None|reason_code:Public:Low:None",
-            ["plugin.feature_start.degraded"] =
-                "feature:Public:Low:None|reason_code:Public:Low:None",
-            ["plugin.feature_stop.degraded"] =
-                "feature:Public:Low:None|reason_code:Public:Low:None",
-            ["plugin.native_game_fonts.degraded"] =
-                "stage:Public:Low:None|reason_code:Public:Low:None",
+                "event_id:Low:None|handler_id:Low:None|reason_code:Low:None",
+            ["plugin.feature_start.degraded"] = "feature:Low:None|reason_code:Low:None",
+            ["plugin.feature_stop.degraded"] = "feature:Low:None|reason_code:Low:None",
+            ["plugin.native_game_fonts.degraded"] = "stage:Low:None|reason_code:Low:None",
             ["plugin.native_game_fonts.loaded"] =
-                "font_count:Public:High:None|font_names:UntrustedText:High:None|source_font:UntrustedText:High:None",
-            ["plugin.native_game_fonts.recovered"] = "font_count:Public:High:None",
-            ["plugin.native_game_fonts.cleanup_failed"] = "stage:Public:Low:None",
-            ["plugin.native_game_fonts.text_rejected"] =
-                "surface:Public:Low:None|code_point:Public:High:None",
+                "font_count:High:None|font_names:High:None|source_font:High:None",
+            ["plugin.native_game_fonts.recovered"] = "font_count:High:None",
+            ["plugin.native_game_fonts.cleanup_failed"] = "stage:Low:None",
+            ["plugin.native_game_fonts.text_rejected"] = "surface:Low:None|code_point:High:None",
         };
 
         Assert.Equal(expected.Count, actual.Count);
@@ -156,7 +149,7 @@ public sealed class PluginLoggingTests
         string.Join(
             "|",
             definition.Fields.Select(field =>
-                $"{field.Name}:{field.Privacy}:{field.Cardinality}:{field.Correlation}"
+                $"{field.Name}:{field.Cardinality}:{field.Correlation}"
             )
         );
 

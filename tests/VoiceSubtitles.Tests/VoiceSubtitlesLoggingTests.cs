@@ -24,26 +24,23 @@ public sealed class VoiceSubtitlesLoggingTests
         var expected = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["voice_subtitles.display.hidden"] =
-                "display_id:Public:High:Full|attempt_id:Public:High:Full|stem:Public:High:None|reason_code:Public:Low:None|elapsed_ms:Public:High:None|playback_state:UntrustedText:Low:None",
+                "display_id:High:Full|attempt_id:High:Full|stem:High:None|reason_code:Low:None|elapsed_ms:High:None|playback_state:Low:None",
             ["voice_subtitles.display.rendered"] =
-                "display_id:Public:High:Full|attempt_id:Public:High:Full|stem:Public:High:None|event_duration_ms:Public:High:None|line_duration_ms:Public:High:None|display_duration_ms:Public:High:None|renderer:UntrustedText:High:None|active_before:Public:Low:None|playback_state:UntrustedText:Low:None|english_text:UntrustedText:High:None|chinese_text:UntrustedText:High:None",
+                "display_id:High:Full|attempt_id:High:Full|stem:High:None|event_duration_ms:High:None|line_duration_ms:High:None|display_duration_ms:High:None|renderer:High:None|active_before:Low:None|playback_state:Low:None|english_text:High:None|chinese_text:High:None",
             ["voice_subtitles.display.skipped"] =
-                "display_id:Public:High:Full|attempt_id:Public:High:Full|stem:Public:High:None|reason_code:Public:Low:None",
+                "display_id:High:Full|attempt_id:High:Full|stem:High:None|reason_code:Low:None",
             ["voice_subtitles.font_environment.observed"] =
-                "reason_code:Public:Low:None|anchor_path:UntrustedText:High:None|source_font:UntrustedText:High:None|source_coverage:Public:Low:None|default_font:UntrustedText:High:None|fallback_fonts:UntrustedText:High:None",
-            ["voice_subtitles.font_inventory.observed"] =
-                "font_count:Public:High:None|fonts:UntrustedText:High:None",
+                "reason_code:Low:None|anchor_path:High:None|source_font:High:None|source_coverage:Low:None|default_font:High:None|fallback_fonts:High:None",
+            ["voice_subtitles.font_inventory.observed"] = "font_count:High:None|fonts:High:None",
             ["voice_subtitles.mount_anchor.selected"] =
-                "anchor_path:UntrustedText:High:None|label_text:UntrustedText:High:None",
+                "anchor_path:High:None|label_text:High:None",
             ["voice_subtitles.overlay.failed"] =
-                "stage:Public:Low:None|anchor_path:UntrustedText:High:Hash|anchor_text:UntrustedText:High:None|reason_code:Public:Low:None",
-            ["voice_subtitles.overlay.mounted"] =
-                "renderer:UntrustedText:High:None|anchor_path:UntrustedText:High:None",
+                "stage:Low:None|anchor_path:High:Hash|anchor_text:High:None|reason_code:Low:None",
+            ["voice_subtitles.overlay.mounted"] = "renderer:High:None|anchor_path:High:None",
             ["voice_subtitles.playback_tracking.degraded"] =
-                "display_id:Public:High:Full|attempt_id:Public:High:Full|reason_code:Public:Low:None",
-            ["voice_subtitles.settings.degraded"] =
-                "phase:Public:Low:None|reason_code:Public:Low:None",
-            ["voice_subtitles.settings.recovered"] = "phase:Public:Low:None",
+                "display_id:High:Full|attempt_id:High:Full|reason_code:Low:None",
+            ["voice_subtitles.settings.degraded"] = "phase:Low:None|reason_code:Low:None",
+            ["voice_subtitles.settings.recovered"] = "phase:Low:None",
         };
 
         Assert.Equal(expected, actual);
@@ -122,7 +119,7 @@ public sealed class VoiceSubtitlesLoggingTests
         string.Join(
             "|",
             definition.Fields.Select(field =>
-                $"{field.Name}:{field.Privacy}:{field.Cardinality}:{field.Correlation}"
+                $"{field.Name}:{field.Cardinality}:{field.Correlation}"
             )
         );
 

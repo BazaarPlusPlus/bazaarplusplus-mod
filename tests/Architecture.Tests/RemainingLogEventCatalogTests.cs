@@ -19,26 +19,21 @@ public sealed class RemainingLogEventCatalogTests
             new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 ["tooltips.level_rewards.rendered_or_skipped"] =
-                    "outcome:Public:Low:None|reason_code:Public:Low:None|level:Public:Low:None|content_length:Public:High:None",
+                    "outcome:Low:None|reason_code:Low:None|level:Low:None|content_length:High:None",
                 ["tooltips.level_rewards.degraded"] =
-                    "outcome:Public:Low:None|reason_code:Public:Low:None|level:Public:Low:None|content_length:Public:High:None",
-                ["tooltips.encounter_section.degraded"] = "reason_code:Public:Low:None",
-                ["tooltips.encounter_inventory.degraded"] = "reason_code:Public:Low:None",
-                ["tooltips.section.degraded"] =
-                    "section_id:Public:Low:None|reason_code:Public:Low:None",
-                ["tooltips.section_host.degraded"] =
-                    "section_id:Public:Low:None|reason_code:Public:Low:None",
-                ["tooltips.preview_refresh.degraded"] =
-                    "reason_code:Public:Low:None|mode:Public:Low:None",
+                    "outcome:Low:None|reason_code:Low:None|level:Low:None|content_length:High:None",
+                ["tooltips.encounter_section.degraded"] = "reason_code:Low:None",
+                ["tooltips.encounter_inventory.degraded"] = "reason_code:Low:None",
+                ["tooltips.section.degraded"] = "section_id:Low:None|reason_code:Low:None",
+                ["tooltips.section_host.degraded"] = "section_id:Low:None|reason_code:Low:None",
+                ["tooltips.preview_refresh.degraded"] = "reason_code:Low:None|mode:Low:None",
                 ["tooltips.preview_target.resolved_or_skipped"] =
-                    "outcome:Public:Low:None|reason_code:Public:Low:None|template_id:Public:High:None|card_instance_id:Public:High:Hash",
-                ["tooltips.encounter_probe.degraded"] =
-                    "probe:Public:Low:None|reason_code:Public:Low:None",
-                ["tooltips.encounter_probe.recovered"] = "probe:Public:Low:None",
-                ["tooltips.card_preview.hover_failed"] =
-                    "operation:Public:Low:None|reason_code:Public:Low:None",
+                    "outcome:Low:None|reason_code:Low:None|template_id:High:None|card_instance_id:High:Hash",
+                ["tooltips.encounter_probe.degraded"] = "probe:Low:None|reason_code:Low:None",
+                ["tooltips.encounter_probe.recovered"] = "probe:Low:None",
+                ["tooltips.card_preview.hover_failed"] = "operation:Low:None|reason_code:Low:None",
                 ["tooltips.package_merchant_summary.degraded"] =
-                    "reason_code:Public:Low:None|merchant_template_id:Public:High:None",
+                    "reason_code:Low:None|merchant_template_id:High:None",
             }
         );
     }
@@ -52,10 +47,10 @@ public sealed class RemainingLogEventCatalogTests
             new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 ["item_enchant_preview.render.degraded"] =
-                    "stage:Public:Low:None|reason_code:Public:Low:None|enchantment:Public:Low:None",
+                    "stage:Low:None|reason_code:Low:None|enchantment:Low:None",
                 ["item_enchant_preview.encounter_probe.degraded"] =
-                    "probe:Public:Low:None|reason_code:Public:Low:None",
-                ["item_enchant_preview.encounter_probe.recovered"] = "probe:Public:Low:None",
+                    "probe:Low:None|reason_code:Low:None",
+                ["item_enchant_preview.encounter_probe.recovered"] = "probe:Low:None",
             }
         );
         AssertCatalog(
@@ -64,7 +59,7 @@ public sealed class RemainingLogEventCatalogTests
             new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 ["pvp_battles.snapshot.degraded"] =
-                    "combatant:Public:Low:None|section:Public:Low:None|battle_id:Public:High:Short|reason_code:Public:Low:None",
+                    "combatant:Low:None|section:Low:None|battle_id:High:Short|reason_code:Low:None",
             }
         );
     }
@@ -121,7 +116,7 @@ public sealed class RemainingLogEventCatalogTests
         string.Join(
             "|",
             definition.Fields.Select(field =>
-                $"{field.Name}:{field.Privacy}:{field.Cardinality}:{field.Correlation}"
+                $"{field.Name}:{field.Cardinality}:{field.Correlation}"
             )
         );
 }

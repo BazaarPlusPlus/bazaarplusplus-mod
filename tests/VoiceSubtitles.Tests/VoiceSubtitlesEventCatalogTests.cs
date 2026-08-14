@@ -54,33 +54,32 @@ public sealed class VoiceSubtitlesEventCatalogTests
             .ToDictionary(definition => definition.EventId, DescribeFields, StringComparer.Ordinal);
         var expected = new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            ["voice_subtitles.observer.installed"] = "player_instance:Public:High:None",
+            ["voice_subtitles.observer.installed"] = "player_instance:High:None",
             ["voice_subtitles.attempt.started"] =
-                "attempt_id:Public:High:Full|origin:Public:Low:None|player_instance:Public:High:None|source:Public:Low:None|hook:Public:Low:None|event_ref:UntrustedText:High:None|event_path:UntrustedText:High:None|event_duration_ms:Public:High:None",
+                "attempt_id:High:Full|origin:Low:None|player_instance:High:None|source:Low:None|hook:Low:None|event_ref:High:None|event_path:High:None|event_duration_ms:High:None",
             ["voice_subtitles.observer.degraded"] =
-                "reason_code:Public:Low:None|origin:Public:Low:None|hook:Public:Low:None|event_ref:UntrustedText:High:None|callback_event:UntrustedText:High:None",
+                "reason_code:Low:None|origin:Low:None|hook:Low:None|event_ref:High:None|callback_event:High:None",
             ["voice_subtitles.attempt.cleared"] =
-                "attempt_id:Public:High:Full|reason_code:Public:Low:None|age_ms:Public:High:None",
+                "attempt_id:High:Full|reason_code:Low:None|age_ms:High:None",
             ["voice_subtitles.sound.observed"] =
-                "attempt_id:Public:High:Full|player_instance:Public:High:None|context_player_instance:Public:High:None|source:Public:Low:None|hook:Public:Low:None|sound_name:UntrustedText:High:None|sound_duration_ms:Public:High:None|event_path:UntrustedText:High:None",
+                "attempt_id:High:Full|player_instance:High:None|context_player_instance:High:None|source:Low:None|hook:Low:None|sound_name:High:None|sound_duration_ms:High:None|event_path:High:None",
             ["voice_subtitles.lookup.skipped"] =
-                "attempt_id:Public:High:Full|origin:Public:Low:None|strategy:Public:Low:None|hook:Public:Low:None|sound_name:UntrustedText:High:None|reason_code:Public:Low:None",
+                "attempt_id:High:Full|origin:Low:None|strategy:Low:None|hook:Low:None|sound_name:High:None|reason_code:Low:None",
             ["voice_subtitles.lookup.resolved"] =
-                "attempt_id:Public:High:Full|origin:Public:Low:None|strategy:Public:Low:None|catalog:Public:Low:None|matched_token:UntrustedText:High:None|candidate_count:Public:High:None|stem:Public:High:None|sound_duration_ms:Public:High:None|event_duration_ms:Public:High:None|line_duration_ms:Public:High:None|display_duration_ms:Public:High:None|english_text:UntrustedText:High:None|chinese_text:UntrustedText:High:None",
+                "attempt_id:High:Full|origin:Low:None|strategy:Low:None|catalog:Low:None|matched_token:High:None|candidate_count:High:None|stem:High:None|sound_duration_ms:High:None|event_duration_ms:High:None|line_duration_ms:High:None|display_duration_ms:High:None|english_text:High:None|chinese_text:High:None",
             ["voice_subtitles.attempt.stopped"] =
-                "attempt_id:Public:High:Full|player_instance:Public:High:None|age_ms:Public:High:None",
+                "attempt_id:High:Full|player_instance:High:None|age_ms:High:None",
             ["voice_subtitles.callback.observed"] =
-                "attempt_id:Public:High:Full|origin:Public:Low:None|age_ms:Public:High:None|source:Public:Low:None|hook:Public:Low:None|context_matches_callback:Public:Low:None|callback_event:UntrustedText:High:None|context_event_ref:UntrustedText:High:None|context_event_path:UntrustedText:High:None",
-            ["voice_subtitles.lookup.failed"] =
-                "attempt_id:Public:High:Full|reason_code:Public:Low:None",
-            ["voice_subtitles.gate.degraded"] = "reason_code:Public:Low:None",
+                "attempt_id:High:Full|origin:Low:None|age_ms:High:None|source:Low:None|hook:Low:None|context_matches_callback:Low:None|callback_event:High:None|context_event_ref:High:None|context_event_path:High:None",
+            ["voice_subtitles.lookup.failed"] = "attempt_id:High:Full|reason_code:Low:None",
+            ["voice_subtitles.gate.degraded"] = "reason_code:Low:None",
             ["voice_subtitles.display.failed"] =
-                "display_id:Public:High:Full|attempt_id:Public:High:Full|stem:Public:High:None|reason_code:Public:Low:None",
-            ["voice_subtitles.observer.failed"] = "reason_code:Public:Low:None",
+                "display_id:High:Full|attempt_id:High:Full|stem:High:None|reason_code:Low:None",
+            ["voice_subtitles.observer.failed"] = "reason_code:Low:None",
             ["voice_subtitles.callback_patch.degraded"] =
-                "reason_code:Public:Low:None|actual_count:Public:High:None|expected_count:Public:Low:None",
+                "reason_code:Low:None|actual_count:High:None|expected_count:Low:None",
             ["voice_subtitles.callback_patch.ready"] =
-                "actual_count:Public:High:None|expected_count:Public:Low:None",
+                "actual_count:High:None|expected_count:Low:None",
         };
 
         Assert.Equal(expected, actual);
@@ -110,30 +109,6 @@ public sealed class VoiceSubtitlesEventCatalogTests
 #endif
     }
 
-    [Fact]
-    public void Structured_exception_projection_hides_multiline_path_and_url_text()
-    {
-        using var capture = new LogCapture();
-
-        BppLog.ErrorEvent(
-            VoiceSubtitleDisplayLogEvents.DisplayFailed,
-            new InvalidOperationException(
-                "private line\n/Users/example/private.json https://secret.example/catalog"
-            ),
-            VoiceSubtitleDisplayLogEvents.DisplayId.Bind(7),
-            VoiceSubtitleDisplayLogEvents.AttemptId.Bind(9),
-            VoiceSubtitleDisplayLogEvents.Stem.Bind("中文台词"),
-            VoiceSubtitleDisplayLogEvents.ReasonCode.Bind(
-                VoiceSubtitleDisplayLogReasonCode.QueueFailed
-            )
-        );
-
-        Assert.Contains("stem=中文台词", capture.Joined);
-        Assert.DoesNotContain("/Users/example", capture.Joined);
-        Assert.DoesNotContain("secret.example", capture.Joined);
-        Assert.DoesNotContain('\n', capture.Joined);
-    }
-
     private static IEnumerable<BppLogEventDefinition> Definitions(Type source) =>
         source
             .GetFields(BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.DeclaredOnly)
@@ -144,7 +119,7 @@ public sealed class VoiceSubtitlesEventCatalogTests
         string.Join(
             "|",
             definition.Fields.Select(field =>
-                $"{field.Name}:{field.Privacy}:{field.Cardinality}:{field.Correlation}"
+                $"{field.Name}:{field.Cardinality}:{field.Correlation}"
             )
         );
 
