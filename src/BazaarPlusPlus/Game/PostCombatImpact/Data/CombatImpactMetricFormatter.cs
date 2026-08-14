@@ -135,14 +135,10 @@ internal static class CombatImpactMetricFormatter
             parts.Add(
                 isRegen
                     ? string.IsNullOrWhiteSpace(healingMarker)
-                        ? chinese
-                            ? $"治疗 {amount}"
-                            : $"{amount} healed"
+                        ? amount
                         : $"{healingMarker}{amount}"
                     : string.IsNullOrWhiteSpace(damageMarker)
-                        ? chinese
-                            ? $"伤害 {amount}"
-                            : $"{amount} dmg"
+                        ? amount
                         : $"{damageMarker}{amount}"
             );
         }
@@ -150,13 +146,7 @@ internal static class CombatImpactMetricFormatter
         if (impact.ShieldAmount > 0)
         {
             var amount = PeriodicAmount(impact.ShieldAmount);
-            parts.Add(
-                string.IsNullOrWhiteSpace(shieldMarker)
-                    ? chinese
-                        ? $"耗盾 {amount}"
-                        : $"{amount} shield consumed"
-                    : $"{shieldMarker}{amount}"
-            );
+            parts.Add(string.IsNullOrWhiteSpace(shieldMarker) ? amount : $"{shieldMarker}{amount}");
         }
 
         return string.Join(" · ", parts);
