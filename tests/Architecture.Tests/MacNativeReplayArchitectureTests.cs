@@ -430,12 +430,20 @@ public sealed class MacNativeReplayArchitectureTests
         // The compiler cannot tell Cancel from Discard: both take the same opaque pointer and
         // differ only in how many references they consume. Discard on a queued event is a
         // use-after-free, Cancel on an unqueued one leaks, so the contract is pinned here.
-        var macHeader = File.ReadAllText(
-            Path.Combine(RepoRoot(), "native", "macos", "BppReplayVideoToolbox.h")
-        );
-        Assert.Contains("releases the caller's reference", macHeader, StringComparison.Ordinal);
-        Assert.Contains("releases BOTH references", macHeader, StringComparison.Ordinal);
-        Assert.Contains("event that WAS queued", macHeader, StringComparison.Ordinal);
+        // Both headers carry the same contract; neither may drift away from it alone.
+        foreach (
+            var headerPath in new[]
+            {
+                Path.Combine(RepoRoot(), "native", "macos", "BppReplayVideoToolbox.h"),
+                Path.Combine(RepoRoot(), "native", "windows", "BppReplayMediaFoundation.h"),
+            }
+        )
+        {
+            var header = File.ReadAllText(headerPath);
+            Assert.Contains("releases the caller's reference", header, StringComparison.Ordinal);
+            Assert.Contains("releases BOTH references", header, StringComparison.Ordinal);
+            Assert.Contains("event that WAS queued", header, StringComparison.Ordinal);
+        }
 
         var macSource = File.ReadAllText(
                 Path.Combine(RepoRoot(), "native", "macos", "BppReplayVideoToolbox.mm")

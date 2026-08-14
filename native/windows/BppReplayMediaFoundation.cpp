@@ -501,6 +501,10 @@ bool InitializeVideoProcessor(Encoder *encoder, int width, int height)
         SetFailure(encoder, "The persistent Unity capture texture must not be multisampled.");
         return false;
     }
+    // Unity commonly exposes an sRGB RenderTexture through a typeless resource, and the D3D11
+    // video processor rejects both TYPELESS and _SRGB source views. Map either onto the plain
+    // UNORM twin here; when that changes the format, the block below creates a typed GPU alias
+    // of the same memory rather than converting or copying pixel data.
     DXGI_FORMAT processorSourceFormat = sourceDescription.Format;
     switch (sourceDescription.Format)
     {
