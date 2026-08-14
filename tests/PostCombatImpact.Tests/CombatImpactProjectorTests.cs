@@ -1255,7 +1255,8 @@ public sealed class CombatImpactProjectorTests
                 "source",
                 EActionCommandType.PlayerBurnApply,
                 Player(ECombatantId.Opponent),
-                triggerSource: "source"
+                triggerSource: "source",
+                effectId: "critical-effect"
             )
         );
         origin.Events.Add(
@@ -1319,6 +1320,7 @@ public sealed class CombatImpactProjectorTests
                 [ECardAttributeType.BurnApplyAmount] = 3,
                 [ECardAttributeType.ShieldApplyAmount] = 15,
             },
+            CritCapableEffectIds = ["critical-effect"],
         };
         entities["crit-listener"] = new CombatImpactEntity(
             "crit-listener",
@@ -1530,6 +1532,7 @@ public sealed class CombatImpactProjectorTests
             {
                 [ECardAttributeType.BurnApplyAmount] = 3,
             },
+            CritCapableEffectIds = ["critical-effect"],
         };
         entities["crit-listener"] = CriticalTriggerEntity(EEffectPriority.Low);
 
@@ -1585,6 +1588,7 @@ public sealed class CombatImpactProjectorTests
             {
                 [ECardAttributeType.BurnApplyAmount] = 3,
             },
+            CritCapableEffectIds = ["critical-effect"],
         };
         entities["crit-listener"] = CriticalTriggerEntity(EEffectPriority.Low);
 
@@ -2026,7 +2030,9 @@ public sealed class CombatImpactProjectorTests
             foreach (var appliedValue in new[] { 4, 8 })
             {
                 var frame = new CombatSimFrame();
-                frame.Events.Add(Executed("source", action, Player(ECombatantId.Player)));
+                var executed = Executed("source", action, Player(ECombatantId.Player));
+                executed.EffectId = "critical-effect";
+                frame.Events.Add(executed);
                 frame.PlayerUpdates = new CombatSimPlayerUpdate
                 {
                     Attributes =
@@ -2060,6 +2066,58 @@ public sealed class CombatImpactProjectorTests
             Assert.Equal(2, group.CriticalOutcomeCount);
             Assert.Equal(8, group.CriticalObservedValue);
         }
+    }
+
+    [Fact]
+    public void Does_not_infer_a_crit_for_burn_triggered_by_another_item()
+    {
+        var simulation = new CombatSim();
+        simulation.Frames.Clear();
+        simulation.Frames.Add(
+            PlayerEffectFrame(
+                EActionCommandType.PlayerBurnApply,
+                EPlayerAttributeType.Burn,
+                0,
+                4,
+                effectId: "passive-burn",
+                triggerSource: "trigger"
+            )
+        );
+        simulation.Frames.Add(
+            PlayerEffectFrame(
+                EActionCommandType.PlayerBurnApply,
+                EPlayerAttributeType.Burn,
+                4,
+                12,
+                effectId: "passive-burn",
+                triggerSource: "trigger"
+            )
+        );
+        simulation.CardStats["source"] = new Dictionary<ECardStats, int>
+        {
+            [ECardStats.BurnAdded] = 12,
+        };
+        var entities = EntitiesWithSourceAttribute(ECardAttributeType.BurnApplyAmount, 4)
+            .ToDictionary(item => item.Key, item => item.Value);
+        entities["source"] = entities["source"] with
+        {
+            Attributes = new Dictionary<ECardAttributeType, int>
+            {
+                [ECardAttributeType.BurnApplyAmount] = 4,
+                [ECardAttributeType.CritChance] = 12,
+            },
+            CritCapableEffectIds = null,
+        };
+
+        var burn = Assert.Single(
+            Assert.Single(CombatImpactProjector.Project(simulation, entities).Sources).Groups
+        );
+
+        Assert.Equal(2, burn.Count);
+        Assert.Equal(0, burn.CriticalCount);
+        Assert.Equal(0, burn.CriticalOutcomeCount);
+        Assert.Null(burn.CriticalObservedValue);
+        Assert.Equal(CombatImpactTriggerPresentationState.Complete, burn.TriggerPresentationState);
     }
 
     [Fact]
@@ -2189,7 +2247,8 @@ public sealed class CombatImpactProjectorTests
                     "source",
                     EActionCommandType.PlayerDamage,
                     Player(ECombatantId.Opponent),
-                    triggerSource: "source"
+                    triggerSource: "source",
+                    effectId: "critical-effect"
                 )
             );
             frame.Events.Add(
@@ -2197,7 +2256,8 @@ public sealed class CombatImpactProjectorTests
                     "source",
                     EActionCommandType.PlayerBurnApply,
                     Player(ECombatantId.Opponent),
-                    triggerSource: "source"
+                    triggerSource: "source",
+                    effectId: "critical-effect"
                 )
             );
             simulation.Frames.Add(frame);
@@ -2268,7 +2328,8 @@ public sealed class CombatImpactProjectorTests
                     "source",
                     EActionCommandType.PlayerDamage,
                     Player(ECombatantId.Opponent),
-                    triggerSource: "source"
+                    triggerSource: "source",
+                    effectId: "critical-effect"
                 )
             );
             frame.Events.Add(
@@ -2276,7 +2337,8 @@ public sealed class CombatImpactProjectorTests
                     "source",
                     EActionCommandType.PlayerBurnApply,
                     Player(ECombatantId.Opponent),
-                    triggerSource: "source"
+                    triggerSource: "source",
+                    effectId: "critical-effect"
                 )
             );
             simulation.Frames.Add(frame);
@@ -2323,7 +2385,8 @@ public sealed class CombatImpactProjectorTests
                     "source",
                     EActionCommandType.PlayerDamage,
                     Player(ECombatantId.Opponent),
-                    triggerSource: "damage-trigger"
+                    triggerSource: "damage-trigger",
+                    effectId: "critical-effect"
                 )
             );
         simulation
@@ -2333,7 +2396,8 @@ public sealed class CombatImpactProjectorTests
                     "source",
                     EActionCommandType.PlayerBurnApply,
                     Player(ECombatantId.Opponent),
-                    triggerSource: "burn-trigger"
+                    triggerSource: "burn-trigger",
+                    effectId: "critical-effect"
                 )
             );
         simulation.Frames[0].OpponentUpdates = new CombatSimPlayerUpdate
@@ -5509,13 +5573,15 @@ public sealed class CombatImpactProjectorTests
         EActionCommandType action,
         IEffectTarget target,
         string? triggerSource = null,
-        string executionContextId = ""
+        string executionContextId = "",
+        string? effectId = null
     ) =>
         new()
         {
             ExecutionContextId = executionContextId,
             Source = InstanceId.TryParse(source),
             TriggerSource = triggerSource == null ? null : InstanceId.TryParse(triggerSource),
+            EffectId = effectId ?? string.Empty,
             ActionType = action,
             Target = target,
         };
@@ -5790,11 +5856,21 @@ public sealed class CombatImpactProjectorTests
         EActionCommandType action,
         EPlayerAttributeType attribute,
         int previous,
-        int current
+        int current,
+        string effectId = "critical-effect",
+        string? triggerSource = null
     )
     {
         var frame = new CombatSimFrame();
-        frame.Events.Add(Executed("source", action, Player(ECombatantId.Player)));
+        frame.Events.Add(
+            Executed(
+                "source",
+                action,
+                Player(ECombatantId.Player),
+                triggerSource,
+                effectId: effectId
+            )
+        );
         frame.PlayerUpdates = new CombatSimPlayerUpdate
         {
             Attributes =
@@ -5932,6 +6008,7 @@ public sealed class CombatImpactProjectorTests
         entities["source"] = entities["source"] with
         {
             Attributes = attributes.ToDictionary(item => item.Attribute, item => item.Value),
+            CritCapableEffectIds = ["critical-effect"],
         };
         return entities;
     }
