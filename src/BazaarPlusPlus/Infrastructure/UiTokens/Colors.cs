@@ -3,6 +3,39 @@ using UnityEngine;
 
 namespace BazaarPlusPlus.Infrastructure.UiTokens;
 
+internal readonly struct CollectionFilterCardPalette
+{
+    public CollectionFilterCardPalette(
+        Color background,
+        Color borderTopLeft,
+        Color borderTopRight,
+        Color borderBottomLeft,
+        Color borderBottomRight,
+        Color topGlow,
+        Color bottomGlow,
+        Color decoration
+    )
+    {
+        Background = background;
+        BorderTopLeft = borderTopLeft;
+        BorderTopRight = borderTopRight;
+        BorderBottomLeft = borderBottomLeft;
+        BorderBottomRight = borderBottomRight;
+        TopGlow = topGlow;
+        BottomGlow = bottomGlow;
+        Decoration = decoration;
+    }
+
+    public Color Background { get; }
+    public Color BorderTopLeft { get; }
+    public Color BorderTopRight { get; }
+    public Color BorderBottomLeft { get; }
+    public Color BorderBottomRight { get; }
+    public Color TopGlow { get; }
+    public Color BottomGlow { get; }
+    public Color Decoration { get; }
+}
+
 internal static class Colors
 {
     public static Color White => Color.white;
@@ -55,6 +88,46 @@ internal static class Colors
     public static Color CollectionPanelBackground => FromRgb(16, 17, 19, 1f);
     public static Color CollectionFilterCardBackground => FromRgb(22, 24, 28, 1f);
     public static Color CollectionFilterCardBorder => FromRgb(0, 0, 0, 1f);
+
+    // The reference palette belongs only to the control deck. The grid still uses the neutral
+    // CollectionFilterCardBackground, so its occlusion behavior remains unchanged.
+    public static CollectionFilterCardPalette CollectionFilterCardReferencePalette =>
+        new(
+            CollectionFilterCardBackground,
+            FromRgb(116, 127, 213, 0.54f),
+            FromRgb(73, 169, 185, 0.28f),
+            FromRgb(70, 110, 158, 0.24f),
+            FromRgb(76, 194, 180, 0.54f),
+            FromRgb(91, 107, 255, 0.30f),
+            FromRgb(67, 221, 231, 0.26f),
+            FromRgb(153, 235, 247, 0.14f)
+        );
+
+    // Secondary filters use the same cool direction as the control deck, but as a quiet
+    // hierarchy cue rather than individual themed cards.
+    public static CollectionFilterCardPalette CollectionFilterCardMutedPalette =>
+        new(
+            FromRgb(19, 21, 24, 1f),
+            FromRgb(116, 127, 213, 0.16f),
+            FromRgb(73, 169, 185, 0.08f),
+            FromRgb(70, 110, 158, 0.07f),
+            FromRgb(76, 194, 180, 0.16f),
+            FromRgb(91, 107, 255, 0.07f),
+            FromRgb(67, 221, 231, 0.06f),
+            FromRgb(153, 235, 247, 0.025f)
+        );
+
+    public static CollectionFilterCardPalette CollectionFilterCardGridPalette =>
+        new(
+            FromRgb(19, 21, 24, 1f),
+            FromRgb(116, 127, 213, 0.34f),
+            FromRgb(73, 169, 185, 0.12f),
+            FromRgb(70, 110, 158, 0.14f),
+            FromRgb(76, 194, 180, 0.20f),
+            FromRgb(91, 107, 255, 0.11f),
+            FromRgb(67, 221, 231, 0.045f),
+            FromRgb(153, 235, 247, 0.02f)
+        );
     public static Color CollectionFilterTitleText => FromRgb(232, 236, 242, 1f);
     public static Color CollectionChipBackground => FromRgb(28, 30, 34, 1f);
     public static Color CollectionChipBorder => FromRgb(63, 68, 73, 1f);

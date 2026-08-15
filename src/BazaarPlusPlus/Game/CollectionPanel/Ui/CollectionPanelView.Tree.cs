@@ -46,10 +46,8 @@ internal sealed partial class CollectionPanelView
         var controlDeck = new VisualElement();
         controlDeck.style.flexDirection = FlexDirection.Column;
         controlDeck.style.flexShrink = 0f;
-        controlDeck.style.backgroundColor = Colors.CollectionFilterCardBackground;
-        UiStyle.Border(controlDeck.style, Borders.Thin, Colors.CollectionFilterCardBorder);
-        UiStyle.Radius(controlDeck.style, Radii.Md);
         UiStyle.Padding(controlDeck.style, UiSpacing.Lg);
+        ApplyCollectionFilterCardTreatment(controlDeck, Colors.CollectionFilterCardMutedPalette);
         rail.Add(controlDeck);
 
         // Title + Close (Close lives here in the operation area, not a top bar).
@@ -150,7 +148,8 @@ internal sealed partial class CollectionPanelView
             UiSpacing.Xl,
             out _heroChipRow,
             out _heroFilterLabel,
-            out var heroHeaderRow
+            out var heroHeaderRow,
+            palette: Colors.CollectionFilterCardMutedPalette
         );
         _allHeroesButton = CreateTextMatchModeButton(
             "bpp-collection-all-heroes",
@@ -217,7 +216,8 @@ internal sealed partial class CollectionPanelView
             UiSpacing.Lg,
             out _keywordChipRow,
             out _keywordFilterLabel,
-            out var keywordHeaderRow
+            out var keywordHeaderRow,
+            palette: Colors.CollectionFilterCardMutedPalette
         );
         _keywordMatchModeButton = CreateTextMatchModeControl(mode =>
             _commands.SetKeywordMatchMode(mode)
@@ -232,7 +232,8 @@ internal sealed partial class CollectionPanelView
             CollectionPanelText.TagHeader(),
             UiSpacing.Lg,
             out _tagChipRow,
-            out var tagHeaderRow
+            out var tagHeaderRow,
+            Colors.CollectionFilterCardMutedPalette
         );
         _tagMatchModeButton = CreateTextMatchModeControl(mode => _commands.SetTagMatchMode(mode));
         tagHeaderRow.Add(_tagMatchModeButton);
@@ -245,7 +246,8 @@ internal sealed partial class CollectionPanelView
             CollectionPanelText.SourceHeader(ECardType.Item),
             UiSpacing.Lg,
             out _sourceChipRow,
-            out _sourceFilterLabel
+            out _sourceFilterLabel,
+            palette: Colors.CollectionFilterCardMutedPalette
         );
         _sourceChipRow.style.flexDirection = FlexDirection.Column;
         _sourceChipRow.style.flexWrap = Wrap.NoWrap;
@@ -333,6 +335,284 @@ internal sealed partial class CollectionPanelView
         mesh.SetNextIndex(0);
         mesh.SetNextIndex(2);
         mesh.SetNextIndex(3);
+    }
+
+    // The treatment is painted on the card itself, so hierarchy can be expressed through a
+    // stronger control deck and quiet secondary filters without changing their contents.
+    private static void ApplyCollectionFilterCardTreatment(
+        VisualElement card,
+        CollectionFilterCardPalette? palette = null
+    )
+    {
+        var resolvedPalette = palette ?? Colors.CollectionFilterCardReferencePalette;
+        card.style.backgroundColor = resolvedPalette.Background;
+        UiStyle.BorderWidth(card.style, Borders.None);
+        UiStyle.Radius(card.style, Radii.Panel);
+        card.style.overflow = Overflow.Hidden;
+        card.generateVisualContent += context =>
+            DrawCollectionFilterCardBackground(context, card, resolvedPalette);
+    }
+
+    private static void DrawCollectionFilterCardBackground(
+        MeshGenerationContext context,
+        VisualElement card,
+        CollectionFilterCardPalette palette
+    )
+    {
+        // contentRect excludes the card's padding. These cards deliberately have 16–24px of
+        // padding, so a border based on it becomes the inset frame shown in the screenshot.
+        // paddingRect is the card's full local paint box here: we own the border and set its
+        // USS border width to zero in ApplyCollectionFilterCardTreatment.
+        var rect = card.paddingRect;
+        if (rect.width <= 0f || rect.height <= 0f)
+            return;
+
+        DrawCollectionFilterCardGlow(
+            context,
+            rect,
+            new Vector2(rect.xMin + rect.width * 0.13f, rect.yMin + rect.height * 0.08f),
+            rect.width * 0.68f,
+            rect.height * 1.05f,
+            palette.TopGlow
+        );
+        DrawCollectionFilterCardGlow(
+            context,
+            rect,
+            new Vector2(rect.xMax - rect.width * 0.05f, rect.yMax - rect.height * 0.05f),
+            rect.width * 0.62f,
+            rect.height * 0.92f,
+            palette.BottomGlow
+        );
+        if (palette.Decoration.a > 0f)
+            DrawCollectionFilterCardDotField(context, rect, palette.Decoration);
+        DrawCollectionFilterCardGradientBorder(context, rect, palette);
+    }
+
+    private static void DrawCollectionFilterCardGradientBorder(
+        MeshGenerationContext context,
+        Rect rect,
+        CollectionFilterCardPalette palette
+    )
+    {
+        // The reference's outline is a quiet, single-pixel highlight. A filled mesh ring makes
+        // its full width visible and reads as a neon frame, so draw a stroked path instead.
+        const float strokeWidth = 1f;
+        const int edgeSegments = 12;
+        const int cornerSegments = 7;
+        var inset = strokeWidth * 0.5f;
+        var bounds = new Rect(
+            rect.xMin + inset,
+            rect.yMin + inset,
+            rect.width - strokeWidth,
+            rect.height - strokeWidth
+        );
+        if (bounds.width <= strokeWidth * 2f || bounds.height <= strokeWidth * 2f)
+            return;
+
+        var radius = Mathf.Min(
+            Radii.Panel - inset,
+            Mathf.Min(bounds.width, bounds.height) * 0.5f
+        );
+        var painter = context.painter2D;
+        painter.lineWidth = strokeWidth;
+        painter.lineCap = LineCap.Round;
+        painter.lineJoin = LineJoin.Round;
+
+        var first = new Vector2(bounds.xMin + radius, bounds.yMin);
+        var previous = first;
+
+        void StrokeTo(Vector2 next)
+        {
+            painter.strokeColor = CollectionFilterCardBorderColor(
+                (previous + next) * 0.5f,
+                bounds,
+                palette
+            );
+            painter.BeginPath();
+            painter.MoveTo(previous);
+            painter.LineTo(next);
+            painter.Stroke();
+            previous = next;
+        }
+
+        void StrokeStraightTo(Vector2 destination)
+        {
+            var start = previous;
+            for (var step = 1; step <= edgeSegments; step++)
+                StrokeTo(Vector2.Lerp(start, destination, step / (float)edgeSegments));
+        }
+
+        void StrokeCorner(int corner, float startDegrees)
+        {
+            var center = CollectionFilterCardCornerCenter(bounds, radius, corner);
+            for (var step = 1; step <= cornerSegments; step++)
+            {
+                var radians = (startDegrees + 90f * step / cornerSegments) * Mathf.Deg2Rad;
+                StrokeTo(center + new Vector2(Mathf.Cos(radians), Mathf.Sin(radians)) * radius);
+            }
+        }
+
+        // Walk the entire perimeter clockwise. Each short stroke gets a colour sampled from the
+        // four-corner gradient, which keeps the transition smooth without ever creating a band.
+        StrokeStraightTo(new Vector2(bounds.xMax - radius, bounds.yMin));
+        StrokeCorner(0, -90f);
+        StrokeStraightTo(new Vector2(bounds.xMax, bounds.yMax - radius));
+        StrokeCorner(1, 0f);
+        StrokeStraightTo(new Vector2(bounds.xMin + radius, bounds.yMax));
+        StrokeCorner(2, 90f);
+        StrokeStraightTo(new Vector2(bounds.xMin, bounds.yMin + radius));
+        StrokeCorner(3, 180f);
+    }
+
+    private static Vector2 CollectionFilterCardCornerCenter(Rect rect, float radius, int corner) =>
+        corner switch
+        {
+            0 => new Vector2(rect.xMax - radius, rect.yMin + radius),
+            1 => new Vector2(rect.xMax - radius, rect.yMax - radius),
+            2 => new Vector2(rect.xMin + radius, rect.yMax - radius),
+            _ => new Vector2(rect.xMin + radius, rect.yMin + radius),
+        };
+
+    private static Color CollectionFilterCardBorderColor(
+        Vector2 point,
+        Rect bounds,
+        CollectionFilterCardPalette palette
+    )
+    {
+        var horizontal = Mathf.InverseLerp(bounds.xMin, bounds.xMax, point.x);
+        var vertical = Mathf.InverseLerp(bounds.yMin, bounds.yMax, point.y);
+        var top = Color.Lerp(
+            palette.BorderTopLeft,
+            palette.BorderTopRight,
+            horizontal
+        );
+        var bottom = Color.Lerp(
+            palette.BorderBottomLeft,
+            palette.BorderBottomRight,
+            horizontal
+        );
+        return Color.Lerp(top, bottom, vertical);
+    }
+
+    private static void DrawCollectionFilterCardGlow(
+        MeshGenerationContext context,
+        Rect rect,
+        Vector2 center,
+        float radiusX,
+        float radiusY,
+        Color color
+    )
+    {
+        radiusX = Mathf.Min(radiusX, rect.width);
+        radiusY = Mathf.Min(radiusY, rect.height);
+        var edge = Colors.WithAlpha(color, 0f);
+        var mesh = context.Allocate(5, 12);
+        mesh.SetNextVertex(
+            new Vertex { position = new Vector3(center.x, center.y, Vertex.nearZ), tint = color }
+        );
+        mesh.SetNextVertex(
+            new Vertex
+            {
+                position = new Vector3(center.x, center.y - radiusY, Vertex.nearZ),
+                tint = edge,
+            }
+        );
+        mesh.SetNextVertex(
+            new Vertex
+            {
+                position = new Vector3(center.x + radiusX, center.y, Vertex.nearZ),
+                tint = edge,
+            }
+        );
+        mesh.SetNextVertex(
+            new Vertex
+            {
+                position = new Vector3(center.x, center.y + radiusY, Vertex.nearZ),
+                tint = edge,
+            }
+        );
+        mesh.SetNextVertex(
+            new Vertex
+            {
+                position = new Vector3(center.x - radiusX, center.y, Vertex.nearZ),
+                tint = edge,
+            }
+        );
+        mesh.SetNextIndex(0);
+        mesh.SetNextIndex(1);
+        mesh.SetNextIndex(2);
+        mesh.SetNextIndex(0);
+        mesh.SetNextIndex(2);
+        mesh.SetNextIndex(3);
+        mesh.SetNextIndex(0);
+        mesh.SetNextIndex(3);
+        mesh.SetNextIndex(4);
+        mesh.SetNextIndex(0);
+        mesh.SetNextIndex(4);
+        mesh.SetNextIndex(1);
+    }
+
+    private static void DrawCollectionFilterCardDotField(
+        MeshGenerationContext context,
+        Rect rect,
+        Color decoration
+    )
+    {
+        const int columns = 10;
+        const int rows = 6;
+        var spacing = Mathf.Clamp(Mathf.Min(rect.width, rect.height) * 0.055f, 4f, 8f);
+        var dotSize = Mathf.Clamp(spacing * 0.19f, 1.1f, 1.7f);
+        var left = rect.xMax - spacing * (columns + 1.5f);
+        var top = rect.yMax - spacing * (rows + 1.2f);
+        var mesh = context.Allocate(columns * rows * 4, columns * rows * 6);
+        for (var row = 0; row < rows; row++)
+        {
+            for (var column = 0; column < columns; column++)
+            {
+                var strength = ((column + 1f) / columns) * ((row + 1f) / rows);
+                var color = Colors.WithAlpha(
+                    decoration,
+                    decoration.a * (0.2f + strength * 0.8f)
+                );
+                var x = left + column * spacing;
+                var y = top + row * spacing;
+                mesh.SetNextVertex(
+                    new Vertex { position = new Vector3(x, y, Vertex.nearZ), tint = color }
+                );
+                mesh.SetNextVertex(
+                    new Vertex
+                    {
+                        position = new Vector3(x + dotSize, y, Vertex.nearZ),
+                        tint = color,
+                    }
+                );
+                mesh.SetNextVertex(
+                    new Vertex
+                    {
+                        position = new Vector3(x + dotSize, y + dotSize, Vertex.nearZ),
+                        tint = color,
+                    }
+                );
+                mesh.SetNextVertex(
+                    new Vertex
+                    {
+                        position = new Vector3(x, y + dotSize, Vertex.nearZ),
+                        tint = color,
+                    }
+                );
+            }
+        }
+
+        for (var dot = 0; dot < columns * rows; dot++)
+        {
+            var vertex = dot * 4;
+            mesh.SetNextIndex((ushort)vertex);
+            mesh.SetNextIndex((ushort)(vertex + 1));
+            mesh.SetNextIndex((ushort)(vertex + 2));
+            mesh.SetNextIndex((ushort)vertex);
+            mesh.SetNextIndex((ushort)(vertex + 2));
+            mesh.SetNextIndex((ushort)(vertex + 3));
+        }
     }
 
     private static VisualElement CreateOperationSpacer()
@@ -756,8 +1036,19 @@ internal sealed partial class CollectionPanelView
         float marginTop,
         out VisualElement chipRow,
         out Label label,
-        bool card = true
-    ) => CreateFilterSection(parent, title, marginTop, out chipRow, out label, out _, card);
+        bool card = true,
+        CollectionFilterCardPalette? palette = null
+    ) =>
+        CreateFilterSection(
+            parent,
+            title,
+            marginTop,
+            out chipRow,
+            out label,
+            out _,
+            card,
+            palette
+        );
 
     private static VisualElement CreateFilterSection(
         VisualElement parent,
@@ -766,7 +1057,8 @@ internal sealed partial class CollectionPanelView
         out VisualElement chipRow,
         out Label label,
         out VisualElement headerRow,
-        bool card = true
+        bool card = true,
+        CollectionFilterCardPalette? palette = null
     )
     {
         var section = new VisualElement();
@@ -775,10 +1067,8 @@ internal sealed partial class CollectionPanelView
         section.style.marginTop = marginTop;
         if (card)
         {
-            section.style.backgroundColor = Colors.CollectionFilterCardBackground;
-            UiStyle.Border(section.style, Borders.Thin, Colors.CollectionFilterCardBorder);
-            UiStyle.Radius(section.style, Radii.Md);
             UiStyle.Padding(section.style, UiSpacing.Md);
+            ApplyCollectionFilterCardTreatment(section, palette);
         }
         parent.Add(section);
 
@@ -988,17 +1278,16 @@ internal sealed partial class CollectionPanelView
         string title,
         float marginTop,
         out VisualElement chipRow,
-        out VisualElement header
+        out VisualElement header,
+        CollectionFilterCardPalette? palette = null
     )
     {
         var section = new VisualElement();
         section.style.flexDirection = FlexDirection.Column;
         section.style.flexShrink = 0f;
         section.style.marginTop = marginTop;
-        section.style.backgroundColor = Colors.CollectionFilterCardBackground;
-        UiStyle.Border(section.style, Borders.Thin, Colors.CollectionFilterCardBorder);
-        UiStyle.Radius(section.style, Radii.Md);
         UiStyle.Padding(section.style, UiSpacing.Md);
+        ApplyCollectionFilterCardTreatment(section, palette);
         parent.Add(section);
 
         header = new VisualElement();
@@ -1080,11 +1369,9 @@ internal sealed partial class CollectionPanelView
         _gridViewport.style.flexShrink = 1f;
         _gridViewport.style.minHeight = 0f;
         _gridViewport.style.minWidth = 0f;
-        // Match the operation rail's card shell so the catalog reads as two aligned panels.
-        _gridViewport.style.backgroundColor = Colors.CollectionFilterCardBackground;
-        UiStyle.Radius(_gridViewport.style, Radii.Md);
-        UiStyle.Border(_gridViewport.style, Borders.Thin, Colors.CollectionFilterCardBorder);
-        _gridViewport.style.overflow = Overflow.Hidden;
+        // The catalog uses the same cool treatment at a middle strength: more dimensional than
+        // secondary filters, quieter than the control deck.
+        ApplyCollectionFilterCardTreatment(_gridViewport, Colors.CollectionFilterCardGridPalette);
         parent.Add(_gridViewport);
 
         _gridScrollView = new ScrollView(ScrollViewMode.Vertical);
