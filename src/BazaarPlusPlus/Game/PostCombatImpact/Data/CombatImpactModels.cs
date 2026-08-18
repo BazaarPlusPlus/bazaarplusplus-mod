@@ -338,6 +338,10 @@ internal sealed record CombatImpactEvent(
 
     internal int? TriggerFrameIndex { get; init; }
 
+    internal string? EffectId { get; init; }
+
+    internal string? ExecutionContextId { get; init; }
+
     internal CombatImpactActivitySourceResolution ActivitySourceResolution { get; init; } =
         CombatImpactActivitySourceResolution.Direct;
 

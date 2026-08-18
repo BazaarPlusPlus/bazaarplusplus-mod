@@ -1356,6 +1356,104 @@ public sealed class CombatImpactProjectorTests
     }
 
     [Fact]
+    public void Does_not_label_on_card_critted_derived_damage_as_critical()
+    {
+        var simulation = new CombatSim();
+        simulation.Frames.Clear();
+
+        var fired = new CombatSimFrame
+        {
+            PlayerUpdates = new CombatSimPlayerUpdate
+            {
+                HealthAdjustments =
+                {
+                    new CombatSimPlayerHealthAdjustment
+                    {
+                        DamageType = EDamageType.Shield,
+                        AttributeChanged = EPlayerHealthChangeType.Shield,
+                        Amount = 210,
+                        IsCrit = true,
+                    },
+                },
+            },
+        };
+        var shield = Executed(
+            "hairpins",
+            EActionCommandType.PlayerShieldApply,
+            Player(ECombatantId.Player),
+            triggerSource: "hairpins",
+            executionContextId: "hairpins-fired"
+        );
+        shield.EffectId = "1";
+        fired.Events.Add(shield);
+        simulation.Frames.Add(fired);
+
+        var critTriggered = new CombatSimFrame
+        {
+            OpponentUpdates = new CombatSimPlayerUpdate
+            {
+                HealthAdjustments =
+                {
+                    // Runtime adjustment matching can inherit the originating activation's crit
+                    // flag. The on-card-critted action itself must still remain non-critical.
+                    DamageAdjustment(EPlayerHealthChangeType.Health, -315, isCritical: true),
+                },
+            },
+        };
+        var damage = Executed(
+            "hairpins",
+            EActionCommandType.PlayerDamage,
+            Player(ECombatantId.Opponent),
+            triggerSource: "hairpins",
+            executionContextId: "hairpins-on-crit"
+        );
+        damage.EffectId = "0";
+        critTriggered.Events.Add(damage);
+        simulation.Frames.Add(critTriggered);
+        simulation.CardStats["hairpins"] = new Dictionary<ECardStats, int>
+        {
+            [ECardStats.DamageDone] = 315,
+            [ECardStats.ShieldAdded] = 210,
+            [ECardStats.UseCount] = 1,
+        };
+
+        var entities = Entities().ToDictionary(item => item.Key, item => item.Value);
+        entities["hairpins"] = new CombatImpactEntity(
+            "hairpins",
+            "Hairpins",
+            "Item",
+            null,
+            5,
+            Attributes: new Dictionary<ECardAttributeType, int>
+            {
+                [ECardAttributeType.DamageAmount] = 315,
+                [ECardAttributeType.ShieldApplyAmount] = 105,
+            },
+            CriticalTriggerAbilitiesByEffectId: new Dictionary<string, EEffectPriority>
+            {
+                ["0"] = EEffectPriority.Medium,
+            },
+            CritCapableEffectIds: ["1"]
+        );
+
+        var report = CombatImpactProjector.Project(simulation, entities);
+        var source = Assert.Single(report.Sources, candidate => candidate.Entity.Id == "hairpins");
+        var damageGroup = Assert.Single(
+            source.Groups,
+            group => group.Kind == CombatImpactKind.DirectDamage
+        );
+        var shieldGroup = Assert.Single(
+            source.Groups,
+            group => group.Kind == CombatImpactKind.Shield
+        );
+
+        Assert.Equal(0, damageGroup.CriticalCount);
+        Assert.Equal(1, shieldGroup.CriticalCount);
+        Assert.Equal(1, report.CriticalTriggerEvidenceAudit.ResolvedOriginCount);
+        Assert.Equal(1, report.CriticalTriggerEvidenceAudit.AttributedOriginCount);
+    }
+
+    [Fact]
     public void Does_not_apply_on_card_critted_evidence_to_an_unrelated_source()
     {
         var simulation = new CombatSim();

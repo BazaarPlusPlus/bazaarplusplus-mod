@@ -125,6 +125,8 @@ internal static class CombatImpactProjector
                     RawDirectSourceId = execution.DirectSourceId,
                     TriggerSourceId = execution.TriggerSourceId,
                     TriggerFrameIndex = execution.FrameIndex,
+                    EffectId = execution.EffectId,
+                    ExecutionContextId = execution.ExecutionContextId,
                     ActivitySourceResolution = triggerProvenance.SourceResolution,
                     TriggerScope = triggerProvenance.Scope,
                     IsUnattributedTransitionClaimant = resolved.IsUnattributedTransitionClaimant,
@@ -1245,13 +1247,18 @@ internal static class CombatImpactProjector
             ))
             .Distinct()
             .ToArray();
+        NormalizeCriticalTriggerExecutions(events, observed);
         var resolutions = observed
-            .Select(evidence => TryResolveCriticalTriggerOrigin(events, executions, evidence))
+            .Select(evidence =>
+                (
+                    Evidence: evidence,
+                    Origin: TryResolveCriticalTriggerOrigin(events, executions, evidence)
+                )
+            )
+            .Where(resolution => resolution.Origin.HasValue)
+            .Select(resolution => (resolution.Evidence, Origin: resolution.Origin!.Value))
             .ToArray();
-        var evidence = resolutions
-            .Where(origin => origin.HasValue)
-            .Select(origin => origin!.Value)
-            .ToHashSet();
+        var evidence = resolutions.Select(resolution => resolution.Origin).ToHashSet();
         if (evidence.Count == 0)
             return new CombatImpactCriticalTriggerEvidenceAudit(0, 0);
 
@@ -1266,6 +1273,14 @@ internal static class CombatImpactProjector
                     )
                 )
                 && CanReceiveCriticalTriggerEvidence(item.Event)
+                && !resolutions.Any(resolution =>
+                    resolution.Origin
+                        == new CriticalTriggerEvidenceKey(
+                            item.Event.SourceId,
+                            item.Event.TriggerFrameIndex.Value
+                        )
+                    && IsCriticalTriggerExecution(item.Event, resolution.Evidence)
+                )
             )
             .GroupBy(item => new CriticalTriggerEvidenceKey(
                 item.Event.SourceId,
@@ -1299,6 +1314,32 @@ internal static class CombatImpactProjector
         return new CombatImpactCriticalTriggerEvidenceAudit(evidence.Count, attributed);
     }
 
+    private static void NormalizeCriticalTriggerExecutions(
+        IList<CombatImpactEvent> events,
+        IReadOnlyList<CriticalTriggerExecutionEvidence> observed
+    )
+    {
+        for (var index = 0; index < events.Count; index++)
+        {
+            var item = events[index];
+            if (!observed.Any(evidence => IsCriticalTriggerExecution(item, evidence)))
+                continue;
+
+            // TTriggerOnCardCritted proves that the triggering activation critted. Its action is a
+            // consequence of that crit, not another critical outcome. Native adjustment matching
+            // can still inherit a same-frame crit flag, so clear both the result and the recovery
+            // candidate before ambiguous-damage recovery runs.
+            events[index] = item with
+            {
+                IsCritical = false,
+                CriticalCount = 0,
+                CriticalOutcomeCount = 1,
+                CriticalValue = null,
+                HasCriticalAdjustmentCandidate = false,
+            };
+        }
+    }
+
     private static CriticalTriggerEvidenceKey? TryResolveCriticalTriggerOrigin(
         IEnumerable<CombatImpactEvent> events,
         IReadOnlyList<ProjectedExecution> executions,
@@ -1312,6 +1353,7 @@ internal static class CombatImpactProjector
                 && frameIndex <= evidence.FrameIndex
                 && frameIndex >= evidence.FrameIndex - 1
                 && CanReceiveCriticalTriggerEvidence(item)
+                && !IsCriticalTriggerExecution(item, evidence)
             )
             .Select(item => item.TriggerFrameIndex!.Value)
             .Distinct()
@@ -1326,12 +1368,8 @@ internal static class CombatImpactProjector
         {
             EEffectPriority.Immediate when sameFrame => evidence.FrameIndex,
             EEffectPriority.Immediate when previousFrame => evidence.FrameIndex - 1,
-            _ when previousFrame
-                    && !HasSelfTriggeredExecution(
-                        executions,
-                        evidence.TriggerSourceId,
-                        evidence.FrameIndex
-                    ) => evidence.FrameIndex - 1,
+            _ when previousFrame && !HasSelfTriggeredExecution(executions, evidence) =>
+                evidence.FrameIndex - 1,
             _ when sameFrame => evidence.FrameIndex,
             _ => -1,
         };
@@ -1343,13 +1381,61 @@ internal static class CombatImpactProjector
 
     private static bool HasSelfTriggeredExecution(
         IEnumerable<ProjectedExecution> executions,
-        string sourceId,
-        int frameIndex
+        CriticalTriggerExecutionEvidence evidence
     ) =>
         executions.Any(execution =>
-            execution.FrameIndex == frameIndex
-            && string.Equals(execution.DirectSourceId, sourceId, StringComparison.Ordinal)
-            && string.Equals(execution.TriggerSourceId, sourceId, StringComparison.Ordinal)
+            execution.FrameIndex == evidence.FrameIndex
+            && string.Equals(
+                execution.DirectSourceId,
+                evidence.TriggerSourceId,
+                StringComparison.Ordinal
+            )
+            && string.Equals(
+                execution.TriggerSourceId,
+                evidence.TriggerSourceId,
+                StringComparison.Ordinal
+            )
+            && !IsCriticalTriggerExecution(execution, evidence)
+        );
+
+    private static bool IsCriticalTriggerExecution(
+        ProjectedExecution execution,
+        CriticalTriggerExecutionEvidence evidence
+    ) =>
+        execution.FrameIndex == evidence.FrameIndex
+        && string.Equals(
+            execution.DirectSourceId,
+            evidence.ListenerSourceId,
+            StringComparison.Ordinal
+        )
+        && string.Equals(
+            execution.TriggerSourceId,
+            evidence.TriggerSourceId,
+            StringComparison.Ordinal
+        )
+        && string.Equals(execution.EffectId, evidence.EffectId, StringComparison.Ordinal)
+        && string.Equals(
+            execution.ExecutionContextId,
+            evidence.ExecutionContextId,
+            StringComparison.Ordinal
+        );
+
+    private static bool IsCriticalTriggerExecution(
+        CombatImpactEvent item,
+        CriticalTriggerExecutionEvidence evidence
+    ) =>
+        item.TriggerFrameIndex == evidence.FrameIndex
+        && string.Equals(
+            item.RawDirectSourceId,
+            evidence.ListenerSourceId,
+            StringComparison.Ordinal
+        )
+        && string.Equals(item.TriggerSourceId, evidence.TriggerSourceId, StringComparison.Ordinal)
+        && string.Equals(item.EffectId, evidence.EffectId, StringComparison.Ordinal)
+        && string.Equals(
+            item.ExecutionContextId,
+            evidence.ExecutionContextId,
+            StringComparison.Ordinal
         );
 
     private static bool CanReceiveCriticalTriggerEvidence(CombatImpactEvent item) =>
