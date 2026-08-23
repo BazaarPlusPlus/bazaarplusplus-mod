@@ -40,7 +40,8 @@ public sealed class EndOfRunCaptureArchitectureTests
         Assert.Contains("BppUiChromeSuppression.Begin", driver);
         Assert.Contains("NativeTooltipSuppression.Begin", driver);
         Assert.Contains("BeginCaptureCurrentFrame", driver);
-        Assert.Contains("EndOfRunSummaryVisualSnapshotSampler.TryCapture", driver);
+        Assert.Contains("_visualSampler.TryCapture", driver);
+        Assert.Contains("EndOfRunHeavySampleCadence", driver);
         Assert.Contains("EndOfRunVisualStabilityTracker", driver);
         Assert.Contains("EndOfRunCleanFramePreparationCore", driver);
         Assert.Contains("ResetVisualStability", driver);

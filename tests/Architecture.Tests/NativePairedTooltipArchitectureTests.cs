@@ -108,6 +108,8 @@ public sealed class NativePairedTooltipArchitectureTests
         Assert.Contains("ClearCurrentCard", suppressionSource);
         Assert.Contains("SetVisibility(false)", suppressionSource);
         Assert.Contains("AreRequiredShowGatesInstalled", suppressionSource);
+        Assert.Contains("CapturePatchCapabilities", suppressionSource);
+        Assert.Contains("NativeTooltipControllerSnapshot", suppressionSource);
         Assert.Contains("Harmony.GetPatchInfo", suppressionSource);
 
         var patchSource = File.ReadAllText(patches);

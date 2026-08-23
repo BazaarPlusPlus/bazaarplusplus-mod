@@ -13,27 +13,36 @@ internal enum EndOfRunCleanFrameVisualState
 internal readonly record struct EndOfRunCleanFrameVisualObservation(
     EndOfRunCleanFrameVisualState State,
     int LoadedCardCount,
+    int TransformCount,
     ulong CardSetFingerprint,
     ulong PoseFingerprint
 )
 {
     internal static EndOfRunCleanFrameVisualObservation Unavailable =>
-        new(EndOfRunCleanFrameVisualState.Unavailable, 0, 0, 0);
+        new(EndOfRunCleanFrameVisualState.Unavailable, 0, 0, 0, 0);
 
     internal static EndOfRunCleanFrameVisualObservation Empty =>
-        new(EndOfRunCleanFrameVisualState.Empty, 0, 0, 0);
+        new(EndOfRunCleanFrameVisualState.Empty, 0, 0, 0, 0);
 
     internal static EndOfRunCleanFrameVisualObservation Sampled(
         int loadedCardCount,
+        int transformCount,
         ulong cardSetFingerprint,
         ulong poseFingerprint
     ) =>
         new(
             EndOfRunCleanFrameVisualState.Sampled,
             loadedCardCount,
+            transformCount,
             cardSetFingerprint,
             poseFingerprint
         );
+
+    internal static EndOfRunCleanFrameVisualObservation Sampled(
+        int loadedCardCount,
+        ulong cardSetFingerprint,
+        ulong poseFingerprint
+    ) => Sampled(loadedCardCount, transformCount: 0, cardSetFingerprint, poseFingerprint);
 }
 
 internal enum EndOfRunCleanFrameDecisionKind
@@ -152,6 +161,11 @@ internal sealed class EndOfRunCleanFramePreparationCore
             ? EndOfRunCleanFrameDecision.Capture
             : EndOfRunCleanFrameDecision.Wait;
     }
+
+    internal bool HasReachedDeadline(float nowSeconds) =>
+        !float.IsNaN(nowSeconds)
+        && !float.IsInfinity(nowSeconds)
+        && nowSeconds >= _deadlineAtSeconds;
 
     private void SetBaseline(EndOfRunCleanFrameVisualObservation visual, float nowSeconds)
     {

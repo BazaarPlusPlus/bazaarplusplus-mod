@@ -21,7 +21,10 @@ internal enum NativeTooltipCleanFrameState
     Unavailable,
 }
 
-internal readonly record struct NativeTooltipCleanFrameAudit(NativeTooltipCleanFrameState State);
+internal readonly record struct NativeTooltipCleanFrameAudit(
+    NativeTooltipCleanFrameState State,
+    int ControllerCount = 0
+);
 
 internal interface INativeTooltipSuppressionLease : IDisposable
 {
@@ -74,9 +77,22 @@ internal static class NativeTooltipSuppression
     private static readonly object Gate = new();
     private static readonly NativeTooltipSuppressionOwnershipCore Ownership = new();
     private static readonly List<AuxiliaryCanvasGate> AuxiliaryGates = new();
+    private static bool? _requiredShowGatesInstalled;
     private static int _activeLeaseCount;
 
     internal static bool IsActive => Volatile.Read(ref _activeLeaseCount) > 0;
+
+    internal static void CapturePatchCapabilities()
+    {
+        lock (Gate)
+            _requiredShowGatesInstalled = ProbeRequiredShowGatesInstalled();
+    }
+
+    internal static void ClearPatchCapabilities()
+    {
+        lock (Gate)
+            _requiredShowGatesInstalled = null;
+    }
 
     internal static INativeTooltipSuppressionLease Begin(NativeTooltipSuppressionOwner owner)
     {
@@ -89,9 +105,11 @@ internal static class NativeTooltipSuppression
         try
         {
             var preparationAvailable = ClearCurrentHoverAndTooltipState();
+            var controllers = new NativeTooltipControllerSnapshot();
             preparationAvailable &=
-                ConcealAndAuditNativeTooltips().State != NativeTooltipCleanFrameState.Unavailable;
-            return new Lease(owner, preparationAvailable);
+                ConcealAndAuditNativeTooltips(controllers).State
+                != NativeTooltipCleanFrameState.Unavailable;
+            return new Lease(owner, preparationAvailable, controllers);
         }
         catch
         {
@@ -162,28 +180,17 @@ internal static class NativeTooltipSuppression
         return available;
     }
 
-    private static NativeTooltipCleanFrameAudit ConcealAndAuditNativeTooltips()
+    private static NativeTooltipCleanFrameAudit ConcealAndAuditNativeTooltips(
+        NativeTooltipControllerSnapshot controllers
+    )
     {
         if (!IsActive || !AreRequiredShowGatesInstalled())
             return UnavailableAudit();
 
         var unavailable = false;
         var dirty = false;
-        CardTooltipController[] cardControllers;
-        AuxiliaryTooltipController[] auxiliaryControllers;
-        try
-        {
-            cardControllers = Object.FindObjectsOfType<CardTooltipController>(
-                includeInactive: true
-            );
-            auxiliaryControllers = Object.FindObjectsOfType<AuxiliaryTooltipController>(
-                includeInactive: true
-            );
-        }
-        catch
-        {
+        if (!controllers.TryGet(out var cardControllers, out var auxiliaryControllers))
             return UnavailableAudit();
-        }
 
         foreach (var controller in cardControllers)
         {
@@ -246,7 +253,8 @@ internal static class NativeTooltipSuppression
         return unavailable
             ? UnavailableAudit()
             : new NativeTooltipCleanFrameAudit(
-                dirty ? NativeTooltipCleanFrameState.Dirty : NativeTooltipCleanFrameState.Clean
+                dirty ? NativeTooltipCleanFrameState.Dirty : NativeTooltipCleanFrameState.Clean,
+                cardControllers.Count + auxiliaryControllers.Count
             );
     }
 
@@ -254,6 +262,15 @@ internal static class NativeTooltipSuppression
         new(NativeTooltipCleanFrameState.Unavailable);
 
     private static bool AreRequiredShowGatesInstalled()
+    {
+        lock (Gate)
+        {
+            _requiredShowGatesInstalled ??= ProbeRequiredShowGatesInstalled();
+            return _requiredShowGatesInstalled.Value;
+        }
+    }
+
+    private static bool ProbeRequiredShowGatesInstalled()
     {
         try
         {
@@ -364,12 +381,18 @@ internal static class NativeTooltipSuppression
     {
         private readonly NativeTooltipSuppressionOwner _owner;
         private readonly bool _preparationAvailable;
+        private readonly NativeTooltipControllerSnapshot _controllers;
         private bool _disposed;
 
-        internal Lease(NativeTooltipSuppressionOwner owner, bool preparationAvailable)
+        internal Lease(
+            NativeTooltipSuppressionOwner owner,
+            bool preparationAvailable,
+            NativeTooltipControllerSnapshot controllers
+        )
         {
             _owner = owner;
             _preparationAvailable = preparationAvailable;
+            _controllers = controllers;
         }
 
         public NativeTooltipCleanFrameAudit AuditCleanFrame()
@@ -379,7 +402,7 @@ internal static class NativeTooltipSuppression
                 return new NativeTooltipCleanFrameAudit(NativeTooltipCleanFrameState.Unavailable);
             }
 
-            return ConcealAndAuditNativeTooltips();
+            return ConcealAndAuditNativeTooltips(_controllers);
         }
 
         public void Dispose()
@@ -394,6 +417,48 @@ internal static class NativeTooltipSuppression
             catch
             {
                 // Native objects may disappear during state teardown; lease accounting is final.
+            }
+        }
+    }
+
+    private sealed class NativeTooltipControllerSnapshot
+    {
+        private readonly NativeTooltipControllerCacheCore<CardTooltipController> _cardControllers =
+            new();
+        private readonly NativeTooltipControllerCacheCore<AuxiliaryTooltipController> _auxiliaryControllers =
+            new();
+
+        internal bool TryGet(
+            out IReadOnlyList<CardTooltipController> cardControllers,
+            out IReadOnlyList<AuxiliaryTooltipController> auxiliaryControllers
+        )
+        {
+            cardControllers = [];
+            auxiliaryControllers = [];
+            try
+            {
+                var parent = Data.TooltipParentComponent;
+                var generation =
+                    parent == null || parent.transform == null
+                        ? 0
+                        : unchecked((parent.GetInstanceID() * 397) ^ parent.transform.childCount);
+                cardControllers = _cardControllers.GetOrRefresh(
+                    generation,
+                    static controller => controller != null,
+                    static () =>
+                        Object.FindObjectsOfType<CardTooltipController>(includeInactive: true)
+                );
+                auxiliaryControllers = _auxiliaryControllers.GetOrRefresh(
+                    generation,
+                    static controller => controller != null,
+                    static () =>
+                        Object.FindObjectsOfType<AuxiliaryTooltipController>(includeInactive: true)
+                );
+                return true;
+            }
+            catch
+            {
+                return false;
             }
         }
     }

@@ -6,6 +6,7 @@ using BazaarPlusPlus.Storage.RunScreenshot;
 EndOfRunCaptureWorkflowBehaviorTests.Run();
 EndOfRunCleanFramePreparationTests.Run();
 EndOfRunCaptureSuppressionLifecycleTests.Run();
+EndOfRunCaptureSamplingPerformanceTests.Run();
 VerifyReadinessAdapter();
 VerifyVisualStabilityTracker();
 VerifyArtifactMapping();

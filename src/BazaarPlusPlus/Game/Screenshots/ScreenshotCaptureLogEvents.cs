@@ -162,6 +162,69 @@ internal static class ScreenshotCaptureLogEvents
         [CleanupFailedStage, CleanupFailedScreenshotId, CleanupFailedFilePath]
     );
 
+#if DEBUG
+    internal static readonly BppLogFieldDefinition SamplingReadinessCount = PublicField(
+        0,
+        "readiness_sample_count",
+        BppLogCardinality.High
+    );
+    internal static readonly BppLogFieldDefinition SamplingReadinessTotalMicroseconds = PublicField(
+        1,
+        "readiness_total_us",
+        BppLogCardinality.High
+    );
+    internal static readonly BppLogFieldDefinition SamplingReadinessMaxMicroseconds = PublicField(
+        2,
+        "readiness_max_us",
+        BppLogCardinality.High
+    );
+    internal static readonly BppLogFieldDefinition SamplingBarrierCount = PublicField(
+        3,
+        "barrier_sample_count",
+        BppLogCardinality.High
+    );
+    internal static readonly BppLogFieldDefinition SamplingBarrierTotalMicroseconds = PublicField(
+        4,
+        "barrier_total_us",
+        BppLogCardinality.High
+    );
+    internal static readonly BppLogFieldDefinition SamplingBarrierMaxMicroseconds = PublicField(
+        5,
+        "barrier_max_us",
+        BppLogCardinality.High
+    );
+    internal static readonly BppLogFieldDefinition SamplingMaxCardCount = PublicField(
+        6,
+        "max_card_count",
+        BppLogCardinality.High
+    );
+    internal static readonly BppLogFieldDefinition SamplingMaxTransformCount = PublicField(
+        7,
+        "max_transform_count",
+        BppLogCardinality.High
+    );
+    internal static readonly BppLogFieldDefinition SamplingMaxControllerCount = PublicField(
+        8,
+        "max_controller_count",
+        BppLogCardinality.High
+    );
+    internal static readonly BppLogEventDefinition SamplingSummary = new(
+        BppLogFeatureScope.Screenshots,
+        "screenshots.capture.sampling_summary",
+        [
+            SamplingReadinessCount,
+            SamplingReadinessTotalMicroseconds,
+            SamplingReadinessMaxMicroseconds,
+            SamplingBarrierCount,
+            SamplingBarrierTotalMicroseconds,
+            SamplingBarrierMaxMicroseconds,
+            SamplingMaxCardCount,
+            SamplingMaxTransformCount,
+            SamplingMaxControllerCount,
+        ]
+    );
+#endif
+
     private static BppLogFieldDefinition PublicField(
         int order,
         string name,
