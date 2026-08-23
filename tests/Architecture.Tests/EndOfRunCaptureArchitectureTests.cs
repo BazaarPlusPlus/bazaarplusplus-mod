@@ -35,6 +35,9 @@ public sealed class EndOfRunCaptureArchitectureTests
         var driver = File.ReadAllText(
             Path.Combine(root, "Game", "Screenshots", "EndOfRunCaptureDriver.cs")
         );
+        var sampler = File.ReadAllText(
+            Path.Combine(root, "Game", "Screenshots", "EndOfRunSummaryVisualSnapshotSampler.cs")
+        );
 
         Assert.Contains("WaitForEndOfFrame", driver);
         Assert.Contains("BppUiChromeSuppression.Begin", driver);
@@ -44,6 +47,8 @@ public sealed class EndOfRunCaptureArchitectureTests
         Assert.Contains("EndOfRunHeavySampleCadence", driver);
         Assert.Contains("EndOfRunVisualStabilityTracker", driver);
         Assert.Contains("EndOfRunCleanFramePreparationCore", driver);
+        Assert.Contains("preparation.ObserveCached(now)", driver);
+        Assert.DoesNotContain("ScreenshotCaptureReasonCode.CleanFrameDeadline", driver);
         Assert.Contains("ResetVisualStability", driver);
         Assert.Contains("IEndOfRunCaptureSurface<EndOfRunScreenController>", driver);
         Assert.DoesNotContain("ResumeContinue", driver);
@@ -52,6 +57,8 @@ public sealed class EndOfRunCaptureArchitectureTests
         Assert.DoesNotContain("MetadataDeadline", driver);
         Assert.DoesNotContain("RevealDeadline", driver);
         Assert.DoesNotContain("ScreenshotCaptureLogEvents", driver);
+        Assert.Contains("ExcludedTopologySentinel", sampler);
+        Assert.Contains("EndOfRunHierarchySentinelCore.Matches", sampler);
     }
 
     [Fact]

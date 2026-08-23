@@ -66,22 +66,20 @@ internal sealed class EndOfRunCaptureSuppressionLifecycle
         }
         catch
         {
-            ReleaseNative();
-            return EndOfRunCleanFrameDecision.CaptureDegraded(
-                ScreenshotCaptureReasonCode.NativeTooltipSuppressionUnavailable
+            tooltipAudit = new NativeTooltipCleanFrameAudit(
+                NativeTooltipCleanFrameState.Unavailable
             );
+            var unavailableVisual = EndOfRunCleanFrameVisualObservation.Unavailable;
+            TryObserveSample(observeSample, tooltipAudit, unavailableVisual);
+            ReleaseNative();
+            return preparation.Observe(tooltipAudit, unavailableVisual, nowSeconds);
         }
         if (tooltipAudit.State == NativeTooltipCleanFrameState.Unavailable)
         {
-            TryObserveSample(
-                observeSample,
-                tooltipAudit,
-                EndOfRunCleanFrameVisualObservation.Unavailable
-            );
+            var unavailableVisual = EndOfRunCleanFrameVisualObservation.Unavailable;
+            TryObserveSample(observeSample, tooltipAudit, unavailableVisual);
             ReleaseNative();
-            return EndOfRunCleanFrameDecision.CaptureDegraded(
-                ScreenshotCaptureReasonCode.NativeTooltipSuppressionUnavailable
-            );
+            return preparation.Observe(tooltipAudit, unavailableVisual, nowSeconds);
         }
 
         EndOfRunCleanFrameVisualObservation visual;
@@ -91,9 +89,7 @@ internal sealed class EndOfRunCaptureSuppressionLifecycle
         }
         catch
         {
-            return EndOfRunCleanFrameDecision.CaptureDegraded(
-                ScreenshotCaptureReasonCode.CleanFrameVisualUnavailable
-            );
+            visual = EndOfRunCleanFrameVisualObservation.Unavailable;
         }
 
         TryObserveSample(observeSample, tooltipAudit, visual);

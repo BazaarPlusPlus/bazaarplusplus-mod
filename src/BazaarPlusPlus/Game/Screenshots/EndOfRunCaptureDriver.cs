@@ -220,7 +220,7 @@ internal sealed class EndOfRunCaptureDriver
 
         var now = Time.realtimeSinceStartup;
         if (!_readinessSampleCadence.ShouldSample(now, summaryId))
-            return false;
+            return _visualStabilityTracker.ObserveCached();
 
         EndOfRunSummaryVisualSnapshot snapshot;
         bool captured;
@@ -400,47 +400,11 @@ internal sealed class EndOfRunCaptureDriver
                     }
 
                     var now = Time.realtimeSinceStartup;
-                    EndOfRunCleanFrameDecision decision;
-                    if (!cadence.ShouldSample(now, _screen.GetInstanceID()))
-                    {
-                        if (!preparation.HasReachedDeadline(now))
-                            continue;
-                        decision = EndOfRunCleanFrameDecision.CaptureDegraded(
-                            ScreenshotCaptureReasonCode.CleanFrameDeadline
-                        );
-                    }
-                    else
-                    {
-#if DEBUG
-                        var startedAt = Stopwatch.GetTimestamp();
-                        var diagnosticTooltipAudit = default(NativeTooltipCleanFrameAudit);
-                        var diagnosticVisual = EndOfRunCleanFrameVisualObservation.Unavailable;
-                        using (CleanFrameSampleMarker.Auto())
-                        {
-                            decision = _suppression.ObserveCleanFrame(
-                                preparation,
-                                () => _driver.CaptureCleanFrameVisual(_screen),
-                                now,
-                                (tooltipAudit, visual) =>
-                                {
-                                    diagnosticTooltipAudit = tooltipAudit;
-                                    diagnosticVisual = visual;
-                                }
-                            );
-                        }
-                        _driver._samplingDiagnostics.RecordBarrier(
-                            startedAt,
-                            diagnosticTooltipAudit,
-                            diagnosticVisual
-                        );
-#else
-                        decision = _suppression.ObserveCleanFrame(
-                            preparation,
-                            () => _driver.CaptureCleanFrameVisual(_screen),
-                            now
-                        );
-#endif
-                    }
+                    var decision = cadence.ShouldSample(now, _screen.GetInstanceID())
+                        ? ObserveFreshCleanFrame(preparation, now)
+                        : preparation.ObserveCached(now);
+                    if (decision.Kind == EndOfRunCleanFrameDecisionKind.ObserveFresh)
+                        decision = ObserveFreshCleanFrame(preparation, now);
                     if (decision.Kind == EndOfRunCleanFrameDecisionKind.Capture)
                     {
                         _preparationDegradationReason ??= decision.ReasonCode;
@@ -511,6 +475,44 @@ internal sealed class EndOfRunCaptureDriver
             }
 
             CompleteFromTask(session.Completion);
+        }
+
+        private EndOfRunCleanFrameDecision ObserveFreshCleanFrame(
+            EndOfRunCleanFramePreparationCore preparation,
+            float nowSeconds
+        )
+        {
+#if DEBUG
+            var startedAt = Stopwatch.GetTimestamp();
+            var diagnosticTooltipAudit = default(NativeTooltipCleanFrameAudit);
+            var diagnosticVisual = EndOfRunCleanFrameVisualObservation.Unavailable;
+            EndOfRunCleanFrameDecision decision;
+            using (CleanFrameSampleMarker.Auto())
+            {
+                decision = _suppression.ObserveCleanFrame(
+                    preparation,
+                    () => _driver.CaptureCleanFrameVisual(_screen),
+                    nowSeconds,
+                    (tooltipAudit, visual) =>
+                    {
+                        diagnosticTooltipAudit = tooltipAudit;
+                        diagnosticVisual = visual;
+                    }
+                );
+            }
+            _driver._samplingDiagnostics.RecordBarrier(
+                startedAt,
+                diagnosticTooltipAudit,
+                diagnosticVisual
+            );
+            return decision;
+#else
+            return _suppression.ObserveCleanFrame(
+                preparation,
+                () => _driver.CaptureCleanFrameVisual(_screen),
+                nowSeconds
+            );
+#endif
         }
 
         private bool InstallSuppression()

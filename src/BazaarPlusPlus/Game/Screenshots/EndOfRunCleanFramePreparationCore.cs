@@ -48,6 +48,7 @@ internal readonly record struct EndOfRunCleanFrameVisualObservation(
 internal enum EndOfRunCleanFrameDecisionKind
 {
     Wait,
+    ObserveFresh,
     Capture,
 }
 
@@ -58,6 +59,9 @@ internal readonly record struct EndOfRunCleanFrameDecision(
 {
     internal static EndOfRunCleanFrameDecision Wait =>
         new(EndOfRunCleanFrameDecisionKind.Wait, null);
+
+    internal static EndOfRunCleanFrameDecision ObserveFresh =>
+        new(EndOfRunCleanFrameDecisionKind.ObserveFresh, null);
 
     internal static EndOfRunCleanFrameDecision Capture =>
         new(EndOfRunCleanFrameDecisionKind.Capture, null);
@@ -81,6 +85,9 @@ internal sealed class EndOfRunCleanFramePreparationCore
     private ulong _cardSetFingerprint;
     private ulong _poseFingerprint;
     private float _stableSinceSeconds;
+    private bool _hasCachedObservation;
+    private NativeTooltipCleanFrameAudit _cachedTooltipAudit;
+    private EndOfRunCleanFrameVisualObservation _cachedVisual;
 
     internal EndOfRunCleanFramePreparationCore(float startedAtSeconds)
     {
@@ -91,6 +98,36 @@ internal sealed class EndOfRunCleanFramePreparationCore
         NativeTooltipCleanFrameAudit tooltipAudit,
         EndOfRunCleanFrameVisualObservation visual,
         float nowSeconds
+    )
+    {
+        _hasCachedObservation = true;
+        _cachedTooltipAudit = tooltipAudit;
+        _cachedVisual = visual;
+        return Decide(tooltipAudit, visual, nowSeconds, isFreshSample: true);
+    }
+
+    internal EndOfRunCleanFrameDecision ObserveCached(float nowSeconds)
+    {
+        if (float.IsNaN(nowSeconds) || float.IsInfinity(nowSeconds))
+        {
+            return EndOfRunCleanFrameDecision.CaptureDegraded(
+                ScreenshotCaptureReasonCode.CleanFrameVisualUnavailable
+            );
+        }
+
+        if (nowSeconds >= _deadlineAtSeconds)
+            return EndOfRunCleanFrameDecision.ObserveFresh;
+        if (!_hasCachedObservation)
+            return EndOfRunCleanFrameDecision.Wait;
+
+        return Decide(_cachedTooltipAudit, _cachedVisual, nowSeconds, isFreshSample: false);
+    }
+
+    private EndOfRunCleanFrameDecision Decide(
+        NativeTooltipCleanFrameAudit tooltipAudit,
+        EndOfRunCleanFrameVisualObservation visual,
+        float nowSeconds,
+        bool isFreshSample
     )
     {
         if (tooltipAudit.State == NativeTooltipCleanFrameState.Unavailable)
@@ -139,6 +176,9 @@ internal sealed class EndOfRunCleanFramePreparationCore
             );
         }
 
+        if (!isFreshSample)
+            return EndOfRunCleanFrameDecision.Wait;
+
         if (
             !_hasCleanBaseline
             || visual.LoadedCardCount != _loadedCardCount
@@ -161,11 +201,6 @@ internal sealed class EndOfRunCleanFramePreparationCore
             ? EndOfRunCleanFrameDecision.Capture
             : EndOfRunCleanFrameDecision.Wait;
     }
-
-    internal bool HasReachedDeadline(float nowSeconds) =>
-        !float.IsNaN(nowSeconds)
-        && !float.IsInfinity(nowSeconds)
-        && nowSeconds >= _deadlineAtSeconds;
 
     private void SetBaseline(EndOfRunCleanFrameVisualObservation visual, float nowSeconds)
     {

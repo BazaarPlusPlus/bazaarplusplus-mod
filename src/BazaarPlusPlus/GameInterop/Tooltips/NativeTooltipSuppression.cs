@@ -76,11 +76,17 @@ internal static class NativeTooltipSuppression
 {
     private static readonly object Gate = new();
     private static readonly NativeTooltipSuppressionOwnershipCore Ownership = new();
+    private static readonly NativeTooltipControllerTopologyGeneration ControllerTopology = new();
     private static readonly List<AuxiliaryCanvasGate> AuxiliaryGates = new();
     private static bool? _requiredShowGatesInstalled;
     private static int _activeLeaseCount;
 
     internal static bool IsActive => Volatile.Read(ref _activeLeaseCount) > 0;
+
+    internal static void NotifyControllerAwake() => ControllerTopology.ObserveControllerAwake();
+
+    internal static void NotifyControllerDestroyed() =>
+        ControllerTopology.ObserveControllerDestroyed();
 
     internal static void CapturePatchCapabilities()
     {
@@ -303,6 +309,22 @@ internal static class NativeTooltipSuppression
                         typeof(AuxiliaryTooltipController),
                         nameof(AuxiliaryTooltipController.ShowAuxiliaryTooltipController)
                     )
+                )
+                && HasOurPostfix(AccessTools.DeclaredMethod(typeof(CardTooltipController), "Awake"))
+                && HasOurPostfix(
+                    AccessTools.DeclaredMethod(typeof(AuxiliaryTooltipController), "Awake")
+                )
+                && HasOurPrefix(
+                    AccessTools.DeclaredMethod(
+                        typeof(CardTooltipController),
+                        nameof(CardTooltipController.OnDestroy)
+                    )
+                )
+                && HasOurPrefix(
+                    AccessTools.DeclaredMethod(
+                        typeof(BaseTooltipController),
+                        nameof(BaseTooltipController.OnDestroy)
+                    )
                 );
         }
         catch
@@ -318,6 +340,15 @@ internal static class NativeTooltipSuppression
         var patchInfo = Harmony.GetPatchInfo(method);
         return patchInfo != null
             && patchInfo.Prefixes.Any(patch => patch.owner == BppPluginMetadata.Guid);
+    }
+
+    private static bool HasOurPostfix(System.Reflection.MethodBase? method)
+    {
+        if (method == null)
+            return false;
+        var patchInfo = Harmony.GetPatchInfo(method);
+        return patchInfo != null
+            && patchInfo.Postfixes.Any(patch => patch.owner == BppPluginMetadata.Guid);
     }
 
     private static AuxiliaryCanvasGate? FindAuxiliaryGate(AuxiliaryTooltipController controller) =>
@@ -427,6 +458,10 @@ internal static class NativeTooltipSuppression
             new();
         private readonly NativeTooltipControllerCacheCore<AuxiliaryTooltipController> _auxiliaryControllers =
             new();
+        private int _observedControllerTopologyGeneration = int.MinValue;
+        private int _observedParentInstanceId = int.MinValue;
+        private int _observedParentChildCount = int.MinValue;
+        private int _cacheGeneration;
 
         internal bool TryGet(
             out IReadOnlyList<CardTooltipController> cardControllers,
@@ -438,18 +473,29 @@ internal static class NativeTooltipSuppression
             try
             {
                 var parent = Data.TooltipParentComponent;
-                var generation =
-                    parent == null || parent.transform == null
-                        ? 0
-                        : unchecked((parent.GetInstanceID() * 397) ^ parent.transform.childCount);
+                var parentInstanceId = parent == null ? 0 : parent.GetInstanceID();
+                var parentChildCount =
+                    parent == null || parent.transform == null ? 0 : parent.transform.childCount;
+                var controllerTopologyGeneration = ControllerTopology.Current;
+                if (
+                    controllerTopologyGeneration != _observedControllerTopologyGeneration
+                    || parentInstanceId != _observedParentInstanceId
+                    || parentChildCount != _observedParentChildCount
+                )
+                {
+                    _observedControllerTopologyGeneration = controllerTopologyGeneration;
+                    _observedParentInstanceId = parentInstanceId;
+                    _observedParentChildCount = parentChildCount;
+                    _cacheGeneration++;
+                }
                 cardControllers = _cardControllers.GetOrRefresh(
-                    generation,
+                    _cacheGeneration,
                     static controller => controller != null,
                     static () =>
                         Object.FindObjectsOfType<CardTooltipController>(includeInactive: true)
                 );
                 auxiliaryControllers = _auxiliaryControllers.GetOrRefresh(
-                    generation,
+                    _cacheGeneration,
                     static controller => controller != null,
                     static () =>
                         Object.FindObjectsOfType<AuxiliaryTooltipController>(includeInactive: true)

@@ -9,7 +9,9 @@ internal static class EndOfRunCaptureSamplingPerformanceTests
         Heavy_sampling_has_a_wall_clock_frequency_cap();
         Sampling_plan_reuses_and_invalidates_by_generation();
         Sampling_plan_prunes_replaced_and_destroyed_entries();
+        Excluded_hierarchy_sentinels_reject_equal_count_replacements();
         Tooltip_snapshot_reuses_until_generation_or_lifetime_changes();
+        Tooltip_lifecycle_signals_invalidate_equal_count_and_deep_topology_changes();
     }
 
     private static void Heavy_sampling_has_a_wall_clock_frequency_cap()
@@ -115,6 +117,30 @@ internal static class EndOfRunCaptureSamplingPerformanceTests
         Assert(cache.Count == 1 && live.Alive, "Destroyed and replacement plans must be pruned.");
     }
 
+    private static void Excluded_hierarchy_sentinels_reject_equal_count_replacements()
+    {
+        var expected = new EndOfRunHierarchySentinelState(
+            InstanceId: 20,
+            ParentInstanceId: 10,
+            SiblingIndex: 2,
+            ChildCount: 3,
+            IsExcluded: true
+        );
+
+        Assert(
+            !EndOfRunHierarchySentinelCore.Matches(expected, expected with { InstanceId = 21 }),
+            "Replacing an excluded root at the same sibling with the same child count must rebuild."
+        );
+        Assert(
+            !EndOfRunHierarchySentinelCore.Matches(expected, expected with { ChildCount = 4 }),
+            "A deep topology change below an excluded root must rebuild the sampling plan."
+        );
+        Assert(
+            !EndOfRunHierarchySentinelCore.Matches(expected, expected with { IsExcluded = false }),
+            "An excluded root becoming structural must enter the pose fingerprint."
+        );
+    }
+
     private static void Tooltip_snapshot_reuses_until_generation_or_lifetime_changes()
     {
         var cache = new NativeTooltipControllerCacheCore<FakeController>();
@@ -139,6 +165,40 @@ internal static class EndOfRunCaptureSamplingPerformanceTests
 
         _ = cache.GetOrRefresh(2, controller => controller.Alive, Scan);
         Assert(scans == 3, "A native topology generation change must rescan once.");
+    }
+
+    private static void Tooltip_lifecycle_signals_invalidate_equal_count_and_deep_topology_changes()
+    {
+        var topology = new NativeTooltipControllerTopologyGeneration();
+        var cache = new NativeTooltipControllerCacheCore<FakeController>();
+        var scans = 0;
+        var controllers = new[] { new FakeController() };
+        FakeController[] Scan()
+        {
+            scans++;
+            return controllers;
+        }
+
+        _ = cache.GetOrRefresh(topology.Current, controller => controller.Alive, Scan);
+        controllers = [new FakeController()];
+        topology.ObserveControllerAwake();
+        _ = cache.GetOrRefresh(topology.Current, controller => controller.Alive, Scan);
+        Assert(
+            scans == 2,
+            "A same-count controller replacement must invalidate through its Awake signal."
+        );
+
+        controllers = [.. controllers, new FakeController()];
+        topology.ObserveControllerAwake();
+        _ = cache.GetOrRefresh(topology.Current, controller => controller.Alive, Scan);
+        Assert(
+            scans == 3,
+            "A controller created below unchanged direct parent topology must invalidate the cache."
+        );
+
+        topology.ObserveControllerDestroyed();
+        _ = cache.GetOrRefresh(topology.Current, controller => controller.Alive, Scan);
+        Assert(scans == 4, "Destroy lifecycle signals must invalidate the controller snapshot.");
     }
 
     private static void Assert(bool condition, string message)

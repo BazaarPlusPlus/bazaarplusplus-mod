@@ -259,12 +259,19 @@ internal sealed class EndOfRunSummaryVisualSnapshotSampler
     {
         private readonly Animator _animator;
         private readonly Transform _root;
+        private readonly ExcludedTopologySentinel[] _excludedTopologySentinels;
 
-        private CardSamplingPlan(Animator animator, Transform root, TransformSamplingNode[] nodes)
+        private CardSamplingPlan(
+            Animator animator,
+            Transform root,
+            TransformSamplingNode[] nodes,
+            ExcludedTopologySentinel[] excludedTopologySentinels
+        )
         {
             _animator = animator;
             _root = root;
             Nodes = nodes;
+            _excludedTopologySentinels = excludedTopologySentinels;
         }
 
         internal int AnimatorInstanceId => _animator.GetInstanceID();
@@ -280,6 +287,11 @@ internal sealed class EndOfRunSummaryVisualSnapshotSampler
                     if (!node.IsAlive)
                         return false;
                 }
+                foreach (var sentinel in _excludedTopologySentinels)
+                {
+                    if (!sentinel.IsAlive)
+                        return false;
+                }
                 return true;
             }
         }
@@ -289,8 +301,14 @@ internal sealed class EndOfRunSummaryVisualSnapshotSampler
         internal static CardSamplingPlan Create(Animator animator, Transform root)
         {
             var nodes = new List<TransformSamplingNode>();
-            AddHierarchy(root, nodes);
-            return new CardSamplingPlan(animator, root, nodes.ToArray());
+            var excludedTopologySentinels = new List<ExcludedTopologySentinel>();
+            AddHierarchy(root, nodes, excludedTopologySentinels);
+            return new CardSamplingPlan(
+                animator,
+                root,
+                nodes.ToArray(),
+                excludedTopologySentinels.ToArray()
+            );
         }
 
         internal bool IsReusable(Animator animator, Transform root)
@@ -302,23 +320,67 @@ internal sealed class EndOfRunSummaryVisualSnapshotSampler
                 if (!node.HasSameHierarchyGeneration)
                     return false;
             }
+            foreach (var sentinel in _excludedTopologySentinels)
+            {
+                if (!sentinel.HasSameHierarchyGeneration)
+                    return false;
+            }
             return true;
         }
 
         private static void AddHierarchy(
             Transform transform,
-            ICollection<TransformSamplingNode> nodes
+            ICollection<TransformSamplingNode> nodes,
+            ICollection<ExcludedTopologySentinel> excludedTopologySentinels
         )
         {
             nodes.Add(new TransformSamplingNode(transform));
             for (var index = 0; index < transform.childCount; index++)
             {
                 var child = transform.GetChild(index);
-                if (child == null || IsNonStructuralVisualSubtree(child))
+                if (child == null)
                     continue;
-                AddHierarchy(child, nodes);
+                if (IsNonStructuralVisualSubtree(child))
+                {
+                    excludedTopologySentinels.Add(new ExcludedTopologySentinel(child));
+                    continue;
+                }
+                AddHierarchy(child, nodes, excludedTopologySentinels);
             }
         }
+    }
+
+    private sealed class ExcludedTopologySentinel
+    {
+        private readonly Transform _transform;
+        private readonly EndOfRunHierarchySentinelState _expected;
+
+        internal ExcludedTopologySentinel(Transform transform)
+        {
+            _transform = transform;
+            _expected = CaptureState(transform, isExcluded: true);
+        }
+
+        internal bool IsAlive => _transform != null;
+
+        internal bool HasSameHierarchyGeneration =>
+            _transform != null
+            && EndOfRunHierarchySentinelCore.Matches(
+                _expected,
+                CaptureState(_transform, IsNonStructuralVisualSubtree(_transform))
+            );
+
+        private static EndOfRunHierarchySentinelState CaptureState(
+            Transform transform,
+            bool isExcluded
+        ) =>
+            new(
+                transform.GetInstanceID(),
+                transform.parent == null ? 0 : transform.parent.GetInstanceID(),
+                transform.GetSiblingIndex(),
+                transform.childCount,
+                isExcluded
+            );
     }
 
     private sealed class TransformSamplingNode

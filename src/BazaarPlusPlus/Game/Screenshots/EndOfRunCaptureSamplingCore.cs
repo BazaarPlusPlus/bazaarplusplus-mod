@@ -38,6 +38,22 @@ internal sealed class EndOfRunHeavySampleCadence
     }
 }
 
+internal readonly record struct EndOfRunHierarchySentinelState(
+    int InstanceId,
+    int ParentInstanceId,
+    int SiblingIndex,
+    int ChildCount,
+    bool IsExcluded
+);
+
+internal static class EndOfRunHierarchySentinelCore
+{
+    internal static bool Matches(
+        EndOfRunHierarchySentinelState expected,
+        EndOfRunHierarchySentinelState current
+    ) => expected == current;
+}
+
 /// <summary>
 /// Reuses a structural sampling plan only while its source generation and native objects remain
 /// valid. Callers still read every live pose value on each sample.
