@@ -40,7 +40,6 @@ internal enum EndOfRunCleanFrameDecisionKind
 {
     Wait,
     Capture,
-    Fail,
 }
 
 internal readonly record struct EndOfRunCleanFrameDecision(
@@ -54,8 +53,9 @@ internal readonly record struct EndOfRunCleanFrameDecision(
     internal static EndOfRunCleanFrameDecision Capture =>
         new(EndOfRunCleanFrameDecisionKind.Capture, null);
 
-    internal static EndOfRunCleanFrameDecision Fail(ScreenshotCaptureReasonCode reasonCode) =>
-        new(EndOfRunCleanFrameDecisionKind.Fail, reasonCode);
+    internal static EndOfRunCleanFrameDecision CaptureDegraded(
+        ScreenshotCaptureReasonCode reasonCode
+    ) => new(EndOfRunCleanFrameDecisionKind.Capture, reasonCode);
 }
 
 /// <summary>
@@ -86,19 +86,19 @@ internal sealed class EndOfRunCleanFramePreparationCore
     {
         if (tooltipAudit.State == NativeTooltipCleanFrameState.Unavailable)
         {
-            return EndOfRunCleanFrameDecision.Fail(
+            return EndOfRunCleanFrameDecision.CaptureDegraded(
                 ScreenshotCaptureReasonCode.NativeTooltipSuppressionUnavailable
             );
         }
         if (visual.State == EndOfRunCleanFrameVisualState.Unavailable)
         {
-            return EndOfRunCleanFrameDecision.Fail(
+            return EndOfRunCleanFrameDecision.CaptureDegraded(
                 ScreenshotCaptureReasonCode.CleanFrameVisualUnavailable
             );
         }
         if (float.IsNaN(nowSeconds) || float.IsInfinity(nowSeconds))
         {
-            return EndOfRunCleanFrameDecision.Fail(
+            return EndOfRunCleanFrameDecision.CaptureDegraded(
                 ScreenshotCaptureReasonCode.CleanFrameVisualUnavailable
             );
         }
@@ -107,19 +107,25 @@ internal sealed class EndOfRunCleanFramePreparationCore
         {
             ResetBaseline();
             return nowSeconds >= _deadlineAtSeconds
-                ? EndOfRunCleanFrameDecision.Fail(ScreenshotCaptureReasonCode.CleanFrameDeadline)
+                ? EndOfRunCleanFrameDecision.CaptureDegraded(
+                    ScreenshotCaptureReasonCode.CleanFrameDeadline
+                )
                 : EndOfRunCleanFrameDecision.Wait;
         }
 
         if (nowSeconds >= _deadlineAtSeconds)
-            return EndOfRunCleanFrameDecision.Fail(ScreenshotCaptureReasonCode.CleanFrameDeadline);
+        {
+            return EndOfRunCleanFrameDecision.CaptureDegraded(
+                ScreenshotCaptureReasonCode.CleanFrameDeadline
+            );
+        }
 
         if (visual.State == EndOfRunCleanFrameVisualState.Empty)
             return EndOfRunCleanFrameDecision.Capture;
 
         if (visual.LoadedCardCount <= 0)
         {
-            return EndOfRunCleanFrameDecision.Fail(
+            return EndOfRunCleanFrameDecision.CaptureDegraded(
                 ScreenshotCaptureReasonCode.CleanFrameVisualUnavailable
             );
         }
