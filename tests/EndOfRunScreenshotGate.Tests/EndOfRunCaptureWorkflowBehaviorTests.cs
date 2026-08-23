@@ -9,7 +9,7 @@ internal static class EndOfRunCaptureWorkflowBehaviorTests
     {
         Missing_surface_is_fail_open();
         Reveal_and_success_flow();
-        Clean_frame_deadline_fails_open_without_capture_or_retry();
+        Clean_frame_fallback_persists_artifact_and_reports_degraded();
         Capture_timeout_starts_when_capture_is_invoked();
         Retryable_failures_get_one_retry_only();
         Adapter_non_retryable_failure_fails_open();
@@ -52,47 +52,36 @@ internal static class EndOfRunCaptureWorkflowBehaviorTests
         Assert(attempt.CancelCount == 1, "Capture should time out after its own deadline.");
     }
 
-    private static void Clean_frame_deadline_fails_open_without_capture_or_retry()
+    private static void Clean_frame_fallback_persists_artifact_and_reports_degraded()
     {
         using var log = new TestLogCapture();
-        var fixture = new Fixture();
-        fixture.Core.OnEndOfRunInitializing();
-        fixture.Core.ObserveRevealStarted(fixture.Screen);
-        fixture.Screen.Readiness = Readiness(EndOfRunCaptureReadinessState.Ready);
-        fixture.Surface.NextAttemptHasStarted = false;
-
-        fixture.Core.OnFrame(fixture.Context);
+        var fixture = ReadyFixture();
         var attempt = fixture.Surface.LastAttempt!;
-        Assert(
-            fixture.Surface.BeginCount == 1 && attempt.LeaseActive,
-            "Summary readiness should automatically begin clean-frame preparation."
-        );
-        Assert(
-            !attempt.HasCaptureStarted,
-            "Screen capture must remain unstarted while the clean barrier is pending."
-        );
-
+        AcquireFrame(fixture);
+        fixture.Files.MarkUsable("clean-frame-fallback.png");
         attempt.Complete(
-            EndOfRunCaptureAttemptOutcome.Failed(ScreenshotCaptureReasonCode.CleanFrameDeadline)
+            Success("clean-frame-fallback.png", ScreenshotCaptureReasonCode.CleanFrameDeadline)
         );
         fixture.Core.OnFrame(fixture.Context);
-        fixture.Clock.Advance(30f);
+        Assert(
+            fixture.Persistence.CallCount == 1,
+            "A clean-frame fallback artifact must persist metadata."
+        );
+
+        fixture.Persistence.CompleteNext(ScreenshotMetadataPersistenceOutcome.Saved());
         fixture.Core.OnFrame(fixture.Context);
 
-        Assert(!attempt.LeaseActive, "Clean-frame failure must release its suppression lease.");
-        Assert(!fixture.Surface.IsBlocked, "Clean-frame deadline must fail open Continue.");
-        Assert(fixture.Surface.BeginCount == 1, "Clean-frame deadline must not retry capture.");
-        Assert(fixture.Persistence.CallCount == 0, "No artifact means no metadata persistence.");
-        Assert(fixture.Files.Deleted.Count == 0, "No capture artifact may exist or be deleted.");
         var terminals = log
             .Events.Where(entry =>
-                entry.Contains("event=screenshots.capture.failed", StringComparison.Ordinal)
+                entry.Contains("event=screenshots.capture.degraded", StringComparison.Ordinal)
             )
             .ToArray();
-        Assert(terminals.Length == 1, "Clean-frame deadline must emit one terminal outcome.");
+        Assert(terminals.Length == 1, "A clean-frame fallback must emit one degraded outcome.");
         Assert(
-            terminals[0].Contains("reason_code=clean_frame_deadline", StringComparison.Ordinal),
-            "Clean-frame deadline must have a low-cardinality terminal reason."
+            terminals[0].Contains("reason_code=clean_frame_deadline", StringComparison.Ordinal)
+                && terminals[0].Contains("artifact_status=complete", StringComparison.Ordinal)
+                && !fixture.Files.Deleted.Contains("clean-frame-fallback.png"),
+            "A clean-frame fallback must retain its complete artifact and degradation reason."
         );
     }
 
@@ -491,9 +480,13 @@ internal static class EndOfRunCaptureWorkflowBehaviorTests
     private static EndOfRunCaptureReadinessOutcome Readiness(EndOfRunCaptureReadinessState state) =>
         new(state, null, null);
 
-    private static EndOfRunCaptureAttemptOutcome Success(string path) =>
+    private static EndOfRunCaptureAttemptOutcome Success(
+        string path,
+        ScreenshotCaptureReasonCode? degradationReason = null
+    ) =>
         EndOfRunCaptureAttemptOutcome.Succeeded(
-            new ScreenshotCaptureResult { ScreenshotId = "shot", FilePath = path }
+            new ScreenshotCaptureResult { ScreenshotId = "shot", FilePath = path },
+            degradationReason
         );
 
     private static void WaitUntil(Func<bool> predicate, string message)

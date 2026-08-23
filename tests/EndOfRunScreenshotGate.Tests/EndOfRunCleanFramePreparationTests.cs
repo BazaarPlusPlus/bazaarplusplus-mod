@@ -8,9 +8,13 @@ internal static class EndOfRunCleanFramePreparationTests
     {
         Capture_waits_for_a_clean_post_cleanup_pose_window();
         Pose_change_restarts_the_post_cleanup_window();
+        Changing_pose_at_deadline_falls_back_to_capture();
         Late_tooltip_visibility_invalidates_the_clean_window();
         Empty_board_can_capture_after_a_clean_render_boundary();
-        Unavailable_native_suppression_fails_clean();
+        Unavailable_native_suppression_falls_back_to_capture();
+        Dirty_tooltip_at_deadline_falls_back_to_capture();
+        Unavailable_visual_falls_back_to_capture();
+        Invalid_visual_observations_fall_back_to_capture();
         Native_suppression_owners_are_reference_counted_independently();
     }
 
@@ -50,6 +54,21 @@ internal static class EndOfRunCleanFramePreparationTests
             core.Observe(Clean(), Sample(1, 11, 101), 0.91f).Kind
                 == EndOfRunCleanFrameDecisionKind.Capture,
             "Capture should resume only after the changed pose settles again."
+        );
+    }
+
+    private static void Changing_pose_at_deadline_falls_back_to_capture()
+    {
+        var core = new EndOfRunCleanFramePreparationCore(startedAtSeconds: 0f);
+        _ = core.Observe(Clean(), Sample(1, 11, 100), 0f);
+        _ = core.Observe(Clean(), Sample(1, 11, 101), 4.9f);
+
+        var decision = core.Observe(Clean(), Sample(1, 11, 102), 5f);
+
+        Assert(
+            decision.Kind == EndOfRunCleanFrameDecisionKind.Capture
+                && decision.ReasonCode == ScreenshotCaptureReasonCode.CleanFrameDeadline,
+            "An unstable pose at the clean-frame deadline must fall back to capture."
         );
     }
 
@@ -95,13 +114,13 @@ internal static class EndOfRunCleanFramePreparationTests
             nowSeconds: 7f
         );
         Assert(
-            expired.Kind == EndOfRunCleanFrameDecisionKind.Fail
+            expired.Kind == EndOfRunCleanFrameDecisionKind.Capture
                 && expired.ReasonCode == ScreenshotCaptureReasonCode.CleanFrameDeadline,
-            "An empty summary must not bypass the bounded clean-frame deadline."
+            "An expired empty summary should capture with its deadline degradation."
         );
     }
 
-    private static void Unavailable_native_suppression_fails_clean()
+    private static void Unavailable_native_suppression_falls_back_to_capture()
     {
         var unavailable = new EndOfRunCleanFramePreparationCore(startedAtSeconds: 0f).Observe(
             new NativeTooltipCleanFrameAudit(NativeTooltipCleanFrameState.Unavailable),
@@ -109,12 +128,15 @@ internal static class EndOfRunCleanFramePreparationTests
             nowSeconds: 0f
         );
         Assert(
-            unavailable.Kind == EndOfRunCleanFrameDecisionKind.Fail
+            unavailable.Kind == EndOfRunCleanFrameDecisionKind.Capture
                 && unavailable.ReasonCode
                     == ScreenshotCaptureReasonCode.NativeTooltipSuppressionUnavailable,
-            "A missing native seam must fail clean before ScreenCapture."
+            "A missing native seam must fall back to ScreenCapture."
         );
+    }
 
+    private static void Dirty_tooltip_at_deadline_falls_back_to_capture()
+    {
         var deadlineCore = new EndOfRunCleanFramePreparationCore(startedAtSeconds: 0f);
         var deadline = deadlineCore.Observe(
             new NativeTooltipCleanFrameAudit(NativeTooltipCleanFrameState.Dirty),
@@ -122,9 +144,47 @@ internal static class EndOfRunCleanFramePreparationTests
             EndOfRunCleanFramePreparationCore.DeadlineSeconds
         );
         Assert(
-            deadline.Kind == EndOfRunCleanFrameDecisionKind.Fail
+            deadline.Kind == EndOfRunCleanFrameDecisionKind.Capture
                 && deadline.ReasonCode == ScreenshotCaptureReasonCode.CleanFrameDeadline,
-            "A persistently dirty frame must stop at the bounded clean deadline."
+            "A persistently dirty frame must fall back to capture at the bounded deadline."
+        );
+    }
+
+    private static void Unavailable_visual_falls_back_to_capture()
+    {
+        var decision = new EndOfRunCleanFramePreparationCore(startedAtSeconds: 0f).Observe(
+            Clean(),
+            EndOfRunCleanFrameVisualObservation.Unavailable,
+            nowSeconds: 0f
+        );
+
+        Assert(
+            decision.Kind == EndOfRunCleanFrameDecisionKind.Capture
+                && decision.ReasonCode == ScreenshotCaptureReasonCode.CleanFrameVisualUnavailable,
+            "An unavailable visual audit must fall back to ScreenCapture."
+        );
+    }
+
+    private static void Invalid_visual_observations_fall_back_to_capture()
+    {
+        var invalidTime = new EndOfRunCleanFramePreparationCore(startedAtSeconds: 0f).Observe(
+            Clean(),
+            Sample(1, 1, 1),
+            nowSeconds: float.NaN
+        );
+        var invalidCount = new EndOfRunCleanFramePreparationCore(startedAtSeconds: 0f).Observe(
+            Clean(),
+            Sample(0, 1, 1),
+            nowSeconds: 0f
+        );
+
+        Assert(
+            invalidTime.Kind == EndOfRunCleanFrameDecisionKind.Capture
+                && invalidTime.ReasonCode == ScreenshotCaptureReasonCode.CleanFrameVisualUnavailable
+                && invalidCount.Kind == EndOfRunCleanFrameDecisionKind.Capture
+                && invalidCount.ReasonCode
+                    == ScreenshotCaptureReasonCode.CleanFrameVisualUnavailable,
+            "Invalid visual observations must degrade capture instead of dropping the artifact."
         );
     }
 

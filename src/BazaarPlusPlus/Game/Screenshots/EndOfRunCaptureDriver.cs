@@ -255,6 +255,7 @@ internal sealed class EndOfRunCaptureDriver
         private IDisposable? _bppSuppression;
         private INativeTooltipSuppressionLease? _nativeTooltipSuppression;
         private ScreenshotCaptureSession? _captureSession;
+        private ScreenshotCaptureReasonCode? _preparationDegradationReason;
         private bool _canceled;
         private bool _hasCaptureStarted;
 
@@ -314,72 +315,65 @@ internal sealed class EndOfRunCaptureDriver
                 yield break;
             }
 
-            Exception? suppressionException = null;
+            var cleanFramePreparationAvailable = false;
             try
             {
                 InstallSuppression();
+                cleanFramePreparationAvailable = true;
             }
-            catch (Exception ex)
-            {
-                suppressionException = ex;
-            }
-            if (suppressionException != null)
+            catch
             {
                 DisposeSuppression();
-                CompletePreparationFailure(
-                    ScreenshotCaptureReasonCode.NativeTooltipSuppressionUnavailable,
-                    suppressionException
-                );
-                yield break;
+                _preparationDegradationReason =
+                    ScreenshotCaptureReasonCode.NativeTooltipSuppressionUnavailable;
             }
 
             _driver.ResetVisualStability();
-            var preparation = new EndOfRunCleanFramePreparationCore(Time.realtimeSinceStartup);
-            var endOfFrame = new WaitForEndOfFrame();
-            while (true)
+            if (cleanFramePreparationAvailable)
             {
-                yield return endOfFrame;
-                if (IsCanceled())
+                var preparation = new EndOfRunCleanFramePreparationCore(Time.realtimeSinceStartup);
+                var endOfFrame = new WaitForEndOfFrame();
+                while (true)
                 {
-                    DisposeSuppression();
-                    CompleteCanceled();
-                    yield break;
-                }
+                    yield return endOfFrame;
+                    if (IsCanceled())
+                    {
+                        DisposeSuppression();
+                        CompleteCanceled();
+                        yield break;
+                    }
 
-                NativeTooltipCleanFrameAudit tooltipAudit;
-                EndOfRunCleanFrameVisualObservation visual;
-                try
-                {
-                    tooltipAudit =
-                        _nativeTooltipSuppression?.AuditCleanFrame()
-                        ?? new NativeTooltipCleanFrameAudit(
-                            NativeTooltipCleanFrameState.Unavailable
-                        );
-                    visual = CaptureCleanFrameVisual(_screen);
-                }
-                catch (Exception ex)
-                {
-                    DisposeSuppression();
-                    CompletePreparationFailure(
-                        ScreenshotCaptureReasonCode.NativeTooltipSuppressionUnavailable,
-                        ex
-                    );
-                    yield break;
-                }
+                    NativeTooltipCleanFrameAudit tooltipAudit;
+                    EndOfRunCleanFrameVisualObservation visual;
+                    try
+                    {
+                        tooltipAudit =
+                            _nativeTooltipSuppression?.AuditCleanFrame()
+                            ?? new NativeTooltipCleanFrameAudit(
+                                NativeTooltipCleanFrameState.Unavailable
+                            );
+                        visual = CaptureCleanFrameVisual(_screen);
+                    }
+                    catch
+                    {
+                        DisposeSuppression();
+                        _preparationDegradationReason =
+                            ScreenshotCaptureReasonCode.NativeTooltipSuppressionUnavailable;
+                        break;
+                    }
 
-                var decision = preparation.Observe(tooltipAudit, visual, Time.realtimeSinceStartup);
-                if (decision.Kind == EndOfRunCleanFrameDecisionKind.Capture)
-                    break;
-                if (decision.Kind == EndOfRunCleanFrameDecisionKind.Fail)
-                {
-                    DisposeSuppression();
-                    CompletePreparationFailure(
-                        decision.ReasonCode ?? ScreenshotCaptureReasonCode.CleanFrameDeadline,
-                        exception: null
+                    var decision = preparation.Observe(
+                        tooltipAudit,
+                        visual,
+                        Time.realtimeSinceStartup
                     );
-                    yield break;
+                    if (decision.Kind == EndOfRunCleanFrameDecisionKind.Capture)
+                    {
+                        _preparationDegradationReason ??= decision.ReasonCode;
+                        break;
+                    }
+                    yield return null;
                 }
-                yield return null;
             }
 
             ScreenshotCaptureSession? session;
@@ -470,16 +464,6 @@ internal sealed class EndOfRunCaptureDriver
             }
         }
 
-        private void CompletePreparationFailure(
-            ScreenshotCaptureReasonCode reason,
-            Exception? exception
-        )
-        {
-            var failure = exception ?? new InvalidOperationException(reason.ToString());
-            _frameAcquired.TrySetException(failure);
-            _completion.TrySetResult(EndOfRunCaptureAttemptOutcome.Failed(reason, exception));
-        }
-
         private void ObserveFrameAcquired(Task frameAcquired)
         {
             _ = frameAcquired.ContinueWith(
@@ -527,7 +511,10 @@ internal sealed class EndOfRunCaptureDriver
                         ? EndOfRunCaptureAttemptOutcome.Failed(
                             ScreenshotCaptureReasonCode.CaptureReturnedNull
                         )
-                        : EndOfRunCaptureAttemptOutcome.Succeeded(capture)
+                        : EndOfRunCaptureAttemptOutcome.Succeeded(
+                            capture,
+                            _preparationDegradationReason
+                        )
                 );
             }
             catch (Exception ex)
