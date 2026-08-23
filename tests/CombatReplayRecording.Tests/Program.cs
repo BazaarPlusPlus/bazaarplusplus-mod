@@ -11,6 +11,7 @@ CurrentNativeReplayBecomesReadyWithoutPersistence();
 OrdinaryManagedReplayKeepsRecordingButtonVisible();
 RecordedManagedReplayTakesDisplayPriority();
 RecordingRestartStatusIsLocalized();
+StartFailureFeedbackSurvivesRefreshAndClearsAtItsBoundaries();
 PvpBattleStoreRejectsPveManifests();
 
 Console.WriteLine("Combat replay recording tests passed.");
@@ -227,6 +228,50 @@ static void RecordingRestartStatusIsLocalized()
     Assert(
         traditional.Contains("請先完成目前重播", StringComparison.Ordinal),
         "Traditional Chinese should resolve the typed replay blocker."
+    );
+}
+
+static void StartFailureFeedbackSurvivesRefreshAndClearsAtItsBoundaries()
+{
+    var feedback = new CurrentReplayRecordingStartFailureFeedback();
+    var ready = new CurrentReplayRecordingSnapshot(
+        CurrentReplayRecordingPhase.Ready,
+        "ordinary-replay",
+        RecordingId: null,
+        FinalFilePath: null,
+        Reason: null,
+        Visible: true,
+        CanStart: true,
+        CanReveal: false
+    );
+
+    feedback.ReportFailure(CurrentReplayRecordingStatusCode.NativeStartRejected, ready);
+    Assert(
+        feedback.Observe(ready) == CurrentReplayRecordingStatusCode.NativeStartRejected,
+        "Immediate OnClicked-to-Refresh feedback must retain the typed start failure."
+    );
+    Assert(
+        feedback.Observe(ready with { Reason = "new raw diagnostic" })
+            == CurrentReplayRecordingStatusCode.NativeStartRejected,
+        "A diagnostic-only change must not clear user-visible start feedback."
+    );
+
+    var preparing = ready with
+    {
+        Phase = CurrentReplayRecordingPhase.Preparing,
+        CanStart = false,
+        StatusCode = CurrentReplayRecordingStatusCode.StorageMoving,
+    };
+    Assert(
+        feedback.Observe(preparing) == null,
+        "The next meaningful recording state must clear stale start feedback."
+    );
+
+    feedback.ReportFailure(CurrentReplayRecordingStatusCode.NativeInvokeFailed, ready);
+    feedback.Clear();
+    Assert(
+        feedback.Observe(ready) == null,
+        "A successful retry must explicitly clear the prior start failure."
     );
 }
 

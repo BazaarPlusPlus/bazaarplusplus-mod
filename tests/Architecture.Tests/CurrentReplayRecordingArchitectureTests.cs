@@ -76,8 +76,16 @@ public sealed class CurrentReplayRecordingArchitectureTests
             "_button.interactable = snapshot.CanReveal || (nativeActionsBound && snapshot.CanStart)",
             controllerSource
         );
-        Assert.Contains("CurrentReplayRecordingText.StartFailure(", controllerSource);
-        Assert.Contains("startStatusCode", controllerSource);
+        Assert.Contains("_startFailureFeedback.Observe(snapshot)", controllerSource);
+        Assert.Contains(
+            "CurrentReplayRecordingText.StartFailure(startFailureStatusCode.Value)",
+            controllerSource
+        );
+        Assert.Contains(
+            "_startFailureFeedback.ReportFailure(startStatusCode, GetDisplaySnapshot())",
+            controllerSource
+        );
+        Assert.Contains("_startFailureFeedback.Clear()", controllerSource);
     }
 
     private static string RepoRoot()
