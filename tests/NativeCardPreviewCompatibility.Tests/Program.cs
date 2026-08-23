@@ -60,10 +60,13 @@ RequireContains(
     constructAndInstantiateUICardBody,
     "selectedItem.transform.SetParent(parentTransform, worldPositionStays: false);"
 );
-RequireContains(
+RequireAnyContains(
     assetLoaderPath,
     assetLoaderText,
-    "internal async Task<GameObject> InstantiateAssetAsyncByReference(AssetReference assetReference)"
+    [
+        "internal async Task<GameObject> InstantiateAssetAsyncByReference(AssetReference assetReference)",
+        "internal async Task<GameObject> InstantiateAssetAsyncByReference(AssetReference assetReference, AssetScope? scope = null)",
+    ]
 );
 
 var cardPreviewBasePath = Path.Combine(
@@ -155,6 +158,16 @@ static void RequireContains(string path, string text, string requiredText)
     {
         throw new InvalidOperationException($"Required string missing from {path}: {requiredText}");
     }
+}
+
+static void RequireAnyContains(string path, string text, string[] alternatives)
+{
+    if (alternatives.Any(alternative => text.Contains(alternative, StringComparison.Ordinal)))
+        return;
+
+    throw new InvalidOperationException(
+        $"None of the supported strings were present in {path}: {string.Join(" | ", alternatives)}"
+    );
 }
 
 static void RequireStatementContains(string path, string text, params string[] requiredFragments)

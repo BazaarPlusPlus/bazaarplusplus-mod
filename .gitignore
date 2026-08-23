@@ -15,6 +15,7 @@ exports/
 libs/
 decompiled/
 decompiled-v*/
+decompiled-staging/
 
 # IDE
 .trae/
