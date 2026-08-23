@@ -192,8 +192,8 @@ static void TestOutcomeResealAndCleanupQueries()
                 "Seven-day permanent files should be retention candidates."
             );
             Assert(
-                RunLogSchema.LocalDatabaseSchemaVersion == 1,
-                "Queue ownership does not change the persistence schema."
+                RunLogSchema.LocalDatabaseSchemaVersion == 2,
+                "Artifact lifecycle migration should own persistence schema version two."
             );
         }
     );

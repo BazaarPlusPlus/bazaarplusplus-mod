@@ -150,6 +150,7 @@ internal sealed partial class HistoryPanelRepository
                 b.result,
                 b.winner_combatant_id,
                 b.loser_combatant_id,
+                b.has_local_payload,
                 s.player_hand_json,
                 s.player_skills_json,
                 s.opponent_hand_json,
@@ -694,45 +695,59 @@ internal sealed partial class HistoryPanelRepository
         command.ExecuteNonQuery();
     }
 
-    public IReadOnlyList<string> ListBattleIdsByRun(string runId)
+    public HistoryRunDeleteResult DeleteRun(string runId)
     {
         if (!DatabaseExists || string.IsNullOrWhiteSpace(runId))
-            return Array.Empty<string>();
+            return new HistoryRunDeleteResult(Array.Empty<string>(), 0);
 
         using var connection = OpenConnection();
-        using var command = connection.CreateCommand();
-        command.CommandTimeout = 2;
-        command.CommandText = $"""
-            SELECT battle_id
-            FROM {RunLogSchema.BattlesTableName}
-            WHERE run_id = $runId
-              AND source = 'LOCAL'
-            ORDER BY recorded_at_utc DESC, battle_id DESC;
-            """;
-        command.Parameters.AddWithValue("$runId", runId);
-
-        using var reader = command.ExecuteReader();
+        using var transaction = connection.BeginTransaction(deferred: false);
         var battleIds = new List<string>();
-        while (reader.Read())
+        using (var listBattles = connection.CreateCommand())
         {
-            if (!reader.IsDBNull(0))
+            listBattles.Transaction = transaction;
+            listBattles.CommandTimeout = 2;
+            listBattles.CommandText = $"""
+                SELECT battle_id
+                FROM {RunLogSchema.BattlesTableName}
+                WHERE run_id = $runId AND source = 'LOCAL'
+                ORDER BY recorded_at_utc DESC, battle_id DESC;
+                """;
+            listBattles.Parameters.AddWithValue("$runId", runId);
+            using var reader = listBattles.ExecuteReader();
+            while (reader.Read())
                 battleIds.Add(reader.GetString(0));
         }
 
-        return battleIds;
-    }
+        var detachedVideoCount = 0;
+        if (battleIds.Count > 0)
+        {
+            using var detachVideos = connection.CreateCommand();
+            detachVideos.Transaction = transaction;
+            detachVideos.CommandTimeout = 2;
+            detachVideos.CommandText = $"""
+                UPDATE {RunLogSchema.CombatReplayVideosTableName}
+                SET attachment_state = 'detached',
+                    detached_at_utc = COALESCE(detached_at_utc, $now)
+                WHERE attachment_state = 'attached'
+                  AND battle_id IN (SELECT value FROM json_each($battleIdsJson));
+                """;
+            detachVideos.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.ToString("o"));
+            detachVideos.Parameters.AddWithValue(
+                "$battleIdsJson",
+                Newtonsoft.Json.JsonConvert.SerializeObject(battleIds)
+            );
+            detachedVideoCount = detachVideos.ExecuteNonQuery();
+        }
 
-    public void DeleteRun(string runId)
-    {
-        if (!DatabaseExists || string.IsNullOrWhiteSpace(runId))
-            return;
-
-        using var connection = OpenConnection();
         using var deleteRun = connection.CreateCommand();
+        deleteRun.Transaction = transaction;
         deleteRun.CommandTimeout = 2;
         deleteRun.CommandText = $"DELETE FROM {RunLogSchema.RunsTableName} WHERE run_id = $runId;";
         deleteRun.Parameters.AddWithValue("$runId", runId);
         deleteRun.ExecuteNonQuery();
+        transaction.Commit();
+        return new HistoryRunDeleteResult(battleIds, detachedVideoCount);
     }
 
     private SqliteConnection OpenConnection(bool ensureSchema = false)
@@ -762,6 +777,11 @@ internal sealed partial class HistoryPanelRepository
                 .ToLowerInvariant();
     }
 }
+
+internal readonly record struct HistoryRunDeleteResult(
+    IReadOnlyList<string> BattleIds,
+    int DetachedVideoCount
+);
 
 internal sealed record GhostBundleReference(
     string LocalBattleId,

@@ -40,6 +40,13 @@ _Avoid_: remote battle, opponent battle
 
 ## Combat replay
 
+**Replay Payload**:
+The local serialized combat input used to replay a recorded PvP battle. It is a recoverable cache governed by the `newest 200 ∪ last 30 days` retention policy; the battle fact remains after eviction, but History no longer offers Replay.
+
+**Replay Video Artifact**:
+A user-requested MP4 plus its metadata. Attachment to a battle and file health are separate facts: deleting a run detaches the metadata without deleting a completed MP4, and only an explicit recordings-root-confined action deletes a detached artifact.
+_Avoid_: replay cache, orphan video
+
 **Saved Replay Lifecycle**:
 The single pure owner (`SavedReplayLifecycle`) of a saved-replay playback session's state algebra; the runtime feeds observations and executes the returned decisions. Replay exit itself still flows only through `CombatReplayRuntime.TryContinueReplay` per ADR-0003.
 

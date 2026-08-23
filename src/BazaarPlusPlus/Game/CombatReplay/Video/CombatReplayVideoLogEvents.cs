@@ -513,6 +513,63 @@ internal static class CombatReplayVideoLogEvents
         [MuxRecordingId, MuxStage, MuxReasonCode, MuxPath, MuxPendingCount]
     );
 
+    internal static readonly BppLogFieldDefinition MaintenanceStatus = Field(0, "status");
+    internal static readonly BppLogFieldDefinition MaintenanceMetadataCount = Field(
+        1,
+        "metadata_count",
+        BppLogCardinality.High
+    );
+    internal static readonly BppLogFieldDefinition MaintenancePresentCount = Field(
+        2,
+        "present_count",
+        BppLogCardinality.High
+    );
+    internal static readonly BppLogFieldDefinition MaintenanceMissingCount = Field(
+        3,
+        "missing_count",
+        BppLogCardinality.High
+    );
+    internal static readonly BppLogFieldDefinition MaintenanceUnknownMp4Count = Field(
+        4,
+        "unknown_mp4_count",
+        BppLogCardinality.High
+    );
+    internal static readonly BppLogFieldDefinition MaintenanceTempCandidateCount = Field(
+        5,
+        "temp_candidate_count",
+        BppLogCardinality.High
+    );
+    internal static readonly BppLogFieldDefinition MaintenanceTempDeletedCount = Field(
+        6,
+        "temp_deleted_count",
+        BppLogCardinality.High
+    );
+    internal static readonly BppLogFieldDefinition MaintenanceFailedCount = Field(
+        7,
+        "failed_count",
+        BppLogCardinality.High
+    );
+    internal static readonly BppLogFieldDefinition MaintenanceUnmanagedCount = Field(
+        8,
+        "unmanaged_count",
+        BppLogCardinality.High
+    );
+    internal static readonly BppLogEventDefinition VideoArtifactMaintenanceObserved = new(
+        BppLogFeatureScope.CombatReplay,
+        "combat_replay.video_artifact.maintenance_observed",
+        [
+            MaintenanceStatus,
+            MaintenanceMetadataCount,
+            MaintenancePresentCount,
+            MaintenanceMissingCount,
+            MaintenanceUnknownMp4Count,
+            MaintenanceTempCandidateCount,
+            MaintenanceTempDeletedCount,
+            MaintenanceFailedCount,
+            MaintenanceUnmanagedCount,
+        ]
+    );
+
     private static BppLogFieldDefinition Field(
         int order,
         string name,

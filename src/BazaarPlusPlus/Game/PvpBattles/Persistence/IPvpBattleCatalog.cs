@@ -1,7 +1,7 @@
 #nullable enable
 namespace BazaarPlusPlus.Game.PvpBattles.Persistence;
 
-internal interface IPvpBattleCatalog
+internal interface IPvpBattleCatalog : IReplayPayloadMaintenanceCatalog
 {
     void Save(PvpBattleManifest manifest);
 

@@ -38,6 +38,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     private OpponentPortraitController? _portraitController;
     private ReplayPlaybackLogOperation? _activePlaybackOperation;
     private ReplayPlaybackLogOperation? _completedPlaybackOperationAwaitingExit;
+    private IDisposable? _activeReplayPayloadLease;
     private ReplayPlaybackLogOperation? _pendingMenuReturnOperation;
     private readonly SavedReplayLifecycle _savedReplay = new();
     private Func<CombatReplayVideoRecorder?>? _videoRecorder;
@@ -168,6 +169,8 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         }
         _activePlaybackOperation = null;
         _completedPlaybackOperationAwaitingExit = null;
+        _activeReplayPayloadLease?.Dispose();
+        _activeReplayPayloadLease = null;
         _pendingMenuReturnOperation = null;
         _savedReplay.ClearPendingMenuReturn();
         _persistence?.Dispose();
@@ -1570,78 +1573,110 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
     public bool ReplaySaved(string battleId, bool recordVideo)
     {
-        if (!CanReplaySavedBattle(battleId, out _))
+        var persistence = _persistence;
+        if (persistence == null)
         {
             LogRequestRejected(
                 CombatReplayPlaybackSource.LocalSaved,
-                ResolveSavedReplayRejectionReason(battleId),
+                ReplayRequestRejectionReasonCode.RuntimeUnavailable,
                 battleId
             );
             return false;
         }
 
-        var controller = _controller;
-        if (controller == null)
-            return false;
-
-        var manifest = controller.LoadBattle(battleId);
-        if (manifest == null)
+        var payloadLease = persistence.TryAcquirePlaybackPayloadLease();
+        if (payloadLease == null)
         {
             LogRequestRejected(
                 CombatReplayPlaybackSource.LocalSaved,
-                ReplayRequestRejectionReasonCode.ManifestUnavailable,
+                ReplayRequestRejectionReasonCode.PayloadOperationBusy,
                 battleId
             );
             return false;
         }
 
-        var payload = controller.LoadPayload(manifest);
-        if (payload == null)
-        {
-            LogRequestRejected(
-                CombatReplayPlaybackSource.LocalSaved,
-                ReplayRequestRejectionReasonCode.PayloadUnavailable,
-                battleId
-            );
-            return false;
-        }
-
-        var operation = new ReplayPlaybackLogOperation(
-            battleId,
-            CombatReplayPlaybackSource.LocalSaved,
-            recordVideo
-        );
-        ResetManagedRecordingUi();
-        _completedPlaybackOperationAwaitingExit = null;
-        _activePlaybackOperation = operation;
-        CombatSequenceMessages sequence;
         try
         {
-            sequence = controller.LoadReplay(payload);
-        }
-        catch (Exception ex)
-        {
-            CompletePlaybackOperation(
-                operation,
-                ReplayPlaybackEndReasonCode.StartFailed,
-                ReplayRollbackStatus.NotRequired,
-                ReplayPlaybackReasonCode.StartException,
-                ex
-            );
-            return false;
-        }
+            if (!CanReplaySavedBattle(battleId, out _))
+            {
+                LogRequestRejected(
+                    CombatReplayPlaybackSource.LocalSaved,
+                    ResolveSavedReplayRejectionReason(battleId),
+                    battleId
+                );
+                return false;
+            }
 
-        PlaybackUiState.InitializedBoardUiControllers.Clear();
-        _savedReplay.OnStartBegun();
-        _ = StartReplayAsync(
-            manifest,
-            sequence,
-            battleId,
-            CombatReplayPlaybackSource.LocalSaved,
-            recordVideo,
-            operation
-        );
-        return true;
+            var controller = _controller;
+            if (controller == null)
+                return false;
+
+            var manifest = controller.LoadBattle(battleId);
+            if (manifest == null)
+            {
+                LogRequestRejected(
+                    CombatReplayPlaybackSource.LocalSaved,
+                    ReplayRequestRejectionReasonCode.ManifestUnavailable,
+                    battleId
+                );
+                return false;
+            }
+
+            var payload = controller.LoadPayload(manifest);
+            if (payload == null)
+            {
+                LogRequestRejected(
+                    CombatReplayPlaybackSource.LocalSaved,
+                    ReplayRequestRejectionReasonCode.PayloadUnavailable,
+                    battleId
+                );
+                return false;
+            }
+
+            var operation = new ReplayPlaybackLogOperation(
+                battleId,
+                CombatReplayPlaybackSource.LocalSaved,
+                recordVideo
+            );
+            ResetManagedRecordingUi();
+            _completedPlaybackOperationAwaitingExit = null;
+            _activePlaybackOperation = operation;
+            _activeReplayPayloadLease?.Dispose();
+            _activeReplayPayloadLease = payloadLease;
+            payloadLease = null;
+            CombatSequenceMessages sequence;
+            try
+            {
+                sequence = controller.LoadReplay(payload);
+            }
+            catch (Exception ex)
+            {
+                CompletePlaybackOperation(
+                    operation,
+                    ReplayPlaybackEndReasonCode.StartFailed,
+                    ReplayRollbackStatus.NotRequired,
+                    ReplayPlaybackReasonCode.StartException,
+                    ex
+                );
+                return false;
+            }
+
+            PlaybackUiState.InitializedBoardUiControllers.Clear();
+            _savedReplay.OnStartBegun();
+            _ = StartReplayAsync(
+                manifest,
+                sequence,
+                battleId,
+                CombatReplayPlaybackSource.LocalSaved,
+                recordVideo,
+                operation
+            );
+            return true;
+        }
+        finally
+        {
+            payloadLease?.Dispose();
+        }
     }
 
     public bool ReplayImportedBattle(
@@ -2158,6 +2193,8 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         if (ReferenceEquals(_activePlaybackOperation, operation))
         {
             _activePlaybackOperation = null;
+            _activeReplayPayloadLease?.Dispose();
+            _activeReplayPayloadLease = null;
             ResetManagedRecordingUi();
         }
     }

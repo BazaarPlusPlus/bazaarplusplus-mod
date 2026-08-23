@@ -110,8 +110,7 @@ internal sealed class HistoryPanelDataService
 
         try
         {
-            battleIds = _repository.ListBattleIdsByRun(runId);
-            _repository.DeleteRun(runId);
+            battleIds = _repository.DeleteRun(runId).BattleIds;
             return true;
         }
         catch (Exception ex)

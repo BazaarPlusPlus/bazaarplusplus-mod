@@ -1590,6 +1590,8 @@ file static class MediaEventCatalogTests
             "recording_id:High:Short|stage:Low:None|path:High:None",
         ["combat_replay.video_mux.diagnostic_observed"] =
             "recording_id:High:Short|stage:Low:None|reason_code:Low:None|path:High:None|pending_count:High:None",
+        ["combat_replay.video_artifact.maintenance_observed"] =
+            "status:Low:None|metadata_count:High:None|present_count:High:None|missing_count:High:None|unknown_mp4_count:High:None|temp_candidate_count:High:None|temp_deleted_count:High:None|failed_count:High:None|unmanaged_count:High:None",
     };
 
     private const string TerminalSchema =
@@ -1614,8 +1616,8 @@ file static class MediaEventCatalogTests
             .Select(field => field.GetValue(null)!)
             .ToArray();
         TestReflection.Assert(
-            direct.Length == 11,
-            $"Expected 11 media events, got {direct.Length}."
+            direct.Length == 12,
+            $"Expected 12 media events, got {direct.Length}."
         );
 
         var actual = direct.ToDictionary(EventId, Schema, StringComparer.Ordinal);
