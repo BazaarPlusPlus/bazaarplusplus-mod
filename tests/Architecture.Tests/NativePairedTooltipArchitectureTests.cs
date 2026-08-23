@@ -108,7 +108,10 @@ public sealed class NativePairedTooltipArchitectureTests
         Assert.Contains("ClearCurrentCard", suppressionSource);
         Assert.Contains("SetVisibility(false)", suppressionSource);
         Assert.Contains("AreRequiredShowGatesInstalled", suppressionSource);
+        Assert.Contains("CapturePatchCapabilities", suppressionSource);
+        Assert.Contains("NativeTooltipControllerSnapshot", suppressionSource);
         Assert.Contains("Harmony.GetPatchInfo", suppressionSource);
+        Assert.Contains("NativeTooltipControllerTopologyGeneration", suppressionSource);
 
         var patchSource = File.ReadAllText(patches);
         Assert.Contains("TooltipParentComponent.ShowCardTooltipController", patchSource);
@@ -116,6 +119,8 @@ public sealed class NativePairedTooltipArchitectureTests
         Assert.Contains("TooltipParentComponent.ShowAuxiliaryTooltipController", patchSource);
         Assert.Contains("CardTooltipController.ShowTooltipController", patchSource);
         Assert.Contains("AuxiliaryTooltipController.ShowAuxiliaryTooltipController", patchSource);
+        Assert.Contains("NativeTooltipSuppression.NotifyControllerAwake", patchSource);
+        Assert.Contains("NativeTooltipSuppression.NotifyControllerDestroyed", patchSource);
 
         var featureOwnedCopies = Directory
             .EnumerateFiles(Path.Combine(sourceRoot, "Game"), "*.cs", SearchOption.AllDirectories)

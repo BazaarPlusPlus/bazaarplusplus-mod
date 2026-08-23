@@ -13,6 +13,9 @@ internal static class EndOfRunCleanFramePreparationTests
         Empty_board_can_capture_after_a_clean_render_boundary();
         Unavailable_native_suppression_falls_back_to_capture();
         Dirty_tooltip_at_deadline_falls_back_to_capture();
+        Cached_observations_do_not_advance_the_clean_window();
+        A_skipped_deadline_frame_requests_one_final_fresh_audit();
+        A_cadence_skipped_deadline_still_executes_the_final_audit();
         Unavailable_visual_falls_back_to_capture();
         Invalid_visual_observations_fall_back_to_capture();
         Native_suppression_owners_are_reference_counted_independently();
@@ -147,6 +150,87 @@ internal static class EndOfRunCleanFramePreparationTests
             deadline.Kind == EndOfRunCleanFrameDecisionKind.Capture
                 && deadline.ReasonCode == ScreenshotCaptureReasonCode.CleanFrameDeadline,
             "A persistently dirty frame must fall back to capture at the bounded deadline."
+        );
+    }
+
+    private static void Cached_observations_do_not_advance_the_clean_window()
+    {
+        var core = new EndOfRunCleanFramePreparationCore(startedAtSeconds: 0f);
+        _ = core.Observe(Clean(), Sample(1, 1, 1), nowSeconds: 0f);
+
+        Assert(
+            core.ObserveCached(nowSeconds: 0.6f).Kind == EndOfRunCleanFrameDecisionKind.Wait,
+            "Reusing a clean observation must not advance the fresh-pose stability clock."
+        );
+        Assert(
+            core.Observe(Clean(), Sample(1, 1, 1), nowSeconds: 0.6f).Kind
+                == EndOfRunCleanFrameDecisionKind.Capture,
+            "A fresh audit may prove the complete clean-frame window."
+        );
+    }
+
+    private static void A_skipped_deadline_frame_requests_one_final_fresh_audit()
+    {
+        var core = new EndOfRunCleanFramePreparationCore(startedAtSeconds: 0f);
+        _ = core.Observe(Clean(), Sample(1, 1, 1), nowSeconds: 4.95f);
+
+        var cachedDecision = core.ObserveCached(
+            nowSeconds: EndOfRunCleanFramePreparationCore.DeadlineSeconds
+        );
+        Assert(
+            cachedDecision.Kind == EndOfRunCleanFrameDecisionKind.ObserveFresh,
+            "A cadence-skipped deadline frame must request a final native and visual audit."
+        );
+
+        var finalDecision = core.Observe(
+            new NativeTooltipCleanFrameAudit(NativeTooltipCleanFrameState.Dirty),
+            Sample(1, 1, 1),
+            nowSeconds: EndOfRunCleanFramePreparationCore.DeadlineSeconds
+        );
+        Assert(
+            finalDecision.Kind == EndOfRunCleanFrameDecisionKind.Capture
+                && finalDecision.ReasonCode == ScreenshotCaptureReasonCode.CleanFrameDeadline,
+            "The pure core must own the final deadline degradation after the fresh audit."
+        );
+    }
+
+    private static void A_cadence_skipped_deadline_still_executes_the_final_audit()
+    {
+        var core = new EndOfRunCleanFramePreparationCore(startedAtSeconds: 0f);
+        var cadence = new EndOfRunHeavySampleCadence();
+        var auditCount = 0;
+
+        EndOfRunCleanFrameDecision Tick(float nowSeconds)
+        {
+            var decision = cadence.ShouldSample(nowSeconds, generation: 1)
+                ? ObserveFresh(nowSeconds)
+                : core.ObserveCached(nowSeconds);
+            return decision.Kind == EndOfRunCleanFrameDecisionKind.ObserveFresh
+                ? ObserveFresh(nowSeconds)
+                : decision;
+        }
+
+        EndOfRunCleanFrameDecision ObserveFresh(float nowSeconds)
+        {
+            auditCount++;
+            return core.Observe(
+                new NativeTooltipCleanFrameAudit(NativeTooltipCleanFrameState.Dirty),
+                Sample(1, 1, 1),
+                nowSeconds
+            );
+        }
+
+        _ = Tick(4.99f);
+        var deadlineDecision = Tick(5f);
+
+        Assert(
+            auditCount == 2,
+            "The deadline must force one final audit even inside the cadence throttle window."
+        );
+        Assert(
+            deadlineDecision.Kind == EndOfRunCleanFrameDecisionKind.Capture
+                && deadlineDecision.ReasonCode == ScreenshotCaptureReasonCode.CleanFrameDeadline,
+            "The final audit result must return through the pure preparation core."
         );
     }
 

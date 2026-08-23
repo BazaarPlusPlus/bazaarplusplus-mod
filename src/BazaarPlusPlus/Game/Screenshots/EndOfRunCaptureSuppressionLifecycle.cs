@@ -43,7 +43,9 @@ internal sealed class EndOfRunCaptureSuppressionLifecycle
     internal EndOfRunCleanFrameDecision ObserveCleanFrame(
         EndOfRunCleanFramePreparationCore preparation,
         Func<EndOfRunCleanFrameVisualObservation> captureVisual,
-        float nowSeconds
+        float nowSeconds,
+        Action<NativeTooltipCleanFrameAudit, EndOfRunCleanFrameVisualObservation>? observeSample =
+            null
     )
     {
         if (preparation == null)
@@ -64,17 +66,20 @@ internal sealed class EndOfRunCaptureSuppressionLifecycle
         }
         catch
         {
-            ReleaseNative();
-            return EndOfRunCleanFrameDecision.CaptureDegraded(
-                ScreenshotCaptureReasonCode.NativeTooltipSuppressionUnavailable
+            tooltipAudit = new NativeTooltipCleanFrameAudit(
+                NativeTooltipCleanFrameState.Unavailable
             );
+            var unavailableVisual = EndOfRunCleanFrameVisualObservation.Unavailable;
+            TryObserveSample(observeSample, tooltipAudit, unavailableVisual);
+            ReleaseNative();
+            return preparation.Observe(tooltipAudit, unavailableVisual, nowSeconds);
         }
         if (tooltipAudit.State == NativeTooltipCleanFrameState.Unavailable)
         {
+            var unavailableVisual = EndOfRunCleanFrameVisualObservation.Unavailable;
+            TryObserveSample(observeSample, tooltipAudit, unavailableVisual);
             ReleaseNative();
-            return EndOfRunCleanFrameDecision.CaptureDegraded(
-                ScreenshotCaptureReasonCode.NativeTooltipSuppressionUnavailable
-            );
+            return preparation.Observe(tooltipAudit, unavailableVisual, nowSeconds);
         }
 
         EndOfRunCleanFrameVisualObservation visual;
@@ -84,10 +89,10 @@ internal sealed class EndOfRunCaptureSuppressionLifecycle
         }
         catch
         {
-            return EndOfRunCleanFrameDecision.CaptureDegraded(
-                ScreenshotCaptureReasonCode.CleanFrameVisualUnavailable
-            );
+            visual = EndOfRunCleanFrameVisualObservation.Unavailable;
         }
+
+        TryObserveSample(observeSample, tooltipAudit, visual);
 
         var decision = preparation.Observe(tooltipAudit, visual, nowSeconds);
         if (
@@ -99,6 +104,22 @@ internal sealed class EndOfRunCaptureSuppressionLifecycle
             ReleaseNative();
         }
         return decision;
+    }
+
+    private static void TryObserveSample(
+        Action<NativeTooltipCleanFrameAudit, EndOfRunCleanFrameVisualObservation>? observer,
+        NativeTooltipCleanFrameAudit tooltipAudit,
+        EndOfRunCleanFrameVisualObservation visual
+    )
+    {
+        try
+        {
+            observer?.Invoke(tooltipAudit, visual);
+        }
+        catch
+        {
+            // Debug diagnostics cannot change clean-frame availability or suppression lifetime.
+        }
     }
 
     internal void ReleaseAll()

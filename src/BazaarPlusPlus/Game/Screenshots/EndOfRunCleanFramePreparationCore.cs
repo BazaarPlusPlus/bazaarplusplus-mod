@@ -13,32 +13,42 @@ internal enum EndOfRunCleanFrameVisualState
 internal readonly record struct EndOfRunCleanFrameVisualObservation(
     EndOfRunCleanFrameVisualState State,
     int LoadedCardCount,
+    int TransformCount,
     ulong CardSetFingerprint,
     ulong PoseFingerprint
 )
 {
     internal static EndOfRunCleanFrameVisualObservation Unavailable =>
-        new(EndOfRunCleanFrameVisualState.Unavailable, 0, 0, 0);
+        new(EndOfRunCleanFrameVisualState.Unavailable, 0, 0, 0, 0);
 
     internal static EndOfRunCleanFrameVisualObservation Empty =>
-        new(EndOfRunCleanFrameVisualState.Empty, 0, 0, 0);
+        new(EndOfRunCleanFrameVisualState.Empty, 0, 0, 0, 0);
 
     internal static EndOfRunCleanFrameVisualObservation Sampled(
         int loadedCardCount,
+        int transformCount,
         ulong cardSetFingerprint,
         ulong poseFingerprint
     ) =>
         new(
             EndOfRunCleanFrameVisualState.Sampled,
             loadedCardCount,
+            transformCount,
             cardSetFingerprint,
             poseFingerprint
         );
+
+    internal static EndOfRunCleanFrameVisualObservation Sampled(
+        int loadedCardCount,
+        ulong cardSetFingerprint,
+        ulong poseFingerprint
+    ) => Sampled(loadedCardCount, transformCount: 0, cardSetFingerprint, poseFingerprint);
 }
 
 internal enum EndOfRunCleanFrameDecisionKind
 {
     Wait,
+    ObserveFresh,
     Capture,
 }
 
@@ -49,6 +59,9 @@ internal readonly record struct EndOfRunCleanFrameDecision(
 {
     internal static EndOfRunCleanFrameDecision Wait =>
         new(EndOfRunCleanFrameDecisionKind.Wait, null);
+
+    internal static EndOfRunCleanFrameDecision ObserveFresh =>
+        new(EndOfRunCleanFrameDecisionKind.ObserveFresh, null);
 
     internal static EndOfRunCleanFrameDecision Capture =>
         new(EndOfRunCleanFrameDecisionKind.Capture, null);
@@ -72,6 +85,9 @@ internal sealed class EndOfRunCleanFramePreparationCore
     private ulong _cardSetFingerprint;
     private ulong _poseFingerprint;
     private float _stableSinceSeconds;
+    private bool _hasCachedObservation;
+    private NativeTooltipCleanFrameAudit _cachedTooltipAudit;
+    private EndOfRunCleanFrameVisualObservation _cachedVisual;
 
     internal EndOfRunCleanFramePreparationCore(float startedAtSeconds)
     {
@@ -82,6 +98,36 @@ internal sealed class EndOfRunCleanFramePreparationCore
         NativeTooltipCleanFrameAudit tooltipAudit,
         EndOfRunCleanFrameVisualObservation visual,
         float nowSeconds
+    )
+    {
+        _hasCachedObservation = true;
+        _cachedTooltipAudit = tooltipAudit;
+        _cachedVisual = visual;
+        return Decide(tooltipAudit, visual, nowSeconds, isFreshSample: true);
+    }
+
+    internal EndOfRunCleanFrameDecision ObserveCached(float nowSeconds)
+    {
+        if (float.IsNaN(nowSeconds) || float.IsInfinity(nowSeconds))
+        {
+            return EndOfRunCleanFrameDecision.CaptureDegraded(
+                ScreenshotCaptureReasonCode.CleanFrameVisualUnavailable
+            );
+        }
+
+        if (nowSeconds >= _deadlineAtSeconds)
+            return EndOfRunCleanFrameDecision.ObserveFresh;
+        if (!_hasCachedObservation)
+            return EndOfRunCleanFrameDecision.Wait;
+
+        return Decide(_cachedTooltipAudit, _cachedVisual, nowSeconds, isFreshSample: false);
+    }
+
+    private EndOfRunCleanFrameDecision Decide(
+        NativeTooltipCleanFrameAudit tooltipAudit,
+        EndOfRunCleanFrameVisualObservation visual,
+        float nowSeconds,
+        bool isFreshSample
     )
     {
         if (tooltipAudit.State == NativeTooltipCleanFrameState.Unavailable)
@@ -129,6 +175,9 @@ internal sealed class EndOfRunCleanFramePreparationCore
                 ScreenshotCaptureReasonCode.CleanFrameVisualUnavailable
             );
         }
+
+        if (!isFreshSample)
+            return EndOfRunCleanFrameDecision.Wait;
 
         if (
             !_hasCleanBaseline

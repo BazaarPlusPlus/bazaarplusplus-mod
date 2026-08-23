@@ -49,7 +49,11 @@ internal sealed class EndOfRunCaptureWorkflow : IEndOfRunCaptureWorkflow, IDispo
             new UnityEndOfRunCaptureClock(),
             new SystemEndOfRunCaptureFileSystem(),
             EndOfRunCapturePolicy.Default,
-            terminal => services.EventBus.Publish(terminal)
+            terminal =>
+            {
+                _driver?.ReportSamplingDiagnostics();
+                services.EventBus.Publish(terminal);
+            }
         );
         RefreshBufferedRunContext();
     }

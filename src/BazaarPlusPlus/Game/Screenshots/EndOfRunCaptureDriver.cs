@@ -9,6 +9,10 @@ using BazaarPlusPlus.Storage.Paths;
 using TheBazaar;
 using TheBazaar.UI.EndOfRun;
 using UnityEngine;
+#if DEBUG
+using System.Diagnostics;
+using Unity.Profiling;
+#endif
 
 namespace BazaarPlusPlus.Game.Screenshots;
 
@@ -23,13 +27,27 @@ internal sealed class EndOfRunCaptureDriver
             ActiveControllerFieldName,
             BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
         );
+#if DEBUG
+    private static readonly ProfilerMarker ReadinessSampleMarker = new(
+        "BPP.EndOfRunCapture.ReadinessSample"
+    );
+    private static readonly ProfilerMarker CleanFrameSampleMarker = new(
+        "BPP.EndOfRunCapture.CleanFrameSample"
+    );
+#endif
     private readonly EndOfRunMouseBlocker _mouseBlocker = new();
     private readonly EndOfRunVisualStabilityTracker _visualStabilityTracker = new();
+    private readonly EndOfRunSummaryVisualSnapshotSampler _visualSampler = new();
+    private readonly EndOfRunHeavySampleCadence _readinessSampleCadence = new();
+#if DEBUG
+    private readonly EndOfRunCaptureSamplingDiagnostics _samplingDiagnostics = new();
+#endif
     private EndOfRunCaptureWorkflow? _workflow;
     private ScreenshotService? _screenshotService;
     private IDisposable? _runInitializedSubscription;
     private EndOfRunScreenController? _cachedScreen;
     private int _visualStabilityScreenId;
+    private int _visualStabilitySummaryId;
     private float _nextControllerScanAtSeconds;
     private IBppServices? _services;
 
@@ -65,6 +83,9 @@ internal sealed class EndOfRunCaptureDriver
         _workflow?.DetachDriver(this);
         _mouseBlocker.Destroy();
         ResetVisualStability();
+#if DEBUG
+        _samplingDiagnostics.Reset();
+#endif
         _cachedScreen = null;
         _nextControllerScanAtSeconds = 0f;
     }
@@ -150,6 +171,9 @@ internal sealed class EndOfRunCaptureDriver
     private void OnRunStarted()
     {
         ResetVisualStability();
+#if DEBUG
+        _samplingDiagnostics.Reset();
+#endif
         _cachedScreen = null;
         _nextControllerScanAtSeconds = 0f;
         _workflow?.OnRunStarted();
@@ -158,6 +182,9 @@ internal sealed class EndOfRunCaptureDriver
     private void OnEndOfRunScreenInitializing()
     {
         ResetVisualStability();
+#if DEBUG
+        _samplingDiagnostics.Reset();
+#endif
         _cachedScreen = null;
         _nextControllerScanAtSeconds = 0f;
         _workflow?.OnEndOfRunInitializing();
@@ -181,13 +208,31 @@ internal sealed class EndOfRunCaptureDriver
         }
 
         var screenId = screen.GetInstanceID();
-        if (_visualStabilityScreenId != screenId)
+        var summaryId = summary.GetInstanceID();
+        if (_visualStabilityScreenId != screenId || _visualStabilitySummaryId != summaryId)
         {
             _visualStabilityTracker.Reset();
+            _visualSampler.Reset();
+            _readinessSampleCadence.Reset();
             _visualStabilityScreenId = screenId;
+            _visualStabilitySummaryId = summaryId;
         }
 
-        if (!EndOfRunSummaryVisualSnapshotSampler.TryCapture(summary, out var snapshot))
+        var now = Time.realtimeSinceStartup;
+        if (!_readinessSampleCadence.ShouldSample(now, summaryId))
+            return _visualStabilityTracker.ObserveCached();
+
+        EndOfRunSummaryVisualSnapshot snapshot;
+        bool captured;
+#if DEBUG
+        var startedAt = Stopwatch.GetTimestamp();
+        using (ReadinessSampleMarker.Auto())
+            captured = _visualSampler.TryCapture(summary, out snapshot);
+        _samplingDiagnostics.RecordReadiness(startedAt, snapshot);
+#else
+        captured = _visualSampler.TryCapture(summary, out snapshot);
+#endif
+        if (!captured)
         {
             _visualStabilityTracker.Reset();
             return false;
@@ -197,7 +242,7 @@ internal sealed class EndOfRunCaptureDriver
             snapshot.LoadedCardCount,
             snapshot.CardSetFingerprint,
             snapshot.PoseFingerprint,
-            Time.realtimeSinceStartup
+            now
         );
     }
 
@@ -217,6 +262,8 @@ internal sealed class EndOfRunCaptureDriver
                 is not EndOfRunSummaryController activeSummary
             )
                 return false;
+            if (activeSummary == null)
+                return false;
             summary = activeSummary;
             return true;
         }
@@ -229,15 +276,25 @@ internal sealed class EndOfRunCaptureDriver
     private void ResetVisualStability()
     {
         _visualStabilityTracker.Reset();
+        _visualSampler.Reset();
+        _readinessSampleCadence.Reset();
         _visualStabilityScreenId = 0;
+        _visualStabilitySummaryId = 0;
     }
 
-    private static EndOfRunCleanFrameVisualObservation CaptureCleanFrameVisual(
+    private EndOfRunCleanFrameVisualObservation CaptureCleanFrameVisual(
         EndOfRunScreenController screen
     ) =>
         TryGetActiveSummary(screen, out var summary)
-            ? EndOfRunSummaryVisualSnapshotSampler.CaptureCleanFrameVisual(summary)
+            ? _visualSampler.CaptureCleanFrameVisual(summary)
             : EndOfRunCleanFrameVisualObservation.Unavailable;
+
+    internal void ReportSamplingDiagnostics()
+    {
+#if DEBUG
+        _samplingDiagnostics.ReportAndReset();
+#endif
+    }
 
     private sealed class UnityCaptureAttempt : IEndOfRunCaptureAttempt
     {
@@ -330,6 +387,7 @@ internal sealed class EndOfRunCaptureDriver
             if (cleanFramePreparationAvailable)
             {
                 var preparation = new EndOfRunCleanFramePreparationCore(Time.realtimeSinceStartup);
+                var cadence = new EndOfRunHeavySampleCadence();
                 var endOfFrame = new WaitForEndOfFrame();
                 while (true)
                 {
@@ -341,17 +399,17 @@ internal sealed class EndOfRunCaptureDriver
                         yield break;
                     }
 
-                    var decision = _suppression.ObserveCleanFrame(
-                        preparation,
-                        () => CaptureCleanFrameVisual(_screen),
-                        Time.realtimeSinceStartup
-                    );
+                    var now = Time.realtimeSinceStartup;
+                    var decision = cadence.ShouldSample(now, _screen.GetInstanceID())
+                        ? ObserveFreshCleanFrame(preparation, now)
+                        : preparation.ObserveCached(now);
+                    if (decision.Kind == EndOfRunCleanFrameDecisionKind.ObserveFresh)
+                        decision = ObserveFreshCleanFrame(preparation, now);
                     if (decision.Kind == EndOfRunCleanFrameDecisionKind.Capture)
                     {
                         _preparationDegradationReason ??= decision.ReasonCode;
                         break;
                     }
-                    yield return null;
                 }
             }
 
@@ -417,6 +475,44 @@ internal sealed class EndOfRunCaptureDriver
             }
 
             CompleteFromTask(session.Completion);
+        }
+
+        private EndOfRunCleanFrameDecision ObserveFreshCleanFrame(
+            EndOfRunCleanFramePreparationCore preparation,
+            float nowSeconds
+        )
+        {
+#if DEBUG
+            var startedAt = Stopwatch.GetTimestamp();
+            var diagnosticTooltipAudit = default(NativeTooltipCleanFrameAudit);
+            var diagnosticVisual = EndOfRunCleanFrameVisualObservation.Unavailable;
+            EndOfRunCleanFrameDecision decision;
+            using (CleanFrameSampleMarker.Auto())
+            {
+                decision = _suppression.ObserveCleanFrame(
+                    preparation,
+                    () => _driver.CaptureCleanFrameVisual(_screen),
+                    nowSeconds,
+                    (tooltipAudit, visual) =>
+                    {
+                        diagnosticTooltipAudit = tooltipAudit;
+                        diagnosticVisual = visual;
+                    }
+                );
+            }
+            _driver._samplingDiagnostics.RecordBarrier(
+                startedAt,
+                diagnosticTooltipAudit,
+                diagnosticVisual
+            );
+            return decision;
+#else
+            return _suppression.ObserveCleanFrame(
+                preparation,
+                () => _driver.CaptureCleanFrameVisual(_screen),
+                nowSeconds
+            );
+#endif
         }
 
         private bool InstallSuppression()

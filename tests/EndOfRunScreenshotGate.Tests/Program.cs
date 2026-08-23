@@ -6,6 +6,7 @@ using BazaarPlusPlus.Storage.RunScreenshot;
 EndOfRunCaptureWorkflowBehaviorTests.Run();
 EndOfRunCleanFramePreparationTests.Run();
 EndOfRunCaptureSuppressionLifecycleTests.Run();
+EndOfRunCaptureSamplingPerformanceTests.Run();
 VerifyReadinessAdapter();
 VerifyVisualStabilityTracker();
 VerifyArtifactMapping();
@@ -147,9 +148,14 @@ static void VerifyVisualStabilityTracker()
         "Cards must remain stable for the full 500 ms window."
     );
     Assert(
+        !tracker.ObserveCached(),
+        "A cadence-skipped frame must reuse the last false verdict without advancing time."
+    );
+    Assert(
         tracker.Observe(2, 10, 101, 1.6f),
         "Observed motion followed by 500 ms stability should settle."
     );
+    Assert(tracker.ObserveCached(), "A cadence-skipped frame should reuse the last true verdict.");
     Assert(!tracker.Observe(3, 11, 101, 2f), "A changed card set should reset the motion history.");
 }
 
