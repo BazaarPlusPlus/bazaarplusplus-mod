@@ -39,10 +39,13 @@
 
     <Compile Include="../../src/BazaarPlusPlus/Game/CombatReplay/CombatReplayPlaybackSource.cs" />
     <Compile Include="../../src/BazaarPlusPlus/Game/CombatReplay/CombatReplayLogEvents.cs" />
+    <Compile Include="../../src/BazaarPlusPlus/Game/CombatReplay/CurrentReplayRecordingStatusCode.cs" />
+    <Compile Include="../../src/BazaarPlusPlus/Game/CombatReplay/ManagedReplayRecordingRestartCore.cs" />
     <Compile Include="../../src/BazaarPlusPlus/Game/CombatReplay/ReplayPlaybackLogOperation.cs" />
     <Compile Include="../../src/BazaarPlusPlus/Game/CombatReplay/SavedReplayLifecycle.cs" />
     <Compile Include="../../src/BazaarPlusPlus/Game/CombatReplay/ReplayPersistenceLogState.cs" />
     <Compile Include="../../src/BazaarPlusPlus/Game/CombatReplay/Bootstrap/ReplayPresentationTaskTracker.cs" />
+    <Compile Include="../../src/BazaarPlusPlus/GameInterop/CombatReplay/NativeReplayRestartGate.cs" />
 
     <Compile Include="../../src/BazaarPlusPlus/Game/HistoryPanel/AccountLink/HistoryPanelAccountLinkLogEvents.cs" />
     <Compile Include="../../src/BazaarPlusPlus/Game/HistoryPanel/AccountLink/AccountLinkLogRequest.cs" />

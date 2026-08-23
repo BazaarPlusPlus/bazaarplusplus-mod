@@ -28,6 +28,26 @@ public sealed class CurrentReplayRecordingArchitectureTests
                 "CurrentReplayRecordingButtonController.cs"
             )
         );
+        var gateSource = File.ReadAllText(
+            Path.Combine(
+                repoRoot,
+                "src",
+                "BazaarPlusPlus",
+                "GameInterop",
+                "CombatReplay",
+                "NativeReplayRestartGate.cs"
+            )
+        );
+        var probeSource = File.ReadAllText(
+            Path.Combine(
+                repoRoot,
+                "src",
+                "BazaarPlusPlus",
+                "GameInterop",
+                "CombatReplay",
+                "NativeReplayRestartProbe.cs"
+            )
+        );
 
         Assert.Contains(
             "ReplayRecordingButtonSnapshotPolicy.OrdinaryManagedReplay(",
@@ -40,11 +60,32 @@ public sealed class CurrentReplayRecordingArchitectureTests
             runtimeSource
         );
         Assert.Contains("invokeNativeReplay();", runtimeSource);
-        Assert.Contains("if (!replay.IsReplaying)", runtimeSource);
+        Assert.Contains("NativeReplayRestartProbe.Observe(", runtimeSource);
+        Assert.DoesNotContain("Data.IsStorageOpen", runtimeSource);
+        Assert.Contains("ReplayInProgress: replay?.IsReplaying == true", probeSource);
+        Assert.Contains("NativeReplayRestartGate.Evaluate(", probeSource);
+        Assert.Contains("StorageOpen: Data.IsStorageOpen", probeSource);
+        Assert.Contains("ConnectionLost: boardManager?.SocketConnectionLost == true", probeSource);
+        Assert.Contains("FailManagedReplayRecordingRestart(", runtimeSource);
+        Assert.DoesNotContain("Finish the current replay before recording it.", runtimeSource);
+        Assert.Contains("StorageMoving", gateSource);
+        Assert.Contains("StorageOpen", gateSource);
+        Assert.Contains("InputBlocked", gateSource);
+        Assert.Contains("ConnectionLost", gateSource);
         Assert.Contains(
             "_button.interactable = snapshot.CanReveal || (nativeActionsBound && snapshot.CanStart)",
             controllerSource
         );
+        Assert.Contains("_startFailureFeedback.Observe(snapshot)", controllerSource);
+        Assert.Contains(
+            "CurrentReplayRecordingText.StartFailure(startFailureStatusCode.Value)",
+            controllerSource
+        );
+        Assert.Contains(
+            "_startFailureFeedback.ReportFailure(startStatusCode, GetDisplaySnapshot())",
+            controllerSource
+        );
+        Assert.Contains("_startFailureFeedback.Clear()", controllerSource);
     }
 
     private static string RepoRoot()
