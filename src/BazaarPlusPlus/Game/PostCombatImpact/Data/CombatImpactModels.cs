@@ -653,7 +653,16 @@ internal sealed record CombatImpactReport(
 internal sealed record CombatImpactCriticalTriggerEvidenceAudit(
     int ResolvedOriginCount,
     int AttributedOriginCount
-);
+)
+{
+    internal int InputEventCount { get; init; }
+
+    internal int InputExecutionCount { get; init; }
+
+    internal int ObservedEvidenceCount { get; init; }
+
+    internal long WorkUnitCount { get; init; }
+}
 
 internal sealed record CombatImpactProjectionInput(
     IReadOnlyDictionary<string, CombatImpactEntity> Entities,
