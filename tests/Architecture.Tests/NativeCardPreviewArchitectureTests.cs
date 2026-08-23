@@ -179,6 +179,34 @@ public sealed class NativeCardPreviewArchitectureTests
     }
 
     [Fact]
+    public void Post_combat_preview_batch_policy_stays_in_the_feature_layer()
+    {
+        var sourceRoot = MainSourceRoot(RepoRoot());
+        var batchPath = Path.Combine(
+            sourceRoot,
+            "Game",
+            "PostCombatImpact",
+            "Ui",
+            "NativePreviewFitBatch.cs"
+        );
+        var viewPath = Path.Combine(
+            sourceRoot,
+            "Patches",
+            "PostCombatImpact",
+            "NativePostCombatImpactTooltipView.cs"
+        );
+
+        Assert.True(File.Exists(batchPath));
+        var batch = File.ReadAllText(batchPath);
+        Assert.DoesNotContain("UnityEngine", batch);
+        Assert.DoesNotContain("Canvas.", batch);
+
+        var view = File.ReadAllText(viewPath);
+        Assert.Contains("NativePreviewFitBatch<PendingNativePreviewFit>", view);
+        Assert.DoesNotContain("List<PendingNativePreviewFit>", view);
+    }
+
+    [Fact]
     public void Same_card_modifier_refresh_keeps_the_native_tooltip_host_alive()
     {
         var sourceRoot = MainSourceRoot(RepoRoot());
