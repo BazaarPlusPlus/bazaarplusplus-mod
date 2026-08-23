@@ -19,28 +19,42 @@ const string evidencePathEnvironmentVariable = "BPP_COMBAT_IMPACT_EVIDENCE_PATH"
 const string gameDataPathEnvironmentVariable = "BPP_GAMEDATA_DB";
 const int defaultBundleSampleLimit = 100;
 
-if (args.Length is < 1 or > 2)
+var benchmarkEnabled = args.Contains("--benchmark", StringComparer.Ordinal);
+var positionalArguments = args.Where(argument =>
+        !string.Equals(argument, "--benchmark", StringComparison.Ordinal)
+    )
+    .ToArray();
+if (
+    positionalArguments.Length is < 1 or > 2
+    || args.Any(argument =>
+        argument.StartsWith("--", StringComparison.Ordinal) && argument != "--benchmark"
+    )
+)
 {
-    throw new ArgumentException("Usage: CombatImpact.Corpus <replay-corpus-path> [report-path]");
+    throw new ArgumentException(
+        "Usage: CombatImpact.Corpus <replay-corpus-path> [report-path] [--benchmark]"
+    );
 }
 
-var corpusPath = Path.GetFullPath(args[0]);
+var corpusPath = Path.GetFullPath(positionalArguments[0]);
 
 if (!Directory.Exists(corpusPath))
     throw new DirectoryNotFoundException($"Replay corpus does not exist: {corpusPath}");
 
 var reportPath =
-    args.Length == 2
-        ? Path.GetFullPath(args[1])
+    positionalArguments.Length == 2
+        ? Path.GetFullPath(positionalArguments[1])
         : Path.GetFullPath(Path.Combine("artifacts", "combat-impact-corpus", "report.json"));
 var loadResult = LoadCorpus(corpusPath);
 var replays = loadResult.Replays;
 var invalidPayloads = loadResult.InvalidPayloads;
 var gameDataPath = ResolveGameDataPath();
-var cardAttributeAttribution = CombatImpactCorpusProjection.Analyze(
+var projectionResult = CombatImpactCorpusProjection.Analyze(
     replays,
-    CombatImpactCorpusCatalog.Load(gameDataPath)
+    CombatImpactCorpusCatalog.Load(gameDataPath),
+    benchmarkEnabled
 );
+var cardAttributeAttribution = projectionResult.Attribution;
 
 var sample = replays
     .Select(replay => new BoundarySample(
@@ -124,6 +138,31 @@ File.WriteAllText(
     evidencePath,
     JsonSerializer.Serialize(evidence, jsonOptions) + Environment.NewLine
 );
+if (projectionResult.Benchmark is { } benchmark)
+{
+    var benchmarkPath = Path.Combine(
+        Path.GetDirectoryName(reportPath)!,
+        Path.GetFileNameWithoutExtension(reportPath) + ".benchmark.json"
+    );
+    File.WriteAllText(
+        benchmarkPath,
+        JsonSerializer.Serialize(benchmark, jsonOptions) + Environment.NewLine
+    );
+    Console.WriteLine(
+        $"BENCHMARK projection_only path={benchmarkPath} battles={benchmark.Battles} "
+            + $"frames={benchmark.Frames} events={benchmark.Events} "
+            + $"executions={benchmark.Executions} evidence={benchmark.Evidence} "
+            + $"critical_work_units={benchmark.CriticalWorkUnits} "
+            + $"elapsed_total_ms={benchmark.ElapsedTotalMilliseconds:F3} "
+            + $"elapsed_p50_ms={benchmark.ElapsedP50Milliseconds:F3} "
+            + $"elapsed_p95_ms={benchmark.ElapsedP95Milliseconds:F3} "
+            + $"elapsed_max_ms={benchmark.ElapsedMaxMilliseconds:F3} "
+            + $"allocated_total_bytes={benchmark.AllocatedTotalBytes} "
+            + $"allocated_p50_bytes={benchmark.AllocatedP50Bytes} "
+            + $"allocated_p95_bytes={benchmark.AllocatedP95Bytes} "
+            + $"allocated_max_bytes={benchmark.AllocatedMaxBytes}"
+    );
+}
 Validate(report);
 
 Console.WriteLine(

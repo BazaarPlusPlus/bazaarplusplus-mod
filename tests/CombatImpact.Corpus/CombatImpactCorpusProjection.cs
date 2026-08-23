@@ -1,4 +1,5 @@
 #nullable enable
+using System.Diagnostics;
 using System.Text;
 using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Domain.Cards.Interfaces;
@@ -258,19 +259,49 @@ internal sealed record CombatImpactCorpusEntityBuild(
 
 internal static class CombatImpactCorpusProjection
 {
-    internal static CardAttributeAttributionCorpusReport Analyze(
+    internal static CombatImpactCorpusProjectionResult Analyze(
         IReadOnlyList<ReplayObservationInput> replays,
-        CombatImpactCorpusCatalog catalog
+        CombatImpactCorpusCatalog catalog,
+        bool benchmarkEnabled
     )
     {
+        var orderedReplays = replays.OrderBy(replay => replay.BattleId, StringComparer.Ordinal);
+        IEnumerable<CombatImpactCorpusProjectionInput> orderedInputs;
+        if (benchmarkEnabled)
+        {
+            var benchmarkInputs = orderedReplays
+                .Select(replay => new CombatImpactCorpusProjectionInput(
+                    replay,
+                    catalog.BuildEntities(replay)
+                ))
+                .ToArray();
+            orderedInputs = benchmarkInputs;
+            if (benchmarkInputs.Length > 0)
+            {
+                CombatImpactProjector.Project(
+                    benchmarkInputs[0].Replay.Combat,
+                    benchmarkInputs[0].EntityBuild.Entities
+                );
+            }
+        }
+        else
+            orderedInputs = orderedReplays.Select(replay => new CombatImpactCorpusProjectionInput(
+                replay,
+                catalog.BuildEntities(replay)
+            ));
+
+        var benchmarkObservations = benchmarkEnabled
+            ? new List<CombatImpactProjectionBenchmarkObservation>(replays.Count)
+            : null;
         var diagnostics = new List<CardAttributeAttributionCorpusObservation>();
         var rawExecutions = 0;
         var implicitPlayerEffects = 0;
         var criticalTriggerResolvedOrigins = 0;
         var criticalTriggerAttributedOrigins = 0;
         var criticalTriggerEvidenceFailures = new List<string>();
-        foreach (var replay in replays.OrderBy(replay => replay.BattleId, StringComparer.Ordinal))
+        foreach (var input in orderedInputs)
         {
+            var replay = input.Replay;
             rawExecutions += replay.Combat.Frames.Sum(frame =>
                 frame
                     .Events.OfType<CombatSimEventEffectExecuted>()
@@ -279,10 +310,20 @@ internal static class CombatImpactCorpusProjection
                         && effect.Target is EffectTargetCard
                     )
             );
-            var entityBuild = catalog.BuildEntities(replay);
+            var entityBuild = input.EntityBuild;
             var entities = entityBuild.Entities;
             implicitPlayerEffects += entityBuild.ImplicitPlayerEffects;
+            var allocatedBefore = benchmarkEnabled ? GC.GetAllocatedBytesForCurrentThread() : 0;
+            var startedAt = benchmarkEnabled ? Stopwatch.GetTimestamp() : 0;
             var report = CombatImpactProjector.Project(replay.Combat, entities);
+            if (benchmarkObservations != null)
+            {
+                var elapsed = Stopwatch.GetElapsedTime(startedAt);
+                var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+                benchmarkObservations.Add(
+                    CombatImpactProjectionBenchmark.Observe(replay, report, elapsed, allocated)
+                );
+            }
             criticalTriggerResolvedOrigins += report
                 .CriticalTriggerEvidenceAudit
                 .ResolvedOriginCount;
@@ -336,7 +377,7 @@ internal static class CombatImpactCorpusProjection
                     + $"attributed={criticalTriggerAttributedOrigins} "
                     + $"battles={string.Join(',', criticalTriggerEvidenceFailures.Take(50))}."
             );
-        return new CardAttributeAttributionCorpusReport(
+        var attribution = new CardAttributeAttributionCorpusReport(
             replays.Count,
             rawExecutions,
             implicitPlayerEffects,
@@ -395,6 +436,12 @@ internal static class CombatImpactCorpusProjection
                     == CombatImpactAttributeTransitionResolution.ConcurrentResidual.ToString()
                 )
                 .ToArray()
+        );
+        return new CombatImpactCorpusProjectionResult(
+            attribution,
+            benchmarkObservations == null
+                ? null
+                : CombatImpactProjectionBenchmark.Summarize(benchmarkObservations)
         );
     }
 
@@ -500,6 +547,16 @@ internal static class CombatImpactCorpusProjection
         return null;
     }
 }
+
+internal sealed record CombatImpactCorpusProjectionInput(
+    ReplayObservationInput Replay,
+    CombatImpactCorpusEntityBuild EntityBuild
+);
+
+internal sealed record CombatImpactCorpusProjectionResult(
+    CardAttributeAttributionCorpusReport Attribution,
+    CombatImpactProjectionBenchmarkReport? Benchmark
+);
 
 internal sealed record CardAttributeAttributionCorpusReport(
     int Battles,

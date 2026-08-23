@@ -1647,6 +1647,25 @@ public sealed class CombatImpactProjectorTests
     }
 
     [Fact]
+    public void Critical_trigger_attribution_work_scales_linearly_with_evidence()
+    {
+        var smaller = ProjectCriticalTriggerScalingCase(64).CriticalTriggerEvidenceAudit;
+        var larger = ProjectCriticalTriggerScalingCase(128).CriticalTriggerEvidenceAudit;
+
+        Assert.Equal(64, smaller.ObservedEvidenceCount);
+        Assert.Equal(128, larger.ObservedEvidenceCount);
+        Assert.InRange(smaller.ResolvedOriginCount, 63, 64);
+        Assert.InRange(larger.ResolvedOriginCount, 127, 128);
+        Assert.Equal(smaller.ResolvedOriginCount, smaller.AttributedOriginCount);
+        Assert.Equal(larger.ResolvedOriginCount, larger.AttributedOriginCount);
+        Assert.True(smaller.WorkUnitCount > 0);
+        Assert.True(
+            larger.WorkUnitCount <= smaller.WorkUnitCount * 2 + 16,
+            $"Expected linear critical-trigger work, got {smaller.WorkUnitCount} -> {larger.WorkUnitCount}."
+        );
+    }
+
+    [Fact]
     public void Does_not_associate_delayed_crit_evidence_with_an_unrelated_same_frame_activation()
     {
         var simulation = new CombatSim();
@@ -5844,6 +5863,50 @@ public sealed class CombatImpactProjectorTests
                 ["crit-gain"] = priority,
             }
         );
+
+    private static CombatImpactReport ProjectCriticalTriggerScalingCase(int evidenceCount)
+    {
+        var simulation = new CombatSim();
+        simulation.Frames.Clear();
+        var target = InstanceId.TryParse("target");
+        for (var index = 0; index < evidenceCount; index++)
+        {
+            var frame = PlayerEffectFrame(
+                EActionCommandType.PlayerBurnApply,
+                EPlayerAttributeType.Burn,
+                (index + 1) * 3,
+                (index + 2) * 3
+            );
+            frame.Events.Add(
+                Executed(
+                    "crit-listener",
+                    EActionCommandType.CardModifyAttribute,
+                    CardTarget("target"),
+                    triggerSource: "source",
+                    executionContextId: $"critical-listener-{index}",
+                    effectId: "crit-gain"
+                )
+            );
+            frame.CardUpdates[target] = DamageUpdate(target, index, index + 1);
+            simulation.Frames.Add(frame);
+        }
+        simulation.CardStats["source"] = new Dictionary<ECardStats, int>
+        {
+            [ECardStats.BurnAdded] = evidenceCount * 3,
+        };
+
+        var entities = Entities().ToDictionary(item => item.Key, item => item.Value);
+        entities["source"] = entities["source"] with
+        {
+            Attributes = new Dictionary<ECardAttributeType, int>
+            {
+                [ECardAttributeType.BurnApplyAmount] = 3,
+            },
+            CritCapableEffectIds = ["critical-effect"],
+        };
+        entities["crit-listener"] = CriticalTriggerEntity(EEffectPriority.Low);
+        return CombatImpactProjector.Project(simulation, entities);
+    }
 
     private static CombatSimPlayerUpdate Damage(int amount) =>
         new()

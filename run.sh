@@ -447,8 +447,8 @@ test_compat() {
 }
 
 test_corpus() {
-    if (($# < 1 || $# > 2)); then
-        echo -e "${RED}Usage: ./run.sh test-corpus <replay-corpus-path> [report-path]${RESET}" >&2
+    if (($# < 1 || $# > 3)); then
+        echo -e "${RED}Usage: ./run.sh test-corpus <replay-corpus-path> [report-path] [--benchmark]${RESET}" >&2
         return 2
     fi
     local corpus_path="$1"
@@ -456,10 +456,25 @@ test_corpus() {
         echo -e "${RED}Replay corpus directory not found: '$corpus_path'.${RESET}" >&2
         return 2
     fi
-    local report_path="${2:-$SCRIPT_DIR/artifacts/combat-impact-corpus/report.json}"
+    local report_path="$SCRIPT_DIR/artifacts/combat-impact-corpus/report.json"
+    local benchmark_arg=()
+    if (($# >= 2)); then
+        if [[ "$2" == "--benchmark" ]]; then
+            benchmark_arg=("--benchmark")
+        else
+            report_path="$2"
+        fi
+    fi
+    if (($# == 3)); then
+        if [[ "$3" != "--benchmark" || "$2" == "--benchmark" ]]; then
+            echo -e "${RED}Usage: ./run.sh test-corpus <replay-corpus-path> [report-path] [--benchmark]${RESET}" >&2
+            return 2
+        fi
+        benchmark_arg=("--benchmark")
+    fi
     dotnet run --project tests/CombatImpact.Corpus/CombatImpact.Corpus.csproj \
         -p:BppDeployToGame=false -p:ManagedPath="$MANAGED" \
-        -- "$corpus_path" "$report_path"
+        -- "$corpus_path" "$report_path" "${benchmark_arg[@]}"
 }
 
 parse_test_options() {
@@ -647,7 +662,7 @@ Usage:
       Run the explicit default xUnit suite without deploying to the live game or fetching seeds.
   $0 test-compat [-p:ManagedPath=...]
       Run every compatibility check whose local game/decompiled prerequisites are available.
-  $0 test-corpus <replay-corpus-path> [report-path]
+  $0 test-corpus <replay-corpus-path> [report-path] [--benchmark]
       Run the opt-in offline Combat Impact corpus acceptance. A corpus is mandatory.
   $0 format
   $0 format-check
