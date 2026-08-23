@@ -67,6 +67,8 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
     private readonly NativePairedTooltipSession _session;
     private readonly List<LayoutElement> _metricColumns = [];
     private readonly List<INativeCardPreviewSession> _previewSessions = [];
+    private readonly NativePreviewFitBatch<PendingNativePreviewFit> _nativePreviewFitBatch = new();
+    private readonly Vector3[] _nativePreviewFitCorners = new Vector3[4];
     private readonly List<ImpactContentBlock> _causedBlocks = [];
     private readonly List<ImpactContentBlock> _receivedBlocks = [];
     private GameObject? _contentRoot;
@@ -434,6 +436,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
 
     private void DisposeNativePreviews()
     {
+        _nativePreviewFitBatch.Reset();
         if (_previewCancellation != null)
         {
             try
@@ -1158,6 +1161,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         CancellationToken cancellationToken
     )
     {
+        var fitQueued = false;
         try
         {
             var outcome = await scope.AcquireAsync(subject, cancellationToken);
@@ -1190,37 +1194,14 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
                 return;
             }
 
-            if (
-                session.FitInto(slot, NativeCardPreviewHorizontalAlignment.Left)
-                != NativeCardPreviewSlotFitResult.Applied
-            )
-            {
-                session.Dispose();
-                HidePreviewSlot(slot);
-                return;
-            }
-
-            if (
-                !NativeCardPreviewSlotFitter.TryAlignVisibleArtworkLeft(
-                    session.Rect,
-                    slot,
-                    out var visibleWidth
-                ) || !FitPreviewColumnToVisibleWidth(slot, visibleWidth, trailingPadding)
-            )
-            {
-                session.Dispose();
-                HidePreviewSlot(slot);
-                BppLog.WarnEvent(
-                    PostCombatImpactLogEvents.InteractionDegraded,
-                    PostCombatImpactLogEvents.ReasonCode.Bind(
-                        PostCombatImpactReasonCode.EntityPreviewUnavailable
-                    )
-                );
-                return;
-            }
-
             _previewSessions.Add(session);
-            owner.Reveal(session.Root);
+            var scheduleFlush = _nativePreviewFitBatch.Enqueue(
+                generation,
+                new PendingNativePreviewFit(session, owner, slot, trailingPadding)
+            );
+            fitQueued = true;
+            if (scheduleFlush)
+                ScheduleNativePreviewFitFlush(generation);
         }
         catch (OperationCanceledException)
         {
@@ -1239,9 +1220,164 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         }
         finally
         {
-            if (generation == _session.Generation)
-                _pendingPreviewCount = Mathf.Max(0, _pendingPreviewCount - 1);
+            if (!fitQueued)
+                CompletePendingPreviews(generation, 1);
         }
+    }
+
+    /// <summary>
+    /// Coalesces native previews that finish acquisition in the same Unity synchronization-context
+    /// turn. The outer presentation still counts each queued preview as pending until this batch has
+    /// completed, so it cannot reveal geometry that has not been fitted yet.
+    /// </summary>
+    private void ScheduleNativePreviewFitFlush(int generation) =>
+        _ = FlushNativePreviewFits(generation);
+
+    private async Task FlushNativePreviewFits(int generation)
+    {
+        await Task.Yield();
+        if (!_nativePreviewFitBatch.TryTake(generation, out var batch))
+            return;
+
+        try
+        {
+            FitNativePreviewBatch(batch);
+        }
+        finally
+        {
+            CompletePendingPreviews(generation, batch.Length);
+        }
+    }
+
+    private void FitNativePreviewBatch(PendingNativePreviewFit[] batch)
+    {
+        try
+        {
+            Canvas.ForceUpdateCanvases();
+        }
+        catch (Exception ex)
+        {
+            foreach (var pending in batch)
+                RejectNativePreview(pending, reportFailure: true, exception: ex);
+            return;
+        }
+
+        var fittedCount = 0;
+        for (var index = 0; index < batch.Length; index++)
+        {
+            var pending = batch[index];
+            try
+            {
+                pending.FitApplied =
+                    NativeCardPreviewSlotFitter.FitWithSettledCanvas(
+                        pending.Session.Rect,
+                        pending.Slot,
+                        NativeCardPreviewHorizontalAlignment.Left,
+                        _nativePreviewFitCorners
+                    ) == NativeCardPreviewSlotFitResult.Applied;
+                batch[index] = pending;
+                if (pending.FitApplied)
+                {
+                    fittedCount++;
+                    continue;
+                }
+
+                RejectNativePreview(pending, reportFailure: false);
+            }
+            catch (Exception ex)
+            {
+                RejectNativePreview(pending, reportFailure: true, exception: ex);
+            }
+        }
+
+        if (fittedCount == 0)
+            return;
+
+        try
+        {
+            Canvas.ForceUpdateCanvases();
+        }
+        catch (Exception ex)
+        {
+            foreach (var pending in batch)
+            {
+                if (pending.FitApplied)
+                    RejectNativePreview(pending, reportFailure: true, exception: ex);
+            }
+            return;
+        }
+
+        foreach (var pending in batch)
+        {
+            if (!pending.FitApplied)
+                continue;
+
+            try
+            {
+                if (
+                    !NativeCardPreviewSlotFitter.TryAlignVisibleArtworkLeftWithSettledCanvas(
+                        pending.Session.Rect,
+                        pending.Slot,
+                        _nativePreviewFitCorners,
+                        out var visibleWidth
+                    )
+                    || !FitPreviewColumnToVisibleWidth(
+                        pending.Slot,
+                        visibleWidth,
+                        pending.TrailingPadding
+                    )
+                )
+                {
+                    RejectNativePreview(pending, reportFailure: true);
+                    continue;
+                }
+
+                pending.Owner.Reveal(pending.Session.Root);
+            }
+            catch (Exception ex)
+            {
+                RejectNativePreview(pending, reportFailure: true, exception: ex);
+            }
+        }
+    }
+
+    private void RejectNativePreview(
+        PendingNativePreviewFit pending,
+        bool reportFailure,
+        Exception? exception = null
+    )
+    {
+        var disposed = false;
+        try
+        {
+            pending.Session.Dispose();
+            disposed = true;
+        }
+        catch (Exception ex)
+        {
+            exception ??= ex;
+            reportFailure = true;
+        }
+        if (disposed)
+            _previewSessions.Remove(pending.Session);
+
+        HidePreviewSlot(pending.Slot);
+        if (!reportFailure)
+            return;
+
+        var reason = PostCombatImpactLogEvents.ReasonCode.Bind(
+            PostCombatImpactReasonCode.EntityPreviewUnavailable
+        );
+        if (exception == null)
+            BppLog.WarnEvent(PostCombatImpactLogEvents.InteractionDegraded, reason);
+        else
+            BppLog.WarnEvent(PostCombatImpactLogEvents.InteractionDegraded, exception, reason);
+    }
+
+    private void CompletePendingPreviews(int generation, int count)
+    {
+        if (generation == _session.Generation)
+            _pendingPreviewCount = Mathf.Max(0, _pendingPreviewCount - Mathf.Max(0, count));
     }
 
     private async Task LoadHero(Image image, RectTransform slot, EHero hero, int generation)
@@ -1273,8 +1409,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         }
         finally
         {
-            if (generation == _session.Generation)
-                _pendingPreviewCount = Mathf.Max(0, _pendingPreviewCount - 1);
+            CompletePendingPreviews(generation, 1);
         }
     }
 
@@ -1574,6 +1709,28 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
             foreach (var row in DetailRows)
                 row.SetActive(true);
         }
+    }
+
+    private struct PendingNativePreviewFit
+    {
+        internal PendingNativePreviewFit(
+            INativeCardPreviewSession session,
+            NativePreviewOwner owner,
+            RectTransform slot,
+            float trailingPadding
+        )
+        {
+            Session = session;
+            Owner = owner;
+            Slot = slot;
+            TrailingPadding = trailingPadding;
+        }
+
+        internal INativeCardPreviewSession Session { get; }
+        internal NativePreviewOwner Owner { get; }
+        internal RectTransform Slot { get; }
+        internal float TrailingPadding { get; }
+        internal bool FitApplied { get; set; }
     }
 
     private sealed class NativePreviewOwner : INativeCardPreviewOwner
