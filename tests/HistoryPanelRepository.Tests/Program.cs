@@ -25,13 +25,14 @@ try
     );
     var databasePath = PathConstants.RunLogDatabase(root);
     InsertPendingOutbox(databasePath, "run-delete");
+    InsertRunDeleteArtifacts(databasePath, "run-delete");
 
     var repository = new HistoryPanelRepository(databasePath);
     Assert(
         repository.ListRecentRuns(10).Single().RunId == "run-delete",
         "Fresh V5 run must be visible."
     );
-    repository.DeleteRun("run-delete");
+    var deleteResult = repository.DeleteRun("run-delete");
     Assert(
         repository.ListRecentRuns(10).Count == 0,
         "HistoryPanel DeleteRun must delete the source run."
@@ -39,6 +40,18 @@ try
     Assert(
         ReadScalar(databasePath, "SELECT COUNT(*) FROM bundle_outbox;") == 1,
         "Outbox audit rows must not block or follow DeleteRun."
+    );
+    Assert(
+        deleteResult.BattleIds.SequenceEqual(["delete-battle"])
+            && deleteResult.DetachedVideoCount == 1,
+        "DeleteRun must atomically return deleted battles and detach their video metadata."
+    );
+    Assert(
+        ReadScalar(
+            databasePath,
+            "SELECT COUNT(*) FROM combat_replay_videos WHERE video_id='kept-video' AND attachment_state='detached' AND file_state='present';"
+        ) == 1,
+        "DeleteRun must retain successful MP4 metadata as a discoverable detached artifact."
     );
 
     var first = Ghost(
@@ -73,8 +86,8 @@ try
     );
 
     Assert(
-        RunLogSchema.LocalDatabaseSchemaVersion == 1 && RunLogSchema.RowSchemaVersion == 1,
-        "V5 is a fresh schema v1."
+        RunLogSchema.LocalDatabaseSchemaVersion == 2 && RunLogSchema.RowSchemaVersion == 2,
+        "Replay lifecycle storage must use the paired V2 schema versions."
     );
     Assert(
         ReadScalar(
@@ -85,6 +98,12 @@ try
     );
 
     AssertRecentRunProjection(databasePath);
+    ReplayMaintenanceStorageTests.Run();
+    ReplayPayloadRetentionPolicyTests.Run();
+    ReplayPayloadOperationGateTests.Run();
+    ReplayPayloadMaintenanceServiceTests.Run();
+    ReplayVideoMetadataLifecycleTests.Run();
+    ReplayVideoArtifactMaintenanceTests.Run();
 
     Console.WriteLine("History panel V5 repository tests passed.");
 }
@@ -138,7 +157,9 @@ static void AssertRecentRunProjection(string databasePath)
 
     // Two countable battles.
     InsertLocalBattle(connection, "b-ok-1", "run-newest");
-    InsertSnapshot(connection, "b-ok-1", "[]", "[]", "[]", "[]");
+    const string emptyCapture =
+        "{\"Items\":[],\"Status\":\"CapturedEmpty\",\"Source\":\"Unknown\"}";
+    InsertSnapshot(connection, "b-ok-1", emptyCapture, emptyCapture, emptyCapture, emptyCapture);
     InsertLocalBattle(connection, "b-ok-2", "run-newest");
     InsertSnapshot(connection, "b-ok-2", "[1]", "[2]", "[3]", "[4]");
     // Malformed snapshot document: present but not countable.
@@ -154,6 +175,12 @@ static void AssertRecentRunProjection(string databasePath)
     InsertSnapshot(connection, "b-middle", "[]", "[]", "[]", "[]");
 
     var repository = new HistoryPanelRepository(databasePath);
+
+    var localBattles = repository.ListBattlesByRun("run-newest");
+    Assert(
+        localBattles.Count > 0 && localBattles.All(battle => !battle.ReplayAvailable),
+        "History must project evicted local payloads as unavailable instead of hard-coding replay eligibility."
+    );
 
     var all = repository.ListRecentRuns(10);
     Assert(
@@ -207,8 +234,14 @@ static void InsertLocalBattle(SqliteConnection connection, string battleId, stri
 {
     using var command = connection.CreateCommand();
     command.CommandText = """
-        INSERT INTO battles (battle_id, source, run_id, recorded_at_utc, combat_kind)
-        VALUES ($battleId, 'LOCAL', $runId, '2026-01-02T00:00:00Z', 'PVPCombat');
+        INSERT INTO battles (
+            battle_id, source, run_id, recorded_at_utc, combat_kind,
+            has_local_payload, local_payload_state
+        )
+        VALUES (
+            $battleId, 'LOCAL', $runId, '2026-01-02T00:00:00Z', 'PVPCombat',
+            0, 'missing'
+        );
         """;
     command.Parameters.AddWithValue("$battleId", battleId);
     command.Parameters.AddWithValue("$runId", runId);
@@ -271,6 +304,35 @@ static void InsertPendingOutbox(string databasePath, string runId)
         "sha-256=:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=:"
     );
     command.Parameters.AddWithValue("$sealed", DateTimeOffset.UtcNow.ToString("o"));
+    command.ExecuteNonQuery();
+}
+
+static void InsertRunDeleteArtifacts(string databasePath, string runId)
+{
+    using var connection = new SqliteConnection($"Data Source={databasePath}");
+    connection.Open();
+    using var command = connection.CreateCommand();
+    command.CommandText = """
+        INSERT INTO battles (
+            battle_id, source, run_id, recorded_at_utc, combat_kind,
+            has_local_payload, local_payload_state
+        ) VALUES (
+            'delete-battle', 'LOCAL', $runId, '2026-08-23T00:00:00Z', 'PVPCombat',
+            1, 'ready'
+        );
+        INSERT INTO combat_replay_videos (
+            video_id, battle_id, source, video_relative_path,
+            width, height, fps, codec, started_at_utc, ended_at_utc,
+            captured_frames, dropped_frames, status, file_size_bytes,
+            attachment_state, file_state
+        ) VALUES (
+            'kept-video', 'delete-battle', 'LocalSaved', '2026/kept-video.mp4',
+            1920, 1080, 30, 'libx264', '2026-08-23T00:00:00Z', '2026-08-23T00:01:00Z',
+            1800, 0, 'COMPLETED', 12345,
+            'attached', 'present'
+        );
+        """;
+    command.Parameters.AddWithValue("$runId", runId);
     command.ExecuteNonQuery();
 }
 

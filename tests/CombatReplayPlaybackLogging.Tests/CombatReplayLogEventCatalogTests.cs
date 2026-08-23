@@ -36,8 +36,10 @@ public sealed class CombatReplayLogEventCatalogTests
                 "battle_id:High:Short|run_id:High:Short|reason_code:Low:None",
             ["combat_replay.persistence.succeeded"] =
                 "battle_id:High:Short|run_id:High:Short|reason_code:Low:None",
-            ["combat_replay.persistence.orphan_cleanup_degraded"] =
-                "reason_code:Low:None|failed_count:High:None",
+            ["combat_replay.maintenance.completed"] =
+                "reason_code:Low:None|evaluated_count:High:None|scheduled_count:High:None|deleted_count:High:None|missing_count:High:None|orphan_count:High:None|failed_count:High:None",
+            ["combat_replay.maintenance.degraded"] =
+                "reason_code:Low:None|evaluated_count:High:None|scheduled_count:High:None|deleted_count:High:None|missing_count:High:None|orphan_count:High:None|failed_count:High:None",
             ["combat_replay.persistence.shutdown_incomplete"] =
                 "pending_count:High:None|in_flight:Low:None|timeout_ms:High:None",
             ["combat_replay.persistence.rollback_cleanup_failed"] = "battle_id:High:Short",
@@ -87,18 +89,6 @@ public sealed class CombatReplayLogEventCatalogTests
             validation.IsValid,
             string.Join("; ", validation.Violations.Select(violation => violation.ToString()))
         );
-    }
-
-    [Fact]
-    public void Orphan_cleanup_storm_key_is_only_the_low_cardinality_reason()
-    {
-        var policy = Assert.IsType<BppLogStormPolicy>(
-            CombatReplayLogEvents.OrphanCleanupDegraded.StormPolicy
-        );
-        var key = Assert.Single(policy.KeyFields);
-        Assert.Same(CombatReplayLogEvents.OrphanCleanupReasonCode, key);
-        Assert.Equal(BppLogCardinality.Low, key.Cardinality);
-        Assert.Equal(BppLogCorrelationPolicy.None, key.Correlation);
     }
 
     private static IEnumerable<BppLogEventDefinition> Definitions() =>

@@ -860,6 +860,23 @@ file sealed class FakePvpBattleCatalog(List<string> calls) : IPvpBattleCatalog
 
     public IEnumerable<string> ListBattleIds() => [];
 
+    public IReadOnlyList<ReplayPayloadMaintenanceRecord> ListReplayMaintenanceInventory() => [];
+
+    public IReadOnlyList<string> ScheduleReplayPayloadDeletion(
+        IReadOnlyCollection<string> battleIds,
+        DateTimeOffset now
+    ) => [];
+
+    public void CompleteReplayPayloadDeletion(
+        IReadOnlyCollection<string> battleIds,
+        DateTimeOffset now
+    ) { }
+
+    public void MarkReplayPayloadMissing(
+        IReadOnlyCollection<string> battleIds,
+        DateTimeOffset now
+    ) { }
+
     public IReadOnlyList<PvpBattleManifest> ListRecentBattles(int limit) => [];
 
     public IReadOnlyList<PvpBattleManifest> ListByRunId(string runId) => [];

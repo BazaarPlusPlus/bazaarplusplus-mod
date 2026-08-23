@@ -201,8 +201,8 @@ internal static partial class HistoryPanelText
     internal static string DeleteRunConfirm(string shortRunId)
     {
         return FormatSimple(
-            $"Press Delete again within 5s to remove {shortRunId}.",
-            $"请在 5 秒内再次点击删除，以移除 {shortRunId}。"
+            $"Press Delete again within 5s to remove {shortRunId}. Completed MP4 recordings will be kept.",
+            $"请在 5 秒内再次点击删除，以移除 {shortRunId}。已完成的 MP4 录像会保留。"
         );
     }
 
@@ -216,11 +216,14 @@ internal static partial class HistoryPanelText
         if (battleCount > 0)
         {
             return FormatSimple(
-                $"Removed run {shortRunId} and cleaned {battleCount} battle records.",
-                $"已删除对局 {shortRunId}，并清理 {battleCount} 条战斗记录。"
+                $"Removed run {shortRunId} and cleaned {battleCount} battle records. Completed MP4 recordings were kept.",
+                $"已删除对局 {shortRunId}，并清理 {battleCount} 条战斗记录。已完成的 MP4 录像已保留。"
             );
         }
 
-        return FormatSimple($"Removed run {shortRunId}.", $"已删除对局 {shortRunId}。");
+        return FormatSimple(
+            $"Removed run {shortRunId}. Completed MP4 recordings were kept.",
+            $"已删除对局 {shortRunId}。已完成的 MP4 录像已保留。"
+        );
     }
 }

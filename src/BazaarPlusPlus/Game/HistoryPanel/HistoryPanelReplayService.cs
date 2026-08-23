@@ -109,6 +109,12 @@ internal sealed class HistoryPanelReplayService
             return false;
         }
 
+        if (!battle.ReplayAvailable)
+        {
+            reason = HistoryPanelText.ReplayPayloadUnavailable(battle.BattleId);
+            return false;
+        }
+
         return runtime.CanReplaySavedBattle(battle.BattleId, out reason);
     }
 

@@ -5,6 +5,26 @@ namespace Architecture.Tests;
 public sealed class CurrentReplayRecordingArchitectureTests
 {
     [Fact]
+    public void Saved_replay_distinguishes_unavailable_persistence_from_a_busy_payload_gate()
+    {
+        var runtimeSource = File.ReadAllText(
+            Path.Combine(
+                RepoRoot(),
+                "src",
+                "BazaarPlusPlus",
+                "Game",
+                "CombatReplay",
+                "CombatReplayRuntime.cs"
+            )
+        );
+
+        Assert.Contains("if (persistence == null)", runtimeSource);
+        Assert.Contains("ReplayRequestRejectionReasonCode.RuntimeUnavailable", runtimeSource);
+        Assert.Contains("ReplayRequestRejectionReasonCode.PayloadOperationBusy", runtimeSource);
+        Assert.DoesNotContain("PayloadMaintenanceActive", runtimeSource);
+    }
+
+    [Fact]
     public void Ordinary_saved_replay_reuses_the_native_replay_action_for_recording()
     {
         var repoRoot = RepoRoot();

@@ -82,8 +82,8 @@ internal static class HistoryPanelRowMapper
             snapshots,
             isFinalBattle: false,
             source: HistoryBattleSource.Local,
-            replayAvailable: true,
-            replayDownloaded: true
+            replayAvailable: GetNullableInt32(reader, "has_local_payload") == 1,
+            replayDownloaded: GetNullableInt32(reader, "has_local_payload") == 1
         );
     }
 
