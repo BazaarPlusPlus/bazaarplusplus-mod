@@ -66,7 +66,18 @@ internal sealed class NativeCardPreviewAssetLoader
             if (assetReference == null)
                 return Failed(template.Id, NativeCardPreviewFailureReason.PreviewTypeUnavailable);
 
-            var raw = InstantiateAssetMethod.Invoke(assetLoader, new[] { assetReference });
+            if (
+                !NativeCardPreviewAssetInvocation.TryBuildArguments(
+                    InstantiateAssetMethod,
+                    assetReference,
+                    out var invocationArguments
+                )
+            )
+            {
+                return Failed(template.Id, NativeCardPreviewFailureReason.ReflectionUnavailable);
+            }
+
+            var raw = InstantiateAssetMethod.Invoke(assetLoader, invocationArguments);
             if (raw is not Task<GameObject> task)
                 return Failed(template.Id, NativeCardPreviewFailureReason.ReflectionUnavailable);
 
