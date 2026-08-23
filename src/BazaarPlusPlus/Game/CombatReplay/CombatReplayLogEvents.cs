@@ -25,6 +25,10 @@ internal enum ReplayPlaybackReasonCode
     AudioWarmupFailed,
     SoundtrackWarmupFailed,
     CombatVfxWarmupFailed,
+    RecordingRestartPromotionFailed,
+    RecordingRestartPublishFailed,
+    RecordingRestartInvokeFailed,
+    RecordingRestartRejected,
 }
 
 internal enum ReplayPlaybackEndReasonCode

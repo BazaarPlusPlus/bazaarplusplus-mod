@@ -276,12 +276,18 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
             return;
 
         if (snapshot.CanStart)
-            runtime.TryStartCurrentReplayRecording(
+        {
+            var started = runtime.TryStartCurrentReplayRecording(
                 nativeReplayButton.onClick.Invoke,
                 nativeRecapButton.onClick.Invoke,
                 nativeRecapBackButton.onClick.Invoke,
-                out _
+                out var startStatusCode
             );
+            if (!started && _cueActivator != null)
+                _cueActivator.defaultValue = CurrentReplayRecordingText.StartFailure(
+                    startStatusCode
+                );
+        }
         Refresh();
     }
 

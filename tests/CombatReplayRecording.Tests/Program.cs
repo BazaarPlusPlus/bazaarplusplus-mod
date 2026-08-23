@@ -10,6 +10,7 @@ CapturedReplayRoutesSeparatePveFromPvpPersistence();
 CurrentNativeReplayBecomesReadyWithoutPersistence();
 OrdinaryManagedReplayKeepsRecordingButtonVisible();
 RecordedManagedReplayTakesDisplayPriority();
+RecordingRestartStatusIsLocalized();
 PvpBattleStoreRejectsPveManifests();
 
 Console.WriteLine("Combat replay recording tests passed.");
@@ -108,6 +109,7 @@ static void OrdinaryManagedReplayKeepsRecordingButtonVisible()
         "ordinary-replay",
         recorderReady: true,
         replayReady: true,
+        CurrentReplayRecordingStatusCode.None,
         unavailableReason: null
     );
     var currentNative = default(CurrentReplayRecordingSnapshot);
@@ -129,7 +131,8 @@ static void OrdinaryManagedReplayKeepsRecordingButtonVisible()
         "ordinary-replay",
         recorderReady: true,
         replayReady: false,
-        unavailableReason: "Finish the current replay before recording it."
+        CurrentReplayRecordingStatusCode.ReplayInProgress,
+        unavailableReason: null
     );
     Assert(replaying.Visible, "The record button should remain visible during playback.");
     Assert(!replaying.CanStart, "Recording must start from the beginning, not mid-replay.");
@@ -171,6 +174,59 @@ static void RecordedManagedReplayTakesDisplayPriority()
     Assert(
         displayed.Phase == CurrentReplayRecordingPhase.Recording,
         "Recorded managed replay progress must not be hidden by current-native state."
+    );
+}
+
+static void RecordingRestartStatusIsLocalized()
+{
+    var snapshot = new CurrentReplayRecordingSnapshot(
+        CurrentReplayRecordingPhase.Preparing,
+        "ordinary-replay",
+        RecordingId: null,
+        FinalFilePath: null,
+        Reason: "raw diagnostic must not reach the tooltip",
+        Visible: true,
+        CanStart: false,
+        CanReveal: false,
+        StatusCode: CurrentReplayRecordingStatusCode.ReplayInProgress
+    );
+
+    var english = CurrentReplayRecordingText.Tooltip(
+        snapshot,
+        languageCode: "en",
+        traditionalChinese: false
+    );
+    Assert(
+        english.Contains("Finish the current replay", StringComparison.Ordinal),
+        "English should resolve the typed replay blocker."
+    );
+    Assert(
+        !english.Contains("raw diagnostic", StringComparison.Ordinal),
+        "Raw diagnostic reasons must not be rendered."
+    );
+
+    var simplified = CurrentReplayRecordingText.Tooltip(
+        snapshot,
+        languageCode: "zh-CN",
+        traditionalChinese: false
+    );
+    Assert(
+        simplified.Contains("请先完成当前回放", StringComparison.Ordinal),
+        "Simplified Chinese should resolve the typed replay blocker."
+    );
+    Assert(
+        !simplified.Contains("Finish the current replay", StringComparison.Ordinal),
+        "Simplified Chinese must not fall through to the English blocker."
+    );
+
+    var traditional = CurrentReplayRecordingText.Tooltip(
+        snapshot,
+        languageCode: "zh-CN",
+        traditionalChinese: true
+    );
+    Assert(
+        traditional.Contains("請先完成目前重播", StringComparison.Ordinal),
+        "Traditional Chinese should resolve the typed replay blocker."
     );
 }
 
