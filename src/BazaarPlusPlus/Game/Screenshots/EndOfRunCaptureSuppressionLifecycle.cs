@@ -69,6 +69,13 @@ internal sealed class EndOfRunCaptureSuppressionLifecycle
                 ScreenshotCaptureReasonCode.NativeTooltipSuppressionUnavailable
             );
         }
+        if (tooltipAudit.State == NativeTooltipCleanFrameState.Unavailable)
+        {
+            ReleaseNative();
+            return EndOfRunCleanFrameDecision.CaptureDegraded(
+                ScreenshotCaptureReasonCode.NativeTooltipSuppressionUnavailable
+            );
+        }
 
         EndOfRunCleanFrameVisualObservation visual;
         try

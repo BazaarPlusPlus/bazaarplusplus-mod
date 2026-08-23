@@ -7,12 +7,48 @@ internal static class EndOfRunCaptureSuppressionLifecycleTests
     internal static void Run()
     {
         Unavailable_native_audit_releases_only_the_native_lease();
+        Unavailable_native_audit_short_circuits_a_throwing_visual_probe();
         Native_audit_exception_releases_only_the_native_lease();
         Unavailable_visual_keeps_suppression_until_restore();
         Visual_exception_uses_the_visual_reason_and_keeps_suppression_until_restore();
         Cancel_before_capture_restores_each_suppression_once();
         Frame_acquired_restore_is_exactly_once();
         Install_after_cancel_restores_new_resources_without_reopening_the_lifecycle();
+    }
+
+    private static void Unavailable_native_audit_short_circuits_a_throwing_visual_probe()
+    {
+        var bpp = new CountingDisposable();
+        var native = new NativeLease(NativeTooltipCleanFrameState.Unavailable);
+        var lifecycle = Installed(bpp, native);
+        var visualProbeCalled = false;
+
+        var decision = lifecycle.ObserveCleanFrame(
+            new EndOfRunCleanFramePreparationCore(startedAtSeconds: 0f),
+            () =>
+            {
+                visualProbeCalled = true;
+                throw new InvalidOperationException("visual audit failed");
+            },
+            nowSeconds: 0f
+        );
+
+        AssertNativeDegradation(
+            decision,
+            "Native unavailability must retain priority over a later visual failure."
+        );
+        Assert(!visualProbeCalled, "A terminal native audit must skip the visual probe.");
+        Assert(
+            native.DisposeCount == 1,
+            "The unavailable native lease must release before capture."
+        );
+        Assert(bpp.DisposeCount == 0, "BPP chrome must stay suppressed until frame acquisition.");
+        lifecycle.ReleaseAll();
+        Assert(bpp.DisposeCount == 1, "Final restore must release BPP chrome.");
+        Assert(
+            native.DisposeCount == 1,
+            "Final restore must not release native suppression twice."
+        );
     }
 
     private static void Unavailable_native_audit_releases_only_the_native_lease()
