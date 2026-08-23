@@ -252,8 +252,7 @@ internal sealed class EndOfRunCaptureDriver
         private readonly TaskCompletionSource<EndOfRunCaptureAttemptOutcome> _completion = new(
             TaskCreationOptions.RunContinuationsAsynchronously
         );
-        private IDisposable? _bppSuppression;
-        private INativeTooltipSuppressionLease? _nativeTooltipSuppression;
+        private readonly EndOfRunCaptureSuppressionLifecycle _suppression = new();
         private ScreenshotCaptureSession? _captureSession;
         private ScreenshotCaptureReasonCode? _preparationDegradationReason;
         private bool _canceled;
@@ -297,14 +296,14 @@ internal sealed class EndOfRunCaptureDriver
                 captureSession = _captureSession;
             }
 
-            DisposeSuppression();
+            _suppression.ReleaseAll();
             if (captureSession != null)
                 CompleteFromTaskWhenReady(captureSession.Completion);
             else
                 CompleteCanceled();
         }
 
-        public void RestoreUi() => DisposeSuppression();
+        public void RestoreUi() => _suppression.ReleaseAll();
 
         private IEnumerator Run()
         {
@@ -318,12 +317,11 @@ internal sealed class EndOfRunCaptureDriver
             var cleanFramePreparationAvailable = false;
             try
             {
-                InstallSuppression();
-                cleanFramePreparationAvailable = true;
+                cleanFramePreparationAvailable = InstallSuppression();
             }
             catch
             {
-                DisposeSuppression();
+                _suppression.ReleaseAll();
                 _preparationDegradationReason =
                     ScreenshotCaptureReasonCode.NativeTooltipSuppressionUnavailable;
             }
@@ -338,33 +336,14 @@ internal sealed class EndOfRunCaptureDriver
                     yield return endOfFrame;
                     if (IsCanceled())
                     {
-                        DisposeSuppression();
+                        _suppression.ReleaseAll();
                         CompleteCanceled();
                         yield break;
                     }
 
-                    NativeTooltipCleanFrameAudit tooltipAudit;
-                    EndOfRunCleanFrameVisualObservation visual;
-                    try
-                    {
-                        tooltipAudit =
-                            _nativeTooltipSuppression?.AuditCleanFrame()
-                            ?? new NativeTooltipCleanFrameAudit(
-                                NativeTooltipCleanFrameState.Unavailable
-                            );
-                        visual = CaptureCleanFrameVisual(_screen);
-                    }
-                    catch
-                    {
-                        DisposeSuppression();
-                        _preparationDegradationReason =
-                            ScreenshotCaptureReasonCode.NativeTooltipSuppressionUnavailable;
-                        break;
-                    }
-
-                    var decision = preparation.Observe(
-                        tooltipAudit,
-                        visual,
+                    var decision = _suppression.ObserveCleanFrame(
+                        preparation,
+                        () => CaptureCleanFrameVisual(_screen),
                         Time.realtimeSinceStartup
                     );
                     if (decision.Kind == EndOfRunCleanFrameDecisionKind.Capture)
@@ -376,6 +355,13 @@ internal sealed class EndOfRunCaptureDriver
                 }
             }
 
+            if (IsCanceled())
+            {
+                _suppression.ReleaseAll();
+                CompleteCanceled();
+                yield break;
+            }
+
             ScreenshotCaptureSession? session;
             try
             {
@@ -385,7 +371,7 @@ internal sealed class EndOfRunCaptureDriver
             }
             catch (Exception ex)
             {
-                DisposeSuppression();
+                _suppression.ReleaseAll();
                 _frameAcquired.TrySetException(ex);
                 _completion.TrySetResult(
                     EndOfRunCaptureAttemptOutcome.Failed(
@@ -398,7 +384,7 @@ internal sealed class EndOfRunCaptureDriver
 
             if (session == null)
             {
-                DisposeSuppression();
+                _suppression.ReleaseAll();
                 _frameAcquired.TrySetException(
                     new InvalidOperationException("Screenshot capture returned no session.")
                 );
@@ -415,7 +401,7 @@ internal sealed class EndOfRunCaptureDriver
             ObserveFrameAcquired(session.FrameAcquired);
             if (IsCanceled())
             {
-                DisposeSuppression();
+                _suppression.ReleaseAll();
                 CompleteFromTaskWhenReady(session.Completion);
                 yield break;
             }
@@ -425,7 +411,7 @@ internal sealed class EndOfRunCaptureDriver
 
             if (IsCanceled())
             {
-                DisposeSuppression();
+                _suppression.ReleaseAll();
                 CompleteFromTaskWhenReady(session.Completion);
                 yield break;
             }
@@ -433,7 +419,7 @@ internal sealed class EndOfRunCaptureDriver
             CompleteFromTask(session.Completion);
         }
 
-        private void InstallSuppression()
+        private bool InstallSuppression()
         {
             var bppSuppression = BppUiChromeSuppression.Begin(
                 BppUiChromeSuppressionMode.Screenshot
@@ -451,17 +437,7 @@ internal sealed class EndOfRunCaptureDriver
                 throw;
             }
 
-            lock (_gate)
-            {
-                if (_canceled)
-                {
-                    nativeSuppression.Dispose();
-                    bppSuppression?.Dispose();
-                    return;
-                }
-                _bppSuppression = bppSuppression;
-                _nativeTooltipSuppression = nativeSuppression;
-            }
+            return _suppression.TryInstall(bppSuppression, nativeSuppression);
         }
 
         private void ObserveFrameAcquired(Task frameAcquired)
@@ -540,35 +516,6 @@ internal sealed class EndOfRunCaptureDriver
         {
             lock (_gate)
                 return _canceled;
-        }
-
-        private void DisposeSuppression()
-        {
-            IDisposable? bppSuppression;
-            INativeTooltipSuppressionLease? nativeSuppression;
-            lock (_gate)
-            {
-                bppSuppression = _bppSuppression;
-                nativeSuppression = _nativeTooltipSuppression;
-                _bppSuppression = null;
-                _nativeTooltipSuppression = null;
-            }
-            try
-            {
-                nativeSuppression?.Dispose();
-            }
-            catch
-            {
-                // Native teardown is best-effort; BPP chrome must still be restored.
-            }
-            try
-            {
-                bppSuppression?.Dispose();
-            }
-            catch
-            {
-                // Logical fail-open is owned by the workflow even if native UI was destroyed.
-            }
         }
     }
 }
