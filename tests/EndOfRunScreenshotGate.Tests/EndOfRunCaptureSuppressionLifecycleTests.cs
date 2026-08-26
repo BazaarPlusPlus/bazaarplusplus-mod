@@ -83,14 +83,20 @@ internal static class EndOfRunCaptureSuppressionLifecycleTests
         var bpp = new CountingDisposable();
         var native = new NativeLease(new InvalidOperationException("native audit failed"));
         var lifecycle = Installed(bpp, native);
+        var observedReason = NativeTooltipCleanFrameReasonCode.None;
 
         var decision = lifecycle.ObserveCleanFrame(
             new EndOfRunCleanFramePreparationCore(startedAtSeconds: 0f),
             Sample,
-            nowSeconds: 0f
+            nowSeconds: 0f,
+            (tooltipAudit, _) => observedReason = tooltipAudit.ReasonCode
         );
 
         AssertNativeDegradation(decision, "A native audit exception must use the native reason.");
+        Assert(
+            observedReason == NativeTooltipCleanFrameReasonCode.AuditException,
+            "Diagnostics must retain the native audit exception reason."
+        );
         Assert(native.DisposeCount == 1, "A throwing native lease must release before capture.");
         Assert(bpp.DisposeCount == 0, "Native failure must not release reliable BPP suppression.");
         lifecycle.ReleaseAll();
