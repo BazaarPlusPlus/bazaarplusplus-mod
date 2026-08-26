@@ -208,6 +208,13 @@ internal static class ScreenshotCaptureLogEvents
         "max_controller_count",
         BppLogCardinality.High
     );
+    internal static readonly BppLogFieldDefinition SamplingMaxSkippedInactiveControllerCount =
+        PublicField(9, "max_skipped_inactive_controller_count", BppLogCardinality.High);
+    internal static readonly BppLogFieldDefinition SamplingNativeTooltipReasonCode = PublicField(
+        10,
+        "native_tooltip_reason_code",
+        BppLogCardinality.Low
+    );
     internal static readonly BppLogEventDefinition SamplingSummary = new(
         BppLogFeatureScope.Screenshots,
         "screenshots.capture.sampling_summary",
@@ -221,6 +228,8 @@ internal static class ScreenshotCaptureLogEvents
             SamplingMaxCardCount,
             SamplingMaxTransformCount,
             SamplingMaxControllerCount,
+            SamplingMaxSkippedInactiveControllerCount,
+            SamplingNativeTooltipReasonCode,
         ]
     );
 #endif

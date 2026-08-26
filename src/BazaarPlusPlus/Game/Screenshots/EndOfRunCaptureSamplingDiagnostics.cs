@@ -17,6 +17,8 @@ internal sealed class EndOfRunCaptureSamplingDiagnostics
     private int _maxCardCount;
     private int _maxTransformCount;
     private int _maxControllerCount;
+    private int _maxSkippedInactiveControllerCount;
+    private NativeTooltipCleanFrameReasonCode _nativeTooltipReasonCode;
 
     [Conditional("DEBUG")]
     internal void RecordReadiness(long startedAt, EndOfRunSummaryVisualSnapshot snapshot)
@@ -40,6 +42,17 @@ internal sealed class EndOfRunCaptureSamplingDiagnostics
         _barrierTotalMicroseconds += elapsed;
         _barrierMaxMicroseconds = Math.Max(_barrierMaxMicroseconds, elapsed);
         _maxControllerCount = Math.Max(_maxControllerCount, tooltipAudit.ControllerCount);
+        _maxSkippedInactiveControllerCount = Math.Max(
+            _maxSkippedInactiveControllerCount,
+            tooltipAudit.SkippedInactiveControllerCount
+        );
+        if (
+            _nativeTooltipReasonCode == NativeTooltipCleanFrameReasonCode.None
+            && tooltipAudit.ReasonCode != NativeTooltipCleanFrameReasonCode.None
+        )
+        {
+            _nativeTooltipReasonCode = tooltipAudit.ReasonCode;
+        }
         RecordVisualCounts(visual.LoadedCardCount, visual.TransformCount);
     }
 
@@ -67,6 +80,12 @@ internal sealed class EndOfRunCaptureSamplingDiagnostics
                     ScreenshotCaptureLogEvents.SamplingMaxCardCount.Bind(_maxCardCount),
                     ScreenshotCaptureLogEvents.SamplingMaxTransformCount.Bind(_maxTransformCount),
                     ScreenshotCaptureLogEvents.SamplingMaxControllerCount.Bind(_maxControllerCount),
+                    ScreenshotCaptureLogEvents.SamplingMaxSkippedInactiveControllerCount.Bind(
+                        _maxSkippedInactiveControllerCount
+                    ),
+                    ScreenshotCaptureLogEvents.SamplingNativeTooltipReasonCode.Bind(
+                        _nativeTooltipReasonCode
+                    ),
                 ]
         );
         Reset();
@@ -84,6 +103,8 @@ internal sealed class EndOfRunCaptureSamplingDiagnostics
         _maxCardCount = 0;
         _maxTransformCount = 0;
         _maxControllerCount = 0;
+        _maxSkippedInactiveControllerCount = 0;
+        _nativeTooltipReasonCode = NativeTooltipCleanFrameReasonCode.None;
     }
 
     private void RecordVisualCounts(int cardCount, int transformCount)

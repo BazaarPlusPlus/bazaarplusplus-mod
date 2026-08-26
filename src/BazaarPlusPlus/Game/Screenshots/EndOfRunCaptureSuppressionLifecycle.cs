@@ -62,12 +62,16 @@ internal sealed class EndOfRunCaptureSuppressionLifecycle
         {
             tooltipAudit =
                 nativeTooltipSuppression?.AuditCleanFrame()
-                ?? new NativeTooltipCleanFrameAudit(NativeTooltipCleanFrameState.Unavailable);
+                ?? new NativeTooltipCleanFrameAudit(
+                    NativeTooltipCleanFrameState.Unavailable,
+                    ReasonCode: NativeTooltipCleanFrameReasonCode.SuppressionInactive
+                );
         }
         catch
         {
             tooltipAudit = new NativeTooltipCleanFrameAudit(
-                NativeTooltipCleanFrameState.Unavailable
+                NativeTooltipCleanFrameState.Unavailable,
+                ReasonCode: NativeTooltipCleanFrameReasonCode.AuditException
             );
             var unavailableVisual = EndOfRunCleanFrameVisualObservation.Unavailable;
             TryObserveSample(observeSample, tooltipAudit, unavailableVisual);

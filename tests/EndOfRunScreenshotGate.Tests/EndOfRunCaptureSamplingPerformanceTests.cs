@@ -12,6 +12,7 @@ internal static class EndOfRunCaptureSamplingPerformanceTests
         Excluded_hierarchy_sentinels_reject_equal_count_replacements();
         Tooltip_snapshot_reuses_until_generation_or_lifetime_changes();
         Tooltip_lifecycle_signals_invalidate_equal_count_and_deep_topology_changes();
+        Tooltip_audit_skips_only_inactive_non_authoritative_controllers();
     }
 
     private static void Heavy_sampling_has_a_wall_clock_frequency_cap()
@@ -200,6 +201,71 @@ internal static class EndOfRunCaptureSamplingPerformanceTests
         _ = cache.GetOrRefresh(topology.Current, controller => controller.Alive, Scan);
         Assert(scans == 4, "Destroy lifecycle signals must invalidate the controller snapshot.");
     }
+
+    private static void Tooltip_audit_skips_only_inactive_non_authoritative_controllers()
+    {
+        Assert(
+            DecideTooltipAudit(
+                isAuthoritative: false,
+                isActiveInHierarchy: false,
+                hasRequiredSurface: false
+            ) == NativeTooltipControllerAuditDecision.SkipInactiveNonAuthoritative,
+            "A replay-stale inactive controller must not make clean-frame suppression unavailable."
+        );
+        Assert(
+            DecideTooltipAudit(
+                isAuthoritative: false,
+                isActiveInHierarchy: false,
+                hasRequiredSurface: true
+            ) == NativeTooltipControllerAuditDecision.SkipInactiveNonAuthoritative,
+            "Inactive non-authoritative controllers must be skipped regardless of stale surfaces."
+        );
+        Assert(
+            DecideTooltipAudit(
+                isAuthoritative: false,
+                isActiveInHierarchy: true,
+                hasRequiredSurface: true
+            ) == NativeTooltipControllerAuditDecision.Audit,
+            "An active controller must still be concealed and audited."
+        );
+        Assert(
+            DecideTooltipAudit(
+                isAuthoritative: false,
+                isActiveInHierarchy: true,
+                hasRequiredSurface: false
+            ) == NativeTooltipControllerAuditDecision.Unavailable,
+            "An active controller without its required surface must degrade capture."
+        );
+        Assert(
+            DecideTooltipAudit(
+                isAuthoritative: true,
+                isActiveInHierarchy: false,
+                hasRequiredSurface: true
+            ) == NativeTooltipControllerAuditDecision.Audit,
+            "The native parent's current controller must remain authoritative while inactive."
+        );
+        Assert(
+            DecideTooltipAudit(
+                isAuthoritative: true,
+                isActiveInHierarchy: false,
+                hasRequiredSurface: false
+            ) == NativeTooltipControllerAuditDecision.Unavailable,
+            "An authoritative controller without its required surface must degrade capture."
+        );
+    }
+
+    private static NativeTooltipControllerAuditDecision DecideTooltipAudit(
+        bool isAuthoritative,
+        bool isActiveInHierarchy,
+        bool hasRequiredSurface
+    ) =>
+        NativeTooltipControllerAuditCore.Decide(
+            new NativeTooltipControllerAuditCandidate(
+                isAuthoritative,
+                isActiveInHierarchy,
+                hasRequiredSurface
+            )
+        );
 
     private static void Assert(bool condition, string message)
     {
