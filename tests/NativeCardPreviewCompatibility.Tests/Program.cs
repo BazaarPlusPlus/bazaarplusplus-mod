@@ -64,9 +64,61 @@ RequireAnyContains(
     assetLoaderPath,
     assetLoaderText,
     [
+        "internal async Task<T> LoadAssetAsyncByAddress<T>(string address, bool reportSuccess = false) where T : UnityEngine.Object",
+        "internal async Task<T> LoadAssetAsyncByAddress<T>(string address, AssetScope? scope = null) where T : UnityEngine.Object",
+    ]
+);
+RequireAnyContains(
+    assetLoaderPath,
+    assetLoaderText,
+    [
+        "internal async Task<T> LoadAssetAsyncByReference<T>(AssetReference assetReference) where T : UnityEngine.Object",
+        "internal async Task<T> LoadAssetAsyncByReference<T>(AssetReference assetReference, AssetScope? scope = null) where T : UnityEngine.Object",
+    ]
+);
+RequireAnyContains(
+    assetLoaderPath,
+    assetLoaderText,
+    [
         "internal async Task<GameObject> InstantiateAssetAsyncByReference(AssetReference assetReference)",
         "internal async Task<GameObject> InstantiateAssetAsyncByReference(AssetReference assetReference, AssetScope? scope = null)",
     ]
+);
+
+var skinAssetPath = Path.Combine(
+    repoRoot,
+    "decompiled",
+    "TheBazaarRuntime",
+    "TheBazaar.Assets.Scripts.ScriptableObjectsScripts",
+    "SkinAssetDataSO.cs"
+);
+if (!File.Exists(skinAssetPath))
+{
+    throw new InvalidOperationException(
+        $"Required decompiled source file is missing: {skinAssetPath}"
+    );
+}
+
+var skinAssetText = File.ReadAllText(skinAssetPath);
+RequireContains(
+    skinAssetPath,
+    skinAssetText,
+    "public AssetReferenceSprite portraitTextureReference;"
+);
+RequireContains(
+    skinAssetPath,
+    skinAssetText,
+    "public AssetReferenceTexture storePortraitTextureReference;"
+);
+RequireContains(
+    skinAssetPath,
+    skinAssetText,
+    "if (animatedPortraitPrefabReference != null && animatedPortraitPrefabReference.RuntimeKeyIsValid())"
+);
+RequireContains(
+    skinAssetPath,
+    skinAssetText,
+    "return await LoadTexture(storePortraitTextureReference);"
 );
 
 var cardPreviewBasePath = Path.Combine(

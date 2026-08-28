@@ -117,7 +117,9 @@ internal static class RandomHeroSkinPoolPatchLogContext
         CollectionKindOf(item.itemData);
 
     internal static CollectiblePoolKind CollectionKindOf(CosmeticItem? item) =>
-        item == null ? CollectiblePoolKind.Unknown : CollectionKindOf(item.EquipableItem);
+        item == null
+            ? CollectiblePoolKind.Unknown
+            : RandomHeroSkinPoolNativeController.CollectionKindOf(item);
 }
 
 [HarmonyPatch(typeof(CosmeticItem), "SetEquipState")]

@@ -94,4 +94,23 @@ public class BppCollectionDockButtonLayoutPlannerTests
         Assert.Equal(1130f, plan.Bounds.CenterX);
         Assert.True(Viewport.Contains(plan.Bounds));
     }
+
+    [Fact]
+    public void Resolve_places_collection_below_gear_when_top_edge_blocks_upward_placement()
+    {
+        var topGear = BppDockButtonBounds.FromCenter(1100f, 840f, 100f, 100f);
+
+        var plan = BppCollectionDockButtonLayoutPlanner.Resolve(
+            Viewport,
+            topGear,
+            collectionWidth: 100f,
+            collectionHeight: 100f,
+            gap: 20f,
+            Array.Empty<BppDockButtonObstacle>()
+        );
+
+        Assert.True(plan.CanApply);
+        Assert.Equal(720f, plan.Bounds.CenterY);
+        Assert.True(Viewport.Contains(plan.Bounds));
+    }
 }

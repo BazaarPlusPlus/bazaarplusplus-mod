@@ -223,6 +223,41 @@ try
             "runs should preserve interrupted/abandoned terminal statuses."
         );
 
+        var collisionSession = Invoke<RunLogSessionState>(
+            storeType,
+            store,
+            "CreateRun",
+            [
+                new RunLogCreateRequest
+                {
+                    RunId = abandonedRunId,
+                    StartedAtUtc = startedAt.AddHours(1).AddMinutes(10),
+                    Hero = "Dooley",
+                    GameMode = "Unranked",
+                    Day = 1,
+                    Hour = 1,
+                },
+            ]
+        );
+        Assert(
+            collisionSession.RunId != abandonedRunId
+                && RunLogRunIdentity.MatchesServerRunId(collisionSession.RunId, abandonedRunId),
+            "A reused terminal server run id should create a distinct matching local run id."
+        );
+        Assert(
+            GetString(connection, "SELECT status FROM runs WHERE run_id = $runId;", abandonedRunId)
+                == "abandoned",
+            "Recovering a reused server run id must not rewrite the historical terminal row."
+        );
+        Assert(
+            GetString(
+                connection,
+                "SELECT status FROM runs WHERE run_id = $runId;",
+                collisionSession.RunId
+            ) == "active",
+            "The recovered collision row should be independently active."
+        );
+
         const string olderActiveRunId = "server-run-older";
         const string newerActiveRunId = "server-run-newer";
         var olderStartedAt = startedAt.AddHours(2);

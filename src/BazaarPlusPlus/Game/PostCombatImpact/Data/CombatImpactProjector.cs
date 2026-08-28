@@ -2765,7 +2765,8 @@ internal static class CombatImpactProjector
     }
 
     private static bool IsExplicitlyIgnoredAction(EActionCommandType action) =>
-        action
+        IsOptionalGameStateAction(action)
+        || action
             is EActionCommandType.None
                 or EActionCommandType.CardAddTags
                 or EActionCommandType.CardRemoveTags
@@ -2784,6 +2785,12 @@ internal static class CombatImpactProjector
                 or EActionCommandType.PlayerPortraitNext
                 or EActionCommandType.PlayerPortraitReset
                 or EActionCommandType.GameReroll;
+
+    private static bool IsOptionalGameStateAction(EActionCommandType action) =>
+        action.ToString()
+            is "GameAddToExclusionSet"
+                or "GameRemoveFromExclusionSet"
+                or "GameSetNextHourSpawnContext";
 
     private static ResolvedImpactValue ResolveValue(
         CombatSimFrame frame,
