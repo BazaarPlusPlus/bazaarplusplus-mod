@@ -22,18 +22,21 @@ internal static class NativeAssetLoaderInvocation
     )
     {
         arguments = Array.Empty<object?>();
-        if (method == null || firstArgument == null)
+        if (
+            method == null
+            || firstArgument == null
+            || !SupportsSignature(method, firstArgument.GetType())
+        )
+        {
             return false;
+        }
 
         var parameters = method.GetParameters();
-        if (parameters.Length == 1 && Accepts(parameters[0], firstArgument))
+        if (parameters.Length == 1)
         {
             arguments = [firstArgument];
             return true;
         }
-
-        if (parameters.Length != 2 || !Accepts(parameters[0], firstArgument))
-            return false;
 
         if (parameters[1].ParameterType == typeof(bool))
         {
@@ -41,15 +44,10 @@ internal static class NativeAssetLoaderInvocation
             return true;
         }
 
-        var scopeType = Nullable.GetUnderlyingType(parameters[1].ParameterType);
-        if (
-            !parameters[1].IsOptional
-            || scopeType?.IsEnum != true
-            || !string.Equals(scopeType.Name, AssetScopeTypeName, StringComparison.Ordinal)
-        )
-        {
+        if (!IsOptionalAssetScope(parameters[1]))
             return false;
-        }
+
+        var scopeType = Nullable.GetUnderlyingType(parameters[1].ParameterType)!;
 
         var scope = scopeIntent switch
         {
@@ -65,6 +63,30 @@ internal static class NativeAssetLoaderInvocation
         return true;
     }
 
-    private static bool Accepts(ParameterInfo parameter, object value) =>
-        parameter.ParameterType.IsInstanceOfType(value);
+    internal static bool SupportsSignature(MethodInfo? method, Type firstArgumentType)
+    {
+        if (method == null || firstArgumentType == null)
+            return false;
+
+        var parameters = method.GetParameters();
+        if (
+            parameters.Length is not (1 or 2)
+            || !parameters[0].ParameterType.IsAssignableFrom(firstArgumentType)
+        )
+        {
+            return false;
+        }
+
+        return parameters.Length == 1
+            || parameters[1].ParameterType == typeof(bool)
+            || IsOptionalAssetScope(parameters[1]);
+    }
+
+    private static bool IsOptionalAssetScope(ParameterInfo parameter)
+    {
+        var scopeType = Nullable.GetUnderlyingType(parameter.ParameterType);
+        return parameter.IsOptional
+            && scopeType?.IsEnum == true
+            && string.Equals(scopeType.Name, AssetScopeTypeName, StringComparison.Ordinal);
+    }
 }

@@ -41,6 +41,10 @@ public sealed class NativeAssetLoadingArchitectureTests
             File.ReadAllText(globalLoaderPath)
         );
         Assert.Contains(
+            "NativeAssetLoaderInvocation.SupportsSignature",
+            File.ReadAllText(globalLoaderPath)
+        );
+        Assert.Contains(
             "NativeAssetLoaderInvocation.TryBuildArguments",
             File.ReadAllText(cardPreviewLoaderPath)
         );

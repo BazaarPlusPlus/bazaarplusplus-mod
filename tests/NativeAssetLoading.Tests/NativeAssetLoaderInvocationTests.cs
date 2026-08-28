@@ -3,7 +3,7 @@ using System.Reflection;
 using BazaarPlusPlus.GameInterop.AssetLoading;
 using Xunit;
 
-namespace NativeCardPreviewHost.Tests;
+namespace NativeAssetLoading.Tests;
 
 public sealed class NativeAssetLoaderInvocationTests
 {
@@ -97,6 +97,17 @@ public sealed class NativeAssetLoaderInvocationTests
 
         Assert.False(supported);
         Assert.Empty(arguments);
+    }
+
+    [Fact]
+    public void Signature_filter_rejects_an_unknown_overload_before_selection()
+    {
+        var supported = NativeAssetLoaderInvocation.SupportsSignature(
+            RequiredMethod(nameof(InstantiateUnknown)),
+            typeof(FakeAssetReference)
+        );
+
+        Assert.False(supported);
     }
 
     private static MethodInfo RequiredMethod(string name) =>

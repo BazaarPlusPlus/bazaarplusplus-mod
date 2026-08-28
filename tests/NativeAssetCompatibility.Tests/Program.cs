@@ -182,7 +182,7 @@ RequireAbsent(
     ]
 );
 
-Console.WriteLine("Native card preview compatibility checks passed.");
+Console.WriteLine("Native asset compatibility checks passed.");
 
 static string FindRepoRoot()
 {

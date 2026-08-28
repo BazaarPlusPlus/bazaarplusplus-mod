@@ -16,6 +16,7 @@
     <Compile Include="../AsyncLoadCache.Tests/*.cs" />
     <Compile Include="../GraphicsUpscaling.Tests/*.cs" />
     <Compile Include="../MusicNoteLetterMath.Tests/*.cs" />
+    <Compile Include="../NativeAssetLoading.Tests/*.cs" />
     <Compile Include="../NativeCardPreviewHost.Tests/*.cs" />
     <Compile Include="../RemoteEmbeddedCatalog.Tests/*.cs" />
 

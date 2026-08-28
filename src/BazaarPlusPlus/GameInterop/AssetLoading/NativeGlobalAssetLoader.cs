@@ -109,10 +109,7 @@ internal static class NativeGlobalAssetLoader
                 && method.GetGenericArguments().Length == 1
             )
             .Where(method =>
-            {
-                var parameters = method.GetParameters();
-                return parameters.Length is 1 or 2
-                    && parameters[0].ParameterType.IsAssignableFrom(firstParameterType);
-            })
+                NativeAssetLoaderInvocation.SupportsSignature(method, firstParameterType)
+            )
             .FirstOrDefault();
 }
