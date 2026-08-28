@@ -20,6 +20,7 @@ TestStoreCreationIsDeferredUntilStart();
 TestStartFailureRollsBackOwnedStoreAndSubscriptions();
 TestRestoredRunResumesOnceAndDifferentRunAbandonsBeforeStart();
 TestPvpManifestAttachesBeforeEventAndCheckpoint(capturedLogs);
+TestReusedTerminalRunIdGetsIndependentLocalIdentity(capturedLogs);
 TestCapturedHandlerCannotCrossStopBoundary();
 TestInterruptedRunResumesOrAbandonsByStableRunId();
 TestDeferredCompletionWaitsForDrainAndStopFailurePreservesActiveRun(capturedLogs);
@@ -252,6 +253,64 @@ static void TestPvpManifestAttachesBeforeEventAndCheckpoint(List<LogEventArgs> c
         ),
         "RunLogging handlers must not leak storage exceptions to the event bus."
     );
+    fixture.Module.Stop();
+}
+
+static void TestReusedTerminalRunIdGetsIndependentLocalIdentity(List<LogEventArgs> capturedLogs)
+{
+    capturedLogs.Clear();
+    const string serverRunId = "reused-terminal-run";
+    var fixture = new Fixture();
+    fixture.Store.CollisionServerRunId = serverRunId;
+    fixture.Module.Start();
+
+    fixture.Activate(serverRunId);
+
+    var localRunId = fixture.Store.ActiveState?.RunId;
+    Assert(
+        localRunId != null
+            && localRunId != serverRunId
+            && RunLogRunIdentity.MatchesServerRunId(localRunId, serverRunId),
+        "A reused terminal server run id must receive a distinct local identity."
+    );
+    Assert(
+        fixture.Context.CurrentServerRunId == localRunId,
+        "The effective local identity must flow to replay and screenshot capture."
+    );
+    Assert(
+        fixture.Store.Events.Single().RunId == localRunId,
+        "The recovered run_started event must belong to the distinct local run."
+    );
+    Assert(
+        capturedLogs.Any(log =>
+            log.Data?.ToString()?.Contains("event=run_logging.run.id_collision_recovered") == true
+        ),
+        "Recovering a reused server run id should emit a typed diagnostic."
+    );
+
+    fixture.Store.Calls.Clear();
+    fixture.Activate(serverRunId);
+    Assert(
+        fixture.Store.Abandonments.Count == 0
+            && fixture.Store.Events.Count == 1
+            && fixture.Store.Calls.Count == 0,
+        "Repeated activation of the reused server id must keep the recovered session."
+    );
+
+    var manifest = new PvpBattleManifest
+    {
+        BattleId = "collision-battle",
+        RunId = serverRunId,
+        CombatKind = "PVPCombat",
+        Participants = new PvpBattleParticipants(),
+    };
+    fixture.Bus.Publish(new PvpBattleRecorded { Manifest = manifest });
+    Assert(
+        manifest.RunId == localRunId
+            && fixture.Store.Calls[0] == $"attach:collision-battle:{localRunId}",
+        "A replay carrying the original server id must attach to the recovered local run."
+    );
+
     fixture.Module.Stop();
 }
 
@@ -669,6 +728,7 @@ file sealed class FakeRunLogStore : IRunLogStore, IDisposable
     internal RunLogSessionState? ActiveState { get; private set; }
     internal bool ThrowOnCompleteRun { get; set; }
     internal bool ThrowOnAppendEvent { get; set; }
+    internal string? CollisionServerRunId { get; set; }
     internal int DisposeCount { get; private set; }
 
     public RunLogSessionState? TryResumeActiveRun() => ActiveState;
@@ -676,9 +736,13 @@ file sealed class FakeRunLogStore : IRunLogStore, IDisposable
     public RunLogSessionState CreateRun(RunLogCreateRequest request)
     {
         _calls.Add($"create:{request.RunId}");
+        var effectiveRunId =
+            request.RunId == CollisionServerRunId
+                ? $"{request.RunId}:bpp:0123456789abcdef0123456789abcdef"
+                : request.RunId;
         ActiveState = new RunLogSessionState
         {
-            RunId = request.RunId,
+            RunId = effectiveRunId,
             SchemaVersion = request.SchemaVersion,
             StartedAtUtc = request.StartedAtUtc,
             LastSeenAtUtc = request.StartedAtUtc,

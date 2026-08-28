@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Runtime.ExceptionServices;
 using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Domain.Core.Types;
+using BazaarPlusPlus.GameInterop.AssetLoading;
 using HarmonyLib;
 using TheBazaar.AppFramework;
 using UnityEngine;
@@ -67,9 +68,10 @@ internal sealed class NativeCardPreviewAssetLoader
                 return Failed(template.Id, NativeCardPreviewFailureReason.PreviewTypeUnavailable);
 
             if (
-                !NativeCardPreviewAssetInvocation.TryBuildArguments(
+                !NativeAssetLoaderInvocation.TryBuildArguments(
                     InstantiateAssetMethod,
                     assetReference,
+                    NativeAssetScopeIntent.Current,
                     out var invocationArguments
                 )
             )

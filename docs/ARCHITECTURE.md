@@ -60,6 +60,7 @@ Each of these is consumed by two or more features. Reaching around one to re-imp
 | Seam | Owner | Consumers |
 |---|---|---|
 | Overlay panel lifecycle | `Game/OverlayPanels/OverlayPanelHost.cs` | Collection, History, LiveBuild |
+| Native asset loading compatibility | `GameInterop/AssetLoading/` | Card preview, portraits, replay warmers |
 | Native card preview | `GameInterop/CardPreview/` | Collection, item boards |
 | Native tooltip suppression | `GameInterop/Tooltips/NativeTooltipSuppression` | replay recording, end-of-run capture |
 | Item board rendering | `GameInterop/ItemBoardPreview/` | History, LiveBuild |

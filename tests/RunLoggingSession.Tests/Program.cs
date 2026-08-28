@@ -169,6 +169,58 @@ Assert(
     "Mismatched sessions should be abandoned with the session_mismatch reason."
 );
 
+const string reusedServerRunId = "server-run-reused";
+var collisionStore = new FakeRunLogStore
+{
+    ResumeState = new RunLogSessionState
+    {
+        RunId = $"{reusedServerRunId}:bpp:0123456789abcdef0123456789abcdef",
+        SchemaVersion = 1,
+        StartedAtUtc = now,
+        LastSeenAtUtc = now.AddMinutes(2),
+        LastSeq = 3,
+        Day = 1,
+        Hour = 2,
+    },
+};
+var collisionManager = ctor.Invoke([
+    collisionStore,
+    new Func<DateTimeOffset>(() => now.AddMinutes(20)),
+    null,
+]);
+var collisionSession = Invoke<RunLogSessionState>(
+    managerType,
+    collisionManager,
+    "EnsureActiveSession",
+    [
+        new RunLogCreateRequest
+        {
+            SchemaVersion = 1,
+            RunId = reusedServerRunId,
+            StartedAtUtc = now.AddMinutes(20),
+            Hero = "Dooley",
+            GameMode = "Ranked",
+            Day = 1,
+            Hour = 2,
+        },
+    ]
+);
+Assert(
+    RunLogRunIdentity.MatchesServerRunId(collisionSession.RunId, reusedServerRunId),
+    "A collision-derived local run id should match its reused server run id."
+);
+Assert(
+    !RunLogRunIdentity.MatchesServerRunId(
+        $"{reusedServerRunId}:bpp:not-a-generated-id",
+        reusedServerRunId
+    ),
+    "Only generated collision identities should match by server-run prefix."
+);
+Assert(
+    collisionStore.CreateRunCalls == 0 && collisionStore.MarkRunAbandonedCalls == 0,
+    "A restored collision-derived session should resume without recreation or abandonment."
+);
+
 var checkpointStore = new FakeRunLogStore();
 PlayerStatsSnapshot? currentStats = new PlayerStatsSnapshot
 {

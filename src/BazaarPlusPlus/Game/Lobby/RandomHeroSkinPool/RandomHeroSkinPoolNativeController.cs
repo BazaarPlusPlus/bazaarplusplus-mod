@@ -13,7 +13,7 @@ internal sealed class RandomHeroSkinPoolNativeController : MonoBehaviour
         new();
     private static RandomHeroSkinPoolNativeController? _activeFetchController;
 
-    private readonly Dictionary<string, CosmeticItem> _itemsById = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, RegisteredItem> _itemsById = new(StringComparer.Ordinal);
     private CollectionManager? _collectionManager;
     private BazaarInventoryTypes.ECollectionType _collectionType = BazaarInventoryTypes
         .ECollectionType
@@ -21,6 +21,22 @@ internal sealed class RandomHeroSkinPoolNativeController : MonoBehaviour
     private EHero _hero = EHero.Common;
     private NativePoolInteractionCoordinator<RandomHeroSkinPoolState>? _coordinator;
     private bool _registered;
+
+    private readonly struct RegisteredItem
+    {
+        public RegisteredItem(CosmeticItem view, BazaarSaleItem data, EHero hero)
+        {
+            View = view;
+            Data = data;
+            Hero = hero;
+        }
+
+        public CosmeticItem View { get; }
+
+        public BazaarSaleItem Data { get; }
+
+        public EHero Hero { get; }
+    }
 
     internal readonly struct FetchScope
     {
@@ -117,15 +133,15 @@ internal sealed class RandomHeroSkinPoolNativeController : MonoBehaviour
             controller?._coordinator == null
             || controller._collectionManager == null
             || !controller._collectionManager.GetRandomizeLoadout(controller._hero)
+            || !controller.TryFindRegistration(item, out var registration)
         )
         {
             return;
         }
 
-        var equipableItem = item.EquipableItem;
         if (
-            equipableItem.hero != controller._hero
-            || equipableItem.itemData.CollectionType != controller._collectionType
+            registration.Hero != controller._hero
+            || registration.Data.CollectionType != controller._collectionType
         )
         {
             return;
@@ -133,9 +149,17 @@ internal sealed class RandomHeroSkinPoolNativeController : MonoBehaviour
 
         state = controller._coordinator.IsVisuallySelected(
             poolModeEnabled: true,
-            equipableItem.itemData.CollectionItemID,
+            registration.Data.CollectionItemID,
             nativeSelected: state
         );
+    }
+
+    internal static CollectiblePoolKind CollectionKindOf(CosmeticItem item)
+    {
+        var controller = FindController(item);
+        return controller != null && controller.TryFindRegistration(item, out var registration)
+            ? LobbyLogWriter.CollectionKind(registration.Data.CollectionType)
+            : CollectiblePoolKind.Unknown;
     }
 
     internal static void NotifyRandomizeChanged(EHero hero)
@@ -223,7 +247,7 @@ internal sealed class RandomHeroSkinPoolNativeController : MonoBehaviour
             return;
         }
 
-        _itemsById[data.CollectionItemID] = item;
+        _itemsById[data.CollectionItemID] = new RegisteredItem(item, data, hero);
     }
 
     private void ApplyVisuals()
@@ -234,16 +258,16 @@ internal sealed class RandomHeroSkinPoolNativeController : MonoBehaviour
         var poolModeEnabled = _collectionManager.GetRandomizeLoadout(_hero);
         foreach (var pair in _itemsById)
         {
-            var item = pair.Value;
+            var registration = pair.Value;
+            var item = registration.View;
             if (item == null)
                 continue;
 
-            var equipableItem = item.EquipableItem;
             if (
-                equipableItem.hero != _hero
-                || equipableItem.itemData.CollectionType != _collectionType
+                registration.Hero != _hero
+                || registration.Data.CollectionType != _collectionType
                 || !string.Equals(
-                    equipableItem.itemData.CollectionItemID,
+                    registration.Data.CollectionItemID,
                     pair.Key,
                     StringComparison.Ordinal
                 )
@@ -253,7 +277,7 @@ internal sealed class RandomHeroSkinPoolNativeController : MonoBehaviour
             }
 
             var nativeSelected = _collectionManager.IsCollectibleOfIDEquipped(
-                equipableItem.itemData,
+                registration.Data,
                 _hero
             );
             var selected =
@@ -265,24 +289,27 @@ internal sealed class RandomHeroSkinPoolNativeController : MonoBehaviour
 
     private bool Owns(CosmeticItem item)
     {
-        if (ReferenceEquals(_activeFetchController, this))
-        {
-            var equipableItem = item.EquipableItem;
-            if (
-                equipableItem.hero == _hero
-                && equipableItem.itemData.CollectionType == _collectionType
-            )
-            {
-                return true;
-            }
-        }
-
         foreach (var registered in _itemsById.Values)
         {
-            if (ReferenceEquals(registered, item))
+            if (ReferenceEquals(registered.View, item))
                 return true;
         }
 
+        return false;
+    }
+
+    private bool TryFindRegistration(CosmeticItem item, out RegisteredItem registration)
+    {
+        foreach (var candidate in _itemsById.Values)
+        {
+            if (!ReferenceEquals(candidate.View, item))
+                continue;
+
+            registration = candidate;
+            return true;
+        }
+
+        registration = default;
         return false;
     }
 
