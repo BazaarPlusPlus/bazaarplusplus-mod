@@ -1,11 +1,11 @@
 #nullable enable
 using System.Reflection;
-using BazaarPlusPlus.GameInterop.CardPreview;
+using BazaarPlusPlus.GameInterop.AssetLoading;
 using Xunit;
 
 namespace NativeCardPreviewHost.Tests;
 
-public sealed class NativeCardPreviewAssetInvocationTests
+public sealed class NativeAssetLoaderInvocationTests
 {
     [Fact]
     public async Task Legacy_single_parameter_signature_is_invokable()
@@ -13,9 +13,10 @@ public sealed class NativeCardPreviewAssetInvocationTests
         var method = RequiredMethod(nameof(InstantiateLegacy));
         var assetReference = new FakeAssetReference();
 
-        var supported = NativeCardPreviewAssetInvocation.TryBuildArguments(
+        var supported = NativeAssetLoaderInvocation.TryBuildArguments(
             method,
             assetReference,
+            NativeAssetScopeIntent.Current,
             out var arguments
         );
 
@@ -26,14 +27,15 @@ public sealed class NativeCardPreviewAssetInvocationTests
     }
 
     [Fact]
-    public async Task Optional_asset_scope_signature_uses_native_current_scope_default()
+    public async Task Current_scope_intent_uses_native_default()
     {
         var method = RequiredMethod(nameof(InstantiateScoped));
         var assetReference = new FakeAssetReference();
 
-        var supported = NativeCardPreviewAssetInvocation.TryBuildArguments(
+        var supported = NativeAssetLoaderInvocation.TryBuildArguments(
             method,
             assetReference,
+            NativeAssetScopeIntent.Current,
             out var arguments
         );
 
@@ -47,13 +49,49 @@ public sealed class NativeCardPreviewAssetInvocationTests
     }
 
     [Fact]
+    public async Task Global_scope_intent_passes_global_enum_value()
+    {
+        var method = RequiredMethod(nameof(InstantiateScoped));
+        var assetReference = new FakeAssetReference();
+
+        var supported = NativeAssetLoaderInvocation.TryBuildArguments(
+            method,
+            assetReference,
+            NativeAssetScopeIntent.Global,
+            out var arguments
+        );
+
+        Assert.True(supported);
+        Assert.Equal(AssetScope.Global, arguments[1]);
+        var task = Assert.IsType<Task<InvocationResult>>(method.Invoke(null, arguments));
+        Assert.Equal(AssetScope.Global, (await task).Scope);
+    }
+
+    [Fact]
+    public void Legacy_report_success_flag_is_disabled()
+    {
+        var method = RequiredMethod(nameof(LoadLegacy));
+
+        var supported = NativeAssetLoaderInvocation.TryBuildArguments(
+            method,
+            "address",
+            NativeAssetScopeIntent.Global,
+            out var arguments
+        );
+
+        Assert.True(supported);
+        Assert.Equal(false, arguments[1]);
+    }
+
+    [Fact]
     public void Unknown_second_parameter_is_rejected()
     {
         var method = RequiredMethod(nameof(InstantiateUnknown));
 
-        var supported = NativeCardPreviewAssetInvocation.TryBuildArguments(
+        var supported = NativeAssetLoaderInvocation.TryBuildArguments(
             method,
             new FakeAssetReference(),
+            NativeAssetScopeIntent.Current,
             out var arguments
         );
 
@@ -62,7 +100,7 @@ public sealed class NativeCardPreviewAssetInvocationTests
     }
 
     private static MethodInfo RequiredMethod(string name) =>
-        typeof(NativeCardPreviewAssetInvocationTests).GetMethod(
+        typeof(NativeAssetLoaderInvocationTests).GetMethod(
             name,
             BindingFlags.NonPublic | BindingFlags.Static
         ) ?? throw new InvalidOperationException($"Missing test method {name}.");
@@ -74,6 +112,9 @@ public sealed class NativeCardPreviewAssetInvocationTests
         FakeAssetReference assetReference,
         AssetScope? scope = null
     ) => Task.FromResult(new InvocationResult(assetReference, scope));
+
+    private static Task<object> LoadLegacy(string address, bool reportSuccess = false) =>
+        Task.FromResult<object>(address);
 
     private static Task<object> InstantiateUnknown(
         FakeAssetReference assetReference,

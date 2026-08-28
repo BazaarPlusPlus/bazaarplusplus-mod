@@ -9,7 +9,6 @@ internal static class NativeGlobalAssetLoader
 {
     private const string LoadByAddressMethodName = "LoadAssetAsyncByAddress";
     private const string LoadByReferenceMethodName = "LoadAssetAsyncByReference";
-    private const string GlobalScopeName = "Global";
     private const string InRunScopeName = "InRun";
 
     private static readonly MethodInfo? LoadByAddressMethod = ResolveGenericMethod(
@@ -70,9 +69,17 @@ internal static class NativeGlobalAssetLoader
         if (method == null)
             throw new MissingMethodException(typeof(AssetLoader).FullName, methodName);
 
-        var arguments = BuildArguments(method, firstArgument);
-        if (arguments == null)
+        if (
+            !NativeAssetLoaderInvocation.TryBuildArguments(
+                method,
+                firstArgument,
+                NativeAssetScopeIntent.Global,
+                out var arguments
+            )
+        )
+        {
             throw new MissingMethodException(typeof(AssetLoader).FullName, methodName);
+        }
 
         try
         {
@@ -108,26 +115,4 @@ internal static class NativeGlobalAssetLoader
                     && parameters[0].ParameterType.IsAssignableFrom(firstParameterType);
             })
             .FirstOrDefault();
-
-    private static object?[]? BuildArguments(MethodInfo method, object firstArgument)
-    {
-        var parameters = method.GetParameters();
-        if (parameters.Length == 1)
-            return [firstArgument];
-        if (parameters.Length != 2)
-            return null;
-
-        var secondParameterType = parameters[1].ParameterType;
-        var scopeType = Nullable.GetUnderlyingType(secondParameterType);
-        if (scopeType?.IsEnum == true)
-        {
-            var globalScope = Enum.Parse(scopeType, GlobalScopeName, ignoreCase: false);
-            return [firstArgument, globalScope];
-        }
-
-        if (secondParameterType == typeof(bool))
-            return [firstArgument, false];
-
-        return null;
-    }
 }
