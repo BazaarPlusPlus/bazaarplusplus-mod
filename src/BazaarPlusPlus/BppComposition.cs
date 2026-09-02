@@ -45,7 +45,6 @@ using BazaarPlusPlus.Patches.PostCombatImpact;
 using BazaarPlusPlus.Patches.Tooltips;
 using BazaarPlusPlus.Storage.Paths;
 using BepInEx.Configuration;
-using BepInEx.Logging;
 
 namespace BazaarPlusPlus;
 
@@ -97,13 +96,9 @@ internal sealed class BppComposition : IDisposable
     public BppMountableRegistry Mountables => _mountables;
     public SettingsDockEntryRegistry SettingsDockRegistry => _settingsDockRegistry;
     public BppPatchFeatures PatchFeatures => _patchFeatures;
-    public ModApiSession? ModApiSession => _modApiSessionRef;
-    public BazaarDbLinkClient? AccountLinkClient => _accountLinkClientRef;
 
-    public BppComposition(ManualLogSource logger, ConfigFile configFile, IGameBuildInfo gameBuild)
+    public BppComposition(ConfigFile configFile, IGameBuildInfo gameBuild)
     {
-        if (logger == null)
-            throw new ArgumentNullException(nameof(logger));
         if (configFile == null)
             throw new ArgumentNullException(nameof(configFile));
         if (gameBuild == null)
@@ -121,8 +116,7 @@ internal sealed class BppComposition : IDisposable
             _gameStateProbe,
             _encounterStateProbe,
             _runSnapshotProbe,
-            gameBuild,
-            logger
+            gameBuild
         );
 
         _runLifecycle = new RunLifecycleModule(_eventBus, _gameStateProbe, _runContext);

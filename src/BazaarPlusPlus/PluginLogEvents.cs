@@ -71,6 +71,11 @@ internal enum PluginFeatureId
     CombatStatusBar,
     VoiceSubtitlesInterop,
     VoiceSubtitles,
+    BazaarAgentCombatSummary,
+    PostCombatImpact,
+    Supporters,
+    RunLogging,
+    BundleSeal,
 }
 
 [BppLogEventSource]

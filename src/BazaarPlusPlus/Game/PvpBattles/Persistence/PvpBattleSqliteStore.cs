@@ -321,19 +321,6 @@ internal sealed class PvpBattleSqliteStore : SqliteStoreBase
         return ReadManifest(reader);
     }
 
-    public void Delete(string battleId)
-    {
-        if (string.IsNullOrWhiteSpace(battleId))
-            return;
-
-        using var connection = OpenConnection();
-        using var command = CreateCommand(connection);
-        command.CommandText =
-            $"DELETE FROM {RunLogSchema.BattlesTableName} WHERE battle_id = $battleId;";
-        command.Parameters.AddWithValue("$battleId", battleId);
-        command.ExecuteNonQuery();
-    }
-
     public void AttachToRun(string battleId, string runId)
     {
         if (string.IsNullOrWhiteSpace(battleId) || string.IsNullOrWhiteSpace(runId))
@@ -357,24 +344,6 @@ internal sealed class PvpBattleSqliteStore : SqliteStoreBase
         command.Parameters.AddWithValue("$battleId", battleId);
         command.Parameters.AddWithValue("$runId", runId);
         command.ExecuteNonQuery();
-    }
-
-    public IEnumerable<string> ListBattleIds()
-    {
-        using var connection = OpenConnection();
-        using var command = CreateCommand(connection);
-        command.CommandText = $"""
-            SELECT battle_id
-            FROM {RunLogSchema.BattlesTableName}
-            WHERE source = 'LOCAL'
-            ORDER BY recorded_at_utc DESC, battle_id DESC;
-            """;
-
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
-        {
-            yield return reader.GetString(0);
-        }
     }
 
     public IReadOnlyList<ReplayPayloadMaintenanceRecord> ListReplayMaintenanceInventory()

@@ -13,6 +13,10 @@ internal sealed class ItemBoardPreviewSurface : IDisposable
     private readonly ItemBoardPreviewGenerationGuard _generation = new();
     private readonly List<ActiveCard> _active = new();
 
+    // GetWorldCorners fills a caller-owned array; these layout/hover passes run per frame on
+    // the main thread and never nest, so one buffer serves them all.
+    private readonly Vector3[] _cornerBuffer = new Vector3[4];
+
     private ItemBoardPreviewOptions _options = new();
     private CancellationTokenSource? _loadCancellation;
     private GameObject? _root;
@@ -613,7 +617,7 @@ internal sealed class ItemBoardPreviewSurface : IDisposable
         if (_boardRect == null || _active.Count == 0)
             return;
 
-        var corners = new Vector3[4];
+        var corners = _cornerBuffer;
         var laid = new List<(Transform card, float frameLeft, float frameWidth)>();
         foreach (var card in _active)
         {
@@ -649,7 +653,7 @@ internal sealed class ItemBoardPreviewSurface : IDisposable
         if (_active.Count == 0)
             return;
 
-        var corners = new Vector3[4];
+        var corners = _cornerBuffer;
         foreach (var card in _active)
         {
             var root = card.Session.Root;
@@ -712,7 +716,7 @@ internal sealed class ItemBoardPreviewSurface : IDisposable
 
     private INativeCardPreviewSession? FindHoveredSession(Vector2 mousePixels)
     {
-        var corners = new Vector3[4];
+        var corners = _cornerBuffer;
         foreach (var card in _active)
         {
             var root = card.Session.Root;

@@ -36,7 +36,7 @@ internal sealed class BppItemBoardPreview : IDisposable
         var plannedBoard = BppItemBoardSlotPlanner.Plan(board);
         return _surface.Render(
             BppItemBoardPreviewMapper.Map(plannedBoard),
-            ItemBoardPreviewOptionsForwarder.ForSurface(_options),
+            _options,
             plannedBoard.Signature,
             onPhase,
             onComplete

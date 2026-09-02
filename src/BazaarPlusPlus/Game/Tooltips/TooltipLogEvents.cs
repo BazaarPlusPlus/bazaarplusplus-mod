@@ -55,12 +55,6 @@ internal enum TooltipPreviewRefreshMode
     Upgrade,
 }
 
-internal enum TooltipCardPreviewOperation
-{
-    InvokeHover,
-    InvokeHoverOut,
-}
-
 internal enum TooltipEncounterProbe
 {
     Encounter,

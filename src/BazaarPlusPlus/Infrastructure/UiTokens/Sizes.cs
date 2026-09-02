@@ -13,7 +13,6 @@ internal static class Sizes
     public const float HistorySelectorRowMinHeight = 270f;
     public const float RunsColumnWidthPercent = 52f;
     public const float PreviewHeightPercent = 33f;
-    public const float FooterHeight = 56f;
     public const float SectionTitleHeight = 32f;
     public const float ChipMinWidth = 86f;
     public const float ChipHeight = 32f;
@@ -37,28 +36,19 @@ internal static class Sizes
     public const float CollectionSearchRowHeight = 36f;
     public const float CollectionScrollShadowHeight = 18f;
     public const int SourceChipsPerRow = 8;
-    public const float SourceChipIconRatio = 48f / 56f;
     public const float SourceChipMinSize = 40f;
     public const float ButtonStandardHeight = 32f;
     public const float ButtonCompactHeight = 24f;
     public const float ButtonFooterHeight = 36f;
-    public const float RunsTabWidth = 72f;
     public const float CollectionSortActiveWidth = 76f;
     public const float CollectionSortInactiveWidth = 64f;
     public const float CollectionSortEnglishActiveWidth = 84f;
     public const float CollectionSortEnglishInactiveWidth = 56f;
     public const float CollectionSortIconSize = 14f;
     public const float CollectionSizeChipWidth = 72f;
-    public const float CollectionSearchButtonSize = ButtonStandardHeight;
-    public const float CollectionSearchIconSize = 18f;
     public const float CollectionCloseButtonSize = 36f;
     public const float CollectionCloseIconSize = 18f;
-    public const float GhostAllButtonWidth = 70f;
-    public const float GhostFilterButtonWidth = 78f;
     public const float ServerHealthButtonWidth = 108f;
-    public const float DeleteButtonWidth = 130f;
-    public const float ReplayButtonWidth = 140f;
-    public const float RecordAndReplayButtonWidth = 190f;
     public const float CloseButtonWidth = 96f;
     public const float StatusHeight = 24f;
     public const float StatusMaxWidth = 220f;
@@ -73,7 +63,6 @@ internal static class Sizes
     public const float LiveBuildRecommendationStatusMaxHeight = 90f;
     public const float LiveBuildRowEmptyMaxHeight = 58f;
     public const float TagFacetChipMaxWidth = 156f;
-    public const float FacetModeToggleWidth = 52f;
     public const float FacetModeToggleHeight = 20f;
     public const int FacetModeFontSize = 13;
     public const float CollectionTabToggleWidth = 96f;
@@ -98,7 +87,6 @@ internal static class Sizes
     public const float BattleRankPillMinWidth = 68f;
     public const float BattleRankPillWidth = 80f;
     public const float DayBubbleSize = 40f;
-    public const float EliminatedNoticeHeight = 34f;
     public const float CombatStatusBarHeight = 60f;
 
     public const int FontTiny = 10;

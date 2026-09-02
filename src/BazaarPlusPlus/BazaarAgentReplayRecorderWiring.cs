@@ -38,7 +38,7 @@ internal static class BazaarAgentReplayRecorderWiring
                     expectedBattleId
                 ),
             tryContinueReplay: () => TryContinueReplay(runtimeAccessor()),
-            getReplayPhase: () => GetReplayPhase(runtimeAccessor(), services)
+            getReplayPhase: () => GetReplayPhase(runtimeAccessor())
         );
     }
 
@@ -50,7 +50,7 @@ internal static class BazaarAgentReplayRecorderWiring
         string? expectedBattleId
     )
     {
-        PrewarmRecordingOnce(services);
+        PrewarmRecordingOnce();
 
         if (runtime == null)
             return BppReplayControlResult.Unavailable("Combat replay runtime is unavailable.");
@@ -162,12 +162,9 @@ internal static class BazaarAgentReplayRecorderWiring
         return BppReplayControlResult.Accepted(runtime.ActiveBattleId);
     }
 
-    private static BppReplayPhaseSnapshot GetReplayPhase(
-        CombatReplayRuntime? runtime,
-        IBppServices services
-    )
+    private static BppReplayPhaseSnapshot GetReplayPhase(CombatReplayRuntime? runtime)
     {
-        PrewarmRecordingOnce(services);
+        PrewarmRecordingOnce();
 
         if (runtime == null)
             return new BppReplayPhaseSnapshot(BppReplayPhase.None, null);
@@ -188,12 +185,11 @@ internal static class BazaarAgentReplayRecorderWiring
 
     // Probe the platform backend the first time the host touches the facade. This facade is called
     // on Unity's main thread, which is mandatory for the first native-plugin load.
-    private static void PrewarmRecordingOnce(IBppServices services)
+    private static void PrewarmRecordingOnce()
     {
         if (Interlocked.Exchange(ref _recordingPrewarmKicked, 1) != 0)
             return;
 
-        _ = services;
         switch (ReplayVideoBackendPolicy.Current)
         {
             case ReplayVideoBackend.MacNative:

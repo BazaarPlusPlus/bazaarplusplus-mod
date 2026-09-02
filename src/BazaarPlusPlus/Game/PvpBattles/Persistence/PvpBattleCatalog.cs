@@ -21,11 +21,6 @@ internal sealed class PvpBattleCatalog : IPvpBattleCatalog
         _store.Save(manifest);
     }
 
-    public void Delete(string battleId)
-    {
-        _store.Delete(battleId);
-    }
-
     public void AttachToRun(string battleId, string runId)
     {
         _store.AttachToRun(battleId, runId);
@@ -34,11 +29,6 @@ internal sealed class PvpBattleCatalog : IPvpBattleCatalog
     public PvpBattleManifest? TryLoad(string battleId)
     {
         return _store.TryLoad(battleId);
-    }
-
-    public IEnumerable<string> ListBattleIds()
-    {
-        return _store.ListBattleIds();
     }
 
     public IReadOnlyList<ReplayPayloadMaintenanceRecord> ListReplayMaintenanceInventory()

@@ -67,39 +67,11 @@ static void TestNativeGameFontSelection()
 static void TestBilingualItemNamePresentation()
 {
     Assert(
-        BilingualItemNamePresentation.TryBuildSubtitle(
-            "Lighter",
-            "打火机",
-            enabled: true,
-            isSupportedCard: true
-        ) == "打火机",
+        BilingualItemNamePresentation.TryBuildSubtitle("Lighter", "打火机") == "打火机",
         "Enabled item tooltips should expose the trimmed translated title."
     );
     Assert(
-        BilingualItemNamePresentation.TryBuildSubtitle(
-            "Lighter",
-            "打火机",
-            enabled: false,
-            isSupportedCard: true
-        ) == null,
-        "Disabled bilingual names should preserve the native title."
-    );
-    Assert(
-        BilingualItemNamePresentation.TryBuildSubtitle(
-            "Lighter",
-            "打火机",
-            enabled: true,
-            isSupportedCard: false
-        ) == null,
-        "Skill and encounter tooltips should not receive item subtitles."
-    );
-    Assert(
-        BilingualItemNamePresentation.TryBuildSubtitle(
-            "打火机",
-            "Lighter",
-            enabled: true,
-            isSupportedCard: true
-        ) == "Lighter",
+        BilingualItemNamePresentation.TryBuildSubtitle("打火机", "Lighter") == "Lighter",
         "Chinese clients should expose the authored English title."
     );
 }

@@ -235,15 +235,6 @@ Assert(
     "Enchant preview must not append into the game's native passive-tooltip string."
 );
 
-Assert(
-    BppTooltipSectionRenderPatch.HasNativeContent(passiveText: "", questGroupCount: 1),
-    "Quest rows should count as native content and keep the divider above enchant previews."
-);
-Assert(
-    !BppTooltipSectionRenderPatch.HasNativeContent(passiveText: "", questGroupCount: 0),
-    "An otherwise empty native block should not add a divider above enchant previews."
-);
-
 var questSectionLayout = BppTooltipSectionRenderPatch.ResolveSectionLayout(
     passiveText: "",
     questGroupCount: 1

@@ -15,6 +15,9 @@ internal sealed class OverlayPanelHost : MonoBehaviour
     private readonly OverlayLifecycleCore _core = new();
     private readonly OverlayPanelHostLogState _logState = new();
     private readonly List<OverlayPanelRegistration> _registrations = new();
+    private int _sceneTokenHandle;
+    private bool _sceneTokenLoaded;
+    private string _sceneToken = string.Empty;
 
     public IOverlayPanelHandle Register(OverlayPanelRegistration registration)
     {
@@ -45,11 +48,9 @@ internal sealed class OverlayPanelHost : MonoBehaviour
         {
             _logState.ExecuteTick(
                 registration.PanelId,
-                () =>
-                    registration.Tick(
-                        dt,
-                        string.Equals(registration.PanelId, openPanelId, StringComparison.Ordinal)
-                    )
+                registration.Tick,
+                dt,
+                string.Equals(registration.PanelId, openPanelId, StringComparison.Ordinal)
             );
         }
     }
@@ -127,8 +128,22 @@ internal sealed class OverlayPanelHost : MonoBehaviour
     private bool ReadIsInCombat() =>
         _logState.ReadIsInCombat(static () => TheBazaar.Data.IsInCombat);
 
-    private static string GetSceneToken(Scene scene) =>
-        $"{scene.name}|{scene.path}|{scene.buildIndex}|{scene.isLoaded}";
+    // name/path/buildIndex are fixed for a given scene handle, so the token string is rebuilt
+    // only when the active scene (or its loaded flag) actually changes.
+    private string GetSceneToken(Scene scene)
+    {
+        if (
+            _sceneToken.Length != 0
+            && _sceneTokenHandle == scene.handle
+            && _sceneTokenLoaded == scene.isLoaded
+        )
+            return _sceneToken;
+
+        _sceneTokenHandle = scene.handle;
+        _sceneTokenLoaded = scene.isLoaded;
+        _sceneToken = $"{scene.name}|{scene.path}|{scene.buildIndex}|{scene.isLoaded}";
+        return _sceneToken;
+    }
 
     private sealed class PanelHandle : IOverlayPanelHandle
     {

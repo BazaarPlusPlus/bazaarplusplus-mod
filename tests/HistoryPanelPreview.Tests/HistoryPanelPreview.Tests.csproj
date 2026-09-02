@@ -73,10 +73,6 @@
       Link="ItemBoardPreviewOptions.cs"
     />
     <Compile
-      Include="../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/ItemBoardPreviewOptionsForwarder.cs"
-      Link="ItemBoardPreviewOptionsForwarder.cs"
-    />
-    <Compile
       Include="../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/ItemBoardSocketLayout.cs"
       Link="ItemBoardSocketLayout.cs"
     />

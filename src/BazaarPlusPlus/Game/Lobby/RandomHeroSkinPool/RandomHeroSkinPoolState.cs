@@ -14,8 +14,6 @@ internal sealed class RandomHeroSkinPoolState : SelectionPoolState<RandomHeroSki
             availableParamName: null
         ) { }
 
-    public IReadOnlyList<string> AvailableSkinIds => AvailableIdsSnapshot;
-
     public IReadOnlyCollection<string> SelectedSkinIds => SelectedIdsSnapshot;
 
     public bool IsSelected(string? skinId) => IsIdSelected(skinId);

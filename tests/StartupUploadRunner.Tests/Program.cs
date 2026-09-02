@@ -12,7 +12,6 @@ using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.ModApi.Clients;
 using BazaarPlusPlus.Storage.BundleQueue;
 using BazaarPlusPlus.Storage.Paths;
-using BepInEx.Logging;
 using Microsoft.Data.Sqlite;
 
 Assert(
@@ -440,7 +439,6 @@ internal sealed class TestServices(IPathProvider paths) : IBppServices
     public IEncounterStateProbe EncounterState => null!;
     public IRunSnapshotProbe RunSnapshot => null!;
     public IGameBuildInfo GameBuild => new TestBuild();
-    public ManualLogSource Logger => null!;
 }
 
 internal sealed class TestBuild : IGameBuildInfo

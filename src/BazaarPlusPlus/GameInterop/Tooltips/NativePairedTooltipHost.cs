@@ -502,7 +502,6 @@ internal sealed class NativePairedTooltipSession
         return new PlacementResult(
             positioned: true,
             side: side,
-            contentWidth: _currentContentWidth,
             overflowed: NativePairedTooltipPlacementMath.Overflows(
                 side,
                 primaryBounds,
