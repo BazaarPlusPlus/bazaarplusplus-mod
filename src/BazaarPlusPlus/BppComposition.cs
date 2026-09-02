@@ -18,7 +18,6 @@ using BazaarPlusPlus.Game.LegendaryPosition;
 using BazaarPlusPlus.Game.LiveBuildPanel;
 using BazaarPlusPlus.Game.LiveBuildPanel.Recommendations;
 using BazaarPlusPlus.Game.Lobby;
-using BazaarPlusPlus.Game.MusicNotes;
 using BazaarPlusPlus.Game.NameOverride;
 using BazaarPlusPlus.Game.OverlayPanels;
 using BazaarPlusPlus.Game.PostCombatImpact;
@@ -238,7 +237,6 @@ internal sealed class BppComposition : IDisposable
             new ComponentMount<CombatReplayVideoRecorder>((c, s) => c.Initialize(s))
         );
         _mountables.Register(new ComponentMount<CombatStatusBar>((c, s) => c.Initialize(s)));
-        _mountables.Register(new ComponentMount<MusicNoteSocketOverlay>());
         // Plugin-lifetime, like _nativeCardPreviewHost: composition does not dispose GameInterop
         // hosts, and the releasable unit is the session the view acquires from it.
         var pairedTooltipHost = new NativePairedTooltipHost();
