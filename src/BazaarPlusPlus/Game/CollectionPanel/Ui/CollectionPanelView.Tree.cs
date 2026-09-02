@@ -409,10 +409,7 @@ internal sealed partial class CollectionPanelView
         if (bounds.width <= strokeWidth * 2f || bounds.height <= strokeWidth * 2f)
             return;
 
-        var radius = Mathf.Min(
-            Radii.Panel - inset,
-            Mathf.Min(bounds.width, bounds.height) * 0.5f
-        );
+        var radius = Mathf.Min(Radii.Panel - inset, Mathf.Min(bounds.width, bounds.height) * 0.5f);
         var painter = context.painter2D;
         painter.lineWidth = strokeWidth;
         painter.lineCap = LineCap.Round;
@@ -481,16 +478,8 @@ internal sealed partial class CollectionPanelView
     {
         var horizontal = Mathf.InverseLerp(bounds.xMin, bounds.xMax, point.x);
         var vertical = Mathf.InverseLerp(bounds.yMin, bounds.yMax, point.y);
-        var top = Color.Lerp(
-            palette.BorderTopLeft,
-            palette.BorderTopRight,
-            horizontal
-        );
-        var bottom = Color.Lerp(
-            palette.BorderBottomLeft,
-            palette.BorderBottomRight,
-            horizontal
-        );
+        var top = Color.Lerp(palette.BorderTopLeft, palette.BorderTopRight, horizontal);
+        var bottom = Color.Lerp(palette.BorderBottomLeft, palette.BorderBottomRight, horizontal);
         return Color.Lerp(top, bottom, vertical);
     }
 
@@ -570,10 +559,7 @@ internal sealed partial class CollectionPanelView
             for (var column = 0; column < columns; column++)
             {
                 var strength = ((column + 1f) / columns) * ((row + 1f) / rows);
-                var color = Colors.WithAlpha(
-                    decoration,
-                    decoration.a * (0.2f + strength * 0.8f)
-                );
+                var color = Colors.WithAlpha(decoration, decoration.a * (0.2f + strength * 0.8f));
                 var x = left + column * spacing;
                 var y = top + row * spacing;
                 mesh.SetNextVertex(
@@ -1039,16 +1025,7 @@ internal sealed partial class CollectionPanelView
         bool card = true,
         CollectionFilterCardPalette? palette = null
     ) =>
-        CreateFilterSection(
-            parent,
-            title,
-            marginTop,
-            out chipRow,
-            out label,
-            out _,
-            card,
-            palette
-        );
+        CreateFilterSection(parent, title, marginTop, out chipRow, out label, out _, card, palette);
 
     private static VisualElement CreateFilterSection(
         VisualElement parent,
