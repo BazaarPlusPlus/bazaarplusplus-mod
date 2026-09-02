@@ -12,6 +12,10 @@
       Include="../../build/RemoteEmbeddedDataFetcher/RemoteEmbeddedDataFetch.cs"
       Link="RemoteEmbeddedDataFetch.cs"
     />
+    <Compile
+      Include="../../build/RemoteEmbeddedDataFetcher/RemoteEmbeddedDataHttpClient.cs"
+      Link="RemoteEmbeddedDataHttpClient.cs"
+    />
     <Compile Include="Program.cs" />
   </ItemGroup>
 </Project>

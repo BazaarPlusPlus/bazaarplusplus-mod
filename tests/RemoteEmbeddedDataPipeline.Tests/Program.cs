@@ -6,6 +6,11 @@ using System.Text;
 using BazaarPlusPlus.RemoteEmbeddedDataFetcher;
 
 await TestFetchValidatesStatusLengthAndJsonAndCleansTemporaryFiles();
+await TestFetchRetriesTransientTransportFailure();
+await TestConnectionsRotateAcrossResolvedAddresses();
+await TestFetchRetriesTransientHttpStatus();
+await TestFetchStopsAfterBoundedTransientRetries();
+await TestFetchDoesNotRetryPermanentHttpStatus();
 TestSeedSetPromotionIsAtomicAcrossFiles();
 await TestMsBuildTargetUsesFetcherHonorsExistingFilesAndPropagatesExitCode();
 await TestFetchDataRejectsBadSchemaWithoutChangingCanonicalSet();
@@ -46,6 +51,167 @@ static async Task TestFetchValidatesStatusLengthAndJsonAndCleansTemporaryFiles()
                 .Any(path => path.EndsWith(".tmp", StringComparison.Ordinal)),
             "Every failed fetch must clean its temporary file."
         );
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task TestFetchRetriesTransientTransportFailure()
+{
+    var root = TemporaryDirectory();
+    try
+    {
+        var destination = Path.Combine(root, "seed.json");
+        using var handler = new TransientThenSuccessHandler("[\"recovered\"]");
+        using var client = new HttpClient(handler);
+
+        await RemoteEmbeddedDataFetch.FetchAsync(
+            client,
+            new RemoteEmbeddedDataRequest(new Uri("https://example.test/seed"), destination, 5)
+        );
+
+        Equal(2, handler.RequestCount, "A transient transport failure should be retried once.");
+        Equal(
+            "[\"recovered\"]",
+            File.ReadAllText(destination),
+            "The successful retry should publish the downloaded seed."
+        );
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task TestConnectionsRotateAcrossResolvedAddresses()
+{
+    var firstAddress = IPAddress.Parse("192.0.2.10");
+    var secondAddress = IPAddress.Parse("192.0.2.20");
+    var connectedAddresses = new List<IPAddress>();
+    var resolutionCount = 0;
+    var connector = new RotatingDnsConnector(
+        (_, _) =>
+        {
+            resolutionCount++;
+            return Task.FromResult(
+                resolutionCount == 1
+                    ? new[] { firstAddress, secondAddress }
+                    : new[] { secondAddress, firstAddress }
+            );
+        },
+        (address, _, _) =>
+        {
+            connectedAddresses.Add(address);
+            return ValueTask.FromResult<Stream>(new MemoryStream());
+        }
+    );
+    var endpoint = new DnsEndPoint("example.test", 443);
+
+    await using (await connector.ConnectAsync(endpoint, CancellationToken.None)) { }
+    await using (await connector.ConnectAsync(endpoint, CancellationToken.None)) { }
+
+    Equal(2, connectedAddresses.Count, "Two connections should be attempted.");
+    Equal(1, resolutionCount, "An address set should stay stable for one fetch lifecycle.");
+    Equal(
+        firstAddress,
+        connectedAddresses[0],
+        "The first connection should use the first address."
+    );
+    Equal(
+        secondAddress,
+        connectedAddresses[1],
+        "A fresh connection should rotate to the next resolved address."
+    );
+}
+
+static async Task TestFetchRetriesTransientHttpStatus()
+{
+    var root = TemporaryDirectory();
+    try
+    {
+        var destination = Path.Combine(root, "seed.json");
+        using var handler = new TransientStatusThenSuccessHandler("[\"recovered\"]");
+        using var client = new HttpClient(handler);
+
+        await RemoteEmbeddedDataFetch.FetchAsync(
+            client,
+            new RemoteEmbeddedDataRequest(new Uri("https://example.test/seed"), destination, 5)
+        );
+
+        Equal(2, handler.RequestCount, "A service-unavailable response should be retried once.");
+        Equal(
+            "[\"recovered\"]",
+            File.ReadAllText(destination),
+            "The successful status retry should publish the downloaded seed."
+        );
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task TestFetchStopsAfterBoundedTransientRetries()
+{
+    var root = TemporaryDirectory();
+    try
+    {
+        var destination = Path.Combine(root, "seed.json");
+        File.WriteAllText(destination, "[\"old\"]");
+        using var handler = new AlwaysTransientHandler();
+        using var client = new HttpClient(handler);
+
+        try
+        {
+            await RemoteEmbeddedDataFetch.FetchAsync(
+                client,
+                new RemoteEmbeddedDataRequest(new Uri("https://example.test/seed"), destination, 5)
+            );
+            throw new InvalidOperationException("Exhausted transient retries were ignored.");
+        }
+        catch (HttpRequestException) { }
+
+        Equal(5, handler.RequestCount, "Transient retries must stop after five attempts.");
+        Equal(
+            "[\"old\"]",
+            File.ReadAllText(destination),
+            "Exhausted retries must preserve the canonical seed."
+        );
+        False(
+            Directory
+                .EnumerateFiles(root)
+                .Any(path => path.EndsWith(".tmp", StringComparison.Ordinal)),
+            "Exhausted retries must clean every temporary file."
+        );
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
+}
+
+static async Task TestFetchDoesNotRetryPermanentHttpStatus()
+{
+    var root = TemporaryDirectory();
+    try
+    {
+        var destination = Path.Combine(root, "seed.json");
+        using var handler = new CountingStatusHandler(HttpStatusCode.NotFound);
+        using var client = new HttpClient(handler);
+
+        try
+        {
+            await RemoteEmbeddedDataFetch.FetchAsync(
+                client,
+                new RemoteEmbeddedDataRequest(new Uri("https://example.test/seed"), destination, 5)
+            );
+            throw new InvalidOperationException("A permanent HTTP failure was ignored.");
+        }
+        catch (HttpRequestException) { }
+
+        Equal(1, handler.RequestCount, "A permanent HTTP status must fail without retrying.");
     }
     finally
     {
@@ -159,7 +325,10 @@ static async Task TestMsBuildTargetUsesFetcherHonorsExistingFilesAndPropagatesEx
             Equal(0, skipped.ExitCode, "Existing non-force seeds should not access the network.");
         }
 
-        var failureServer = new LoopbackServer("failure", "failure", HttpStatusCode.BadGateway);
+        var failureServer = new LoopbackServer(
+            Enumerable.Repeat("failure", 5),
+            HttpStatusCode.BadGateway
+        );
         await using (failureServer)
         {
             var failedDestination = Path.Combine(root, "failed-data");
@@ -401,6 +570,74 @@ internal sealed class StaticHandler : HttpMessageHandler
         Task.FromResult(new HttpResponseMessage(_status) { Content = new StringContent(_content) });
 }
 
+internal sealed class TransientThenSuccessHandler(string content) : HttpMessageHandler
+{
+    internal int RequestCount { get; private set; }
+
+    protected override Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request,
+        CancellationToken cancellationToken
+    )
+    {
+        RequestCount++;
+        if (RequestCount == 1)
+            throw new HttpRequestException("connection reset");
+
+        return Task.FromResult(
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(content) }
+        );
+    }
+}
+
+internal sealed class TransientStatusThenSuccessHandler(string content) : HttpMessageHandler
+{
+    internal int RequestCount { get; private set; }
+
+    protected override Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request,
+        CancellationToken cancellationToken
+    )
+    {
+        RequestCount++;
+        return Task.FromResult(
+            RequestCount == 1
+                ? new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)
+                : new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(content),
+                }
+        );
+    }
+}
+
+internal sealed class AlwaysTransientHandler : HttpMessageHandler
+{
+    internal int RequestCount { get; private set; }
+
+    protected override Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request,
+        CancellationToken cancellationToken
+    )
+    {
+        RequestCount++;
+        throw new HttpRequestException("connection reset");
+    }
+}
+
+internal sealed class CountingStatusHandler(HttpStatusCode status) : HttpMessageHandler
+{
+    internal int RequestCount { get; private set; }
+
+    protected override Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request,
+        CancellationToken cancellationToken
+    )
+    {
+        RequestCount++;
+        return Task.FromResult(new HttpResponseMessage(status));
+    }
+}
+
 internal sealed class LoopbackServer : IAsyncDisposable
 {
     private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
@@ -413,8 +650,11 @@ internal sealed class LoopbackServer : IAsyncDisposable
         string secondResponse,
         HttpStatusCode status = HttpStatusCode.OK
     )
+        : this(new[] { firstResponse, secondResponse }, status) { }
+
+    internal LoopbackServer(IEnumerable<string> responses, HttpStatusCode status)
     {
-        _responses = new[] { firstResponse, secondResponse };
+        _responses = responses.ToArray();
         _status = status;
         _listener.Start();
         var endpoint = (IPEndPoint)_listener.LocalEndpoint;
