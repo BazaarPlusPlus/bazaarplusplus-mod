@@ -13,7 +13,6 @@ public sealed class BazaarAgentStructuredLoggingTests
             ["agent.snapshot.ready"] = "Info|state:Low:None",
             ["agent.action.failed"] =
                 "Error|request_id:High:Short,action_kind:Low:None,reason_code:Low:None",
-            ["agent.listener.restart_started"] = "Debug|old_port:Low:None,new_port:Low:None",
             ["agent.listener.started"] = "Info|port:Low:None",
             ["agent.listener.recovered"] = "Info|port:Low:None",
             ["agent.listener.degraded"] = "Warning|port:Low:None,reason_code:Low:None",
@@ -21,8 +20,6 @@ public sealed class BazaarAgentStructuredLoggingTests
                 "Warning|reason_code:Low:None,failed_phase_count:Low:None,first_failed_phase:Low:None",
             ["agent.decision_log.append_failed"] =
                 "Error|decision_id:High:Short,run_id:High:Short,request_id:High:Short,reason_code:Low:None",
-            ["agent.context_capture.failed"] =
-                "Error|tick_id:High:None,state:Low:None,reason_code:Low:None",
             ["agent.listener.failed"] = "Error|port:Low:None,reason_code:Low:None",
             ["agent.http_request.failed"] =
                 "Error|request_id:High:Short,route:Low:None,method:Low:None,reason_code:Low:None",
@@ -130,7 +127,6 @@ public sealed class BazaarAgentStructuredLoggingTests
         {
             ["agent.action.failed"] = "request_id",
             ["agent.decision_log.append_failed"] = "decision_id,run_id",
-            ["agent.context_capture.failed"] = "state,reason_code",
             ["agent.listener.degraded"] = "port,reason_code",
             ["agent.listener.stop_degraded"] = "reason_code",
             ["agent.listener.failed"] = "",

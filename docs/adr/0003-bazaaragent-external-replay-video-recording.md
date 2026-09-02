@@ -15,9 +15,9 @@ Once automatic replay exit was removed, the ordinary action loop had no legal wa
 ## Guardrails
 
 - `CombatReplayRuntime.TryContinueReplay` is the only programmatic `ReplayState` exit. It rejects while starting, playing, capturing recap post-roll, or already exiting ([runtime](../../src/BazaarPlusPlus/Game/CombatReplay/CombatReplayRuntime.cs#L763-L807)).
-- The host never calls `ReplayState.Exit()` directly; an architecture test pins the single-exit boundary ([test](../../tests/Architecture.Tests/CoreLayeringTests.cs#L1226-L1272)).
+- The host never calls `ReplayState.Exit()` directly; an architecture test pins the single-exit boundary ([test](../../tests/Architecture.Tests/CoreLayeringTests.cs) — `Optional_BazaarAgent_host_does_not_leak_into_the_main_plugin`).
 - Emit `Continue` only at `FinishedAwaitingContinue` ([context reader](../../src/BazaarPlusPlus.BazaarAgentHost/BazaarAgentGameContextReader.cs#L582-L595)); route it through `BazaarAgentGameBridge.CurrentRecorder.TryContinueReplay`; never add another exit path ([dispatcher](../../src/BazaarPlusPlus.BazaarAgentHost/BazaarAgentGameActionDispatcher.cs#L168-L177)).
-- The additive `Continue` action kind is part of schema `2.2.0` ([contract](../../src/BazaarPlusPlus.BazaarAgent/Contract/BazaarAgentDecision.cs#L9-L29)); validator tests pin availability/staleness behavior ([tests](../../tests/BazaarAgent.Tests/BazaarAgentActionValidatorTests.cs#L503-L522)).
+- The additive `Continue` action kind is part of the decision schema pinned by `BazaarAgentSchema.Version` ([contract](../../src/BazaarPlusPlus.BazaarAgent/Contract/BazaarAgentDecision.cs)); validator tests pin availability/staleness behavior ([tests](../../tests/BazaarAgent.Tests/BazaarAgentActionValidatorTests.cs#L503-L522)).
 - Keep replay transport primitive and policy-free: one recording per battle; batching and concatenation stay external. Mid-playback skipping remains out of scope; phase races fail safely and retry on a later snapshot.
 
 ## Ghost payload perspective contract

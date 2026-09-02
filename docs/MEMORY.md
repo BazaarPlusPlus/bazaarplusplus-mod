@@ -8,7 +8,7 @@ Domain constraints that must stay true in the system.
 
 - MessagePack-serialized DTOs in the Unity/Mono runtime must keep their whole serialized graph `public`.
 - Key game entities (cards, merchants, trainers) by their stable template GUID, never by display name or `ArtKey` substring. [`src/BazaarPlusPlus/GameInterop/Cards/PackageIdentity.cs`]
-- Package-card identity is `EHiddenTag.Package` only, resolved via `PackageIdentity.IsPackage` — never name or `ArtKey` heuristics. Nine call sites across Collection classification and the package-merchant tooltip depend on that single resolver. [`src/BazaarPlusPlus/GameInterop/Cards/PackageIdentity.cs`]
+- Package-card identity is `EHiddenTag.Package` only, resolved via `PackageIdentity.IsPackage` — never name or `ArtKey` heuristics. Collection classification and the package-merchant tooltip depend on that single resolver. [`src/BazaarPlusPlus/GameInterop/Cards/PackageIdentity.cs`]
 - Bump both `RunLogSchema` version constants together when the persisted graph changes; there is no separate upload-payload version. [`src/BazaarPlusPlus.Storage/RunLog/RunLogSchema.cs` | ADR-0007]
 - The mod carries **no play policy**: transport and validation only. All agent strategy lives in the external `bazaarplusplus-agent`. [ADR-0002]
 - The BazaarAgent external contract is v3 — `GET /v3/context` and `POST /v3/actions` are the only decision routes. Wire field names and delta-merge semantics are pinned in `src/BazaarPlusPlus.BazaarAgent/AGENT_README.md`; keep that file in step with the projector. [ADR-0002 | ADR-0003]
@@ -36,9 +36,9 @@ One line each, full record in [adr/](adr/). A line here exists to stop a settled
 
 Facts that take more than one file to derive, and that ARCHITECTURE does not state.
 
-- CollectionPanel source filtering runs off the embedded `collection-sources.json` at `ExpectedSchemaVersion` 4, and the catalog size is pinned by test at 73 sources / 50 merchants / 23 trainers — adding a source means updating that expectation too. [`src/BazaarPlusPlus/Game/CollectionPanel/Sources/CollectionSourceCatalog.cs` | `tests/CollectionSourceFiltering.Tests/Program.cs`]
+- CollectionPanel source filtering runs off the embedded `collection-sources.json` at `ExpectedSchemaVersion` 4, and the catalog size is pinned by the source/merchant/trainer count assertions in `tests/CollectionSourceFiltering.Tests/Program.cs` — adding a source means updating those expectations too. [`src/BazaarPlusPlus/Game/CollectionPanel/Sources/CollectionSourceCatalog.cs` | `tests/CollectionSourceFiltering.Tests/Program.cs`]
 - There is exactly one upload feed and one `BackgroundUploadPump`. Settings rows arm attempts through the `UploadArmRequested` bus event; there is deliberately no static feed registry, and the per-feature upload controllers it replaced are not coming back. [`src/BazaarPlusPlus/Game/Upload/IUploadFeed.cs` | ADR-0006]
-- The cloud backend (uploads, ghost battles, BazaarDB snapshots) lives in the separate `bazaarplusplus-server` repo behind `mod-api-v4.bazaarplusplus.com`. Its behavior is **not** verifiable from this repo — treat server-side claims as unconfirmed until checked there.
+- The cloud backend (uploads, ghost battles, BazaarDB snapshots) lives in the separate `bazaarplusplus-server` repo behind `mod-api-v5.bazaarplusplus.com` (`ModApiUploadDefaults.ApiBaseUrl`). Its behavior is **not** verifiable from this repo — treat server-side claims as unconfirmed until checked there.
 
 ## Patterns
 
@@ -83,4 +83,4 @@ Each of these failed silently, or reported something misleading, at least once.
 - `BackgroundUploadPump.OnDestroy` is a two-point dispose: release arm subscriptions first, dispose the session only after the drain callback. Merging them lets an in-flight `RunAttemptAsync` hit disposed resources. [`src/BazaarPlusPlus/Game/Upload/BackgroundUploadPump.cs` | ADR-0006]
 - `HistoryPanelDependencies`' single ctor stays guard-free direct assignment: scenario capsules construct it with positional nulls as pinned behavior anchors, so adding null guards breaks them at construction. [`src/BazaarPlusPlus/Game/HistoryPanel/HistoryPanelDependencies.cs` | ADR-0004]
 - `run.sh` defaults `DOTNET_SYSTEM_NET_DISABLEIPV6=1`, override-preserving, so unusable advertised IPv6 routes cannot stall build-time downloads. [`run.sh`]
-- Sixteen `*.Tests` directories own no `.csproj`; directory wildcards in three host projects absorb their sources. Deleting or renaming one leaves its wildcard matching zero Compile items instead of failing, so those tests silently stop running. [`tests/PureBehavior.Tests/PureBehavior.Tests.csproj` | `tests/RuntimeIntegration.Tests/RuntimeIntegration.Tests.csproj` | `tests/FeatureLogging.Tests/FeatureLogging.Tests.csproj`]
+- Fifteen `*.Tests` directories own no `.csproj`; directory wildcards in three host projects absorb their sources. Deleting or renaming one leaves its wildcard matching zero Compile items instead of failing, so those tests silently stop running. [`tests/PureBehavior.Tests/PureBehavior.Tests.csproj` | `tests/RuntimeIntegration.Tests/RuntimeIntegration.Tests.csproj` | `tests/FeatureLogging.Tests/FeatureLogging.Tests.csproj`]

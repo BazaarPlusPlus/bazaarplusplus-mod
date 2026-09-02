@@ -172,7 +172,7 @@ internal sealed class BppConfig : IBppConfig
             "Hotkeys",
             "UpgradePreviewActivationMode",
             DefaultUpgradePreviewActivationMode,
-            "How Shift behaves across BazaarPlusPlus preview features. Hold = active only while Shift is held. Toggle = each Shift press switches the upgrade preview and music-note overlay on or off."
+            "How Shift behaves across BazaarPlusPlus preview features. Hold = active only while Shift is held. Toggle = each Shift press switches the upgrade preview on or off."
         );
         ToggleCollectionPanelHotkeyPathConfig = config.Bind(
             "Hotkeys",

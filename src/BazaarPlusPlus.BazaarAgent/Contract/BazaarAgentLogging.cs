@@ -33,7 +33,6 @@ public enum BazaarAgentLogReasonCode
     HttpResponseCloseException,
     RejectedBodyDrainException,
     DecisionLogAppendException,
-    ContextCaptureWriteException,
     ContextBuildException,
     SceneProbeException,
     ClientCacheTypeUnavailable,
@@ -435,31 +434,6 @@ public static class BazaarAgentLogEvents
         DecisionLogReasonCode
     );
 
-    private static readonly BazaarAgentLogFieldDefinition ContextCaptureTickId = new(
-        "tick_id",
-        BazaarAgentLogCardinality.High,
-        BazaarAgentLogCorrelation.None
-    );
-    private static readonly BazaarAgentLogFieldDefinition ContextCaptureState = new(
-        "state",
-        BazaarAgentLogCardinality.Low,
-        BazaarAgentLogCorrelation.None
-    );
-    private static readonly BazaarAgentLogFieldDefinition ContextCaptureReasonCode = new(
-        "reason_code",
-        BazaarAgentLogCardinality.Low,
-        BazaarAgentLogCorrelation.None
-    );
-
-    public static readonly BazaarAgentLogEventDefinition ContextCaptureFailedDefinition = new(
-        BazaarAgentLogSeverity.Error,
-        "agent.context_capture.failed",
-        new BazaarAgentLogStormPolicy(ContextCaptureState, ContextCaptureReasonCode),
-        ContextCaptureTickId,
-        ContextCaptureState,
-        ContextCaptureReasonCode
-    );
-
     private static readonly BazaarAgentLogFieldDefinition ContextDegradedReasonCode = new(
         "reason_code",
         BazaarAgentLogCardinality.Low,
@@ -548,16 +522,6 @@ public static class BazaarAgentLogEvents
         BazaarAgentLogCardinality.Low,
         BazaarAgentLogCorrelation.None
     );
-    private static readonly BazaarAgentLogFieldDefinition ListenerRestartOldPort = new(
-        "old_port",
-        BazaarAgentLogCardinality.Low,
-        BazaarAgentLogCorrelation.None
-    );
-    private static readonly BazaarAgentLogFieldDefinition ListenerRestartNewPort = new(
-        "new_port",
-        BazaarAgentLogCardinality.Low,
-        BazaarAgentLogCorrelation.None
-    );
 
     public static readonly BazaarAgentLogEventDefinition ListenerStartedDefinition = new(
         BazaarAgentLogSeverity.Info,
@@ -578,13 +542,6 @@ public static class BazaarAgentLogEvents
         new BazaarAgentLogStormPolicy(ListenerDegradedPort, ListenerDegradedReasonCode),
         ListenerDegradedPort,
         ListenerDegradedReasonCode
-    );
-
-    public static readonly BazaarAgentLogEventDefinition ListenerRestartStartedDefinition = new(
-        BazaarAgentLogSeverity.Debug,
-        "agent.listener.restart_started",
-        ListenerRestartOldPort,
-        ListenerRestartNewPort
     );
 
     private static readonly BazaarAgentLogFieldDefinition ListenerStopReasonCode = new(
@@ -715,19 +672,6 @@ public static class BazaarAgentLogEvents
             DecisionLogReasonCode.Bind(BazaarAgentLogReasonCode.DecisionLogAppendException)
         );
 
-    public static BazaarAgentLogEvent ContextCaptureFailed(
-        ulong tickId,
-        BazaarAgentRunStateName state,
-        Exception exception
-    ) =>
-        new(
-            ContextCaptureFailedDefinition,
-            exception,
-            ContextCaptureTickId.Bind(tickId),
-            ContextCaptureState.Bind(state),
-            ContextCaptureReasonCode.Bind(BazaarAgentLogReasonCode.ContextCaptureWriteException)
-        );
-
     public static BazaarAgentLogEvent ContextDegraded(Exception exception) =>
         ContextDegraded(BazaarAgentLogReasonCode.ContextBuildException, exception);
 
@@ -775,14 +719,6 @@ public static class BazaarAgentLogEvents
             exception,
             ListenerDegradedPort.Bind(port),
             ListenerDegradedReasonCode.Bind(BazaarAgentLogReasonCode.ListenerStartException)
-        );
-
-    public static BazaarAgentLogEvent ListenerRestartStarted(int oldPort, int newPort) =>
-        new(
-            ListenerRestartStartedDefinition,
-            exception: null,
-            ListenerRestartOldPort.Bind(oldPort),
-            ListenerRestartNewPort.Bind(newPort)
         );
 
     public static BazaarAgentLogEvent ListenerStopDegraded(

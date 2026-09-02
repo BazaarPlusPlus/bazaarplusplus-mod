@@ -21,8 +21,8 @@
 
 **云同步（可选，默认按项说明）**
 
-- run / replay 后台上传到 V4 后端，仅在不处于 live run 时执行。
-- BazaarDB 截图上传默认关闭；启用后终局截图快照推到 V4 后端，由 BazaarDB 队列拉取。
+- run / replay 后台上传到 V5 后端，仅在不处于 live run 时执行。
+- BazaarDB 截图上传默认关闭；启用后终局截图快照推到 V5 后端，由 BazaarDB 队列拉取。
 - Anonymous Mode 可将本地玩家名替换为 `Anonymous`。
 
 **BazaarAgent（外部集成，默认不构建、不安装）**
@@ -72,7 +72,7 @@
 - run 记录、战斗回放与终局截图均保存在本地（SQLite、replay payload、截图文件）。
 - 云同步不携带任何鉴权凭证，且只在非 live run 状态下执行上传扫描。
 - 语音字幕与终局 build 种子由构建管线嵌入，运行时在本地缓存过期后后台刷新。
-- 云端后端（上传、ghost battles、replay 链接、BazaarDB 快照投递）在独立仓库 `bazaarplusplus-server`，部署于 `mod-api-v4.bazaarplusplus.com`；mod 侧 HTTP 客户端在 `src/BazaarPlusPlus.ModApi/`。
+- 云端后端（上传、ghost battles、replay 链接、BazaarDB 快照投递）在独立仓库 `bazaarplusplus-server`，部署于 `mod-api-v5.bazaarplusplus.com`；mod 侧 HTTP 客户端在 `src/BazaarPlusPlus.ModApi/`。
 
 ## 仓库导览
 
