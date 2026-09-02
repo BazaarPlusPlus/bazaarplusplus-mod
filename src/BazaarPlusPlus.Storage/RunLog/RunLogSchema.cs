@@ -24,10 +24,6 @@ public static class RunLogSchema
 
     public static int CurrentSchemaVersion => LocalDatabaseSchemaVersion;
     public static string DatabaseFileName => PathConstants.RunLogDatabaseFileName;
-    public static string RunCheckpointsTableName => RunsTableName;
-    public static string RunStatusTableName => RunsTableName;
-    public static string PvpBattlesTableName => BattlesTableName;
-    public static string GhostBattlesTableName => BattlesTableName;
 
     public static string BootstrapSql =>
         $"""
@@ -244,8 +240,9 @@ public static class RunLogSchema
 
             CREATE INDEX IF NOT EXISTS idx_{RunEventsTableName}_ts_utc
                 ON {RunEventsTableName}(ts_utc);
-            CREATE INDEX IF NOT EXISTS idx_{RunsTableName}_status_last_seen
-                ON {RunsTableName}(status, last_seen_at_utc DESC);
+            DROP INDEX IF EXISTS idx_{RunsTableName}_status_last_seen;
+            CREATE INDEX IF NOT EXISTS idx_{RunsTableName}_completed_last_seen
+                ON {RunsTableName}(completed, last_seen_at_utc DESC);
             CREATE INDEX IF NOT EXISTS idx_{RunsTableName}_started_at_utc
                 ON {RunsTableName}(started_at_utc DESC);
             CREATE INDEX IF NOT EXISTS idx_{BattlesTableName}_run_id_recorded
