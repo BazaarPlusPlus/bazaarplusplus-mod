@@ -9,4 +9,12 @@
   <ItemGroup>
     <ProjectReference Include="../../src/BazaarPlusPlus.Storage/BazaarPlusPlus.Storage.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <None
+      Include="../../src/BazaarPlusPlus.Storage/BazaarPlusPlus.history-database.json"
+      Link="BazaarPlusPlus.history-database.json"
+      CopyToOutputDirectory="PreserveNewest"
+    />
+  </ItemGroup>
 </Project>
