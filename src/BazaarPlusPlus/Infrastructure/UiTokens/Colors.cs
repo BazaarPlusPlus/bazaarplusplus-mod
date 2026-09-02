@@ -87,7 +87,6 @@ internal static class Colors
     // cards scrolled outside the viewport, so any alpha here leaks card edges.
     public static Color CollectionPanelBackground => FromRgb(16, 17, 19, 1f);
     public static Color CollectionFilterCardBackground => FromRgb(22, 24, 28, 1f);
-    public static Color CollectionFilterCardBorder => FromRgb(0, 0, 0, 1f);
 
     // The reference palette belongs only to the control deck. The grid still uses the neutral
     // CollectionFilterCardBackground, so its occlusion behavior remains unchanged.

@@ -22,7 +22,6 @@ using BazaarPlusPlus.Localization;
 using BazaarPlusPlus.Patches;
 using BazaarPlusPlus.Storage.Paths;
 using BepInEx.Configuration;
-using BepInEx.Logging;
 using Xunit;
 
 namespace BazaarPlusPlus.Tests.SettingsDockRegistry;
@@ -92,7 +91,6 @@ public class SettingsDockRegistryTests
         public IEncounterStateProbe EncounterState => null!;
         public IRunSnapshotProbe RunSnapshot => null!;
         public IGameBuildInfo GameBuild => null!;
-        public ManualLogSource Logger => null!;
     }
 
     [Fact]

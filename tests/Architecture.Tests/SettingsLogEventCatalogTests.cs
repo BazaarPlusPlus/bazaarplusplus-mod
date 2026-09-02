@@ -21,8 +21,6 @@ public sealed class SettingsLogEventCatalogTests
             ["combat_status_bar.config.loaded"] = "enabled:Low:None|speed_multiplier:Low:None",
             ["settings.hotkey.degraded"] =
                 "action_id:Low:None|binding_path:High:Hash|reason_code:Low:None",
-            ["settings.hotkey.modifier_disagreement_observed"] =
-                "binding_path:High:Hash|legacy_pressed:Low:None|action_pressed:Low:None",
             ["settings.dock_sprite.degraded"] = "reason_code:Low:None|resource_id:Low:None",
             ["settings.native_section.degraded"] = "stage:Low:None|reason_code:Low:None",
             ["settings.native_section.recovered"] = "stage:Low:None",

@@ -25,7 +25,6 @@ TestSlotPlanner_SelectableShopCentersByTotalSpan();
 TestSlotPlanner_SelectableShopSkipsOverflowRemainder();
 TestPreviewMapper_UsesDisplaySocketAndBoardPrefix();
 TestPreviewMapper_CarriesDisplaySpan();
-TestOptionsForwarder_PreservesSlotGridLayoutMode();
 TestSlotGridGeometry_ResolvesSingleSlot();
 TestSlotGridGeometry_ResolvesMediumSpan();
 TestSlotGridGeometry_ResolvesLargeSpan();
@@ -385,58 +384,6 @@ static void TestPreviewMapper_CarriesDisplaySpan()
 
     Assert(spec.SocketId == EContainerSocketId.Socket_4, "Mapper should preserve display socket.");
     Assert(spec.DisplaySpan == 3, "Mapper should pass the planned display span to the renderer.");
-}
-
-static void TestOptionsForwarder_PreservesSlotGridLayoutMode()
-{
-    Action<NativeCardPreviewFailure> cardPreviewFailureReporter = _ => { };
-    Action<NativeCardPreviewFailure> hoverFailureReporter = _ => { };
-    Action<ItemBoardPreviewFailure> itemBoardFailureReporter = _ => { };
-    var options = new ItemBoardPreviewOptions
-    {
-        Layer = 7,
-        SortingOrder = 8,
-        LayoutMode = ItemBoardPreviewLayoutMode.SlotGrid,
-        ShowHover = false,
-        UseCanvasGroup = true,
-        CardPreviewFailureReporter = cardPreviewFailureReporter,
-        HoverFailureReporter = hoverFailureReporter,
-        ItemBoardFailureReporter = itemBoardFailureReporter,
-        SlotGridHorizontalInsetPixels = 11f,
-        SlotGridVerticalInsetPixels = 12f,
-        SlotGridMaxHeightRatio = 0.75f,
-        SlotGridMaxScale = 0.9f,
-    };
-
-    var forwarded = ItemBoardPreviewOptionsForwarder.ForSurface(options);
-
-    Assert(
-        forwarded.LayoutMode == ItemBoardPreviewLayoutMode.SlotGrid,
-        "Layout mode must forward."
-    );
-    Assert(forwarded.Layer == 7, "Layer must forward.");
-    Assert(forwarded.SortingOrder == 8, "Sorting order must forward.");
-    Assert(!forwarded.ShowHover, "Hover option must forward.");
-    Assert(forwarded.UseCanvasGroup, "CanvasGroup option must forward.");
-    Assert(
-        ReferenceEquals(forwarded.CardPreviewFailureReporter, cardPreviewFailureReporter),
-        "Card-preview failure reporter must forward."
-    );
-    Assert(
-        ReferenceEquals(forwarded.HoverFailureReporter, hoverFailureReporter),
-        "Hover failure reporter must forward."
-    );
-    Assert(
-        ReferenceEquals(forwarded.ItemBoardFailureReporter, itemBoardFailureReporter),
-        "Item-board failure reporter must forward."
-    );
-    Assert(
-        forwarded.SlotGridHorizontalInsetPixels == 11f,
-        "SlotGrid horizontal inset must forward."
-    );
-    Assert(forwarded.SlotGridVerticalInsetPixels == 12f, "SlotGrid vertical inset must forward.");
-    Assert(forwarded.SlotGridMaxHeightRatio == 0.75f, "SlotGrid max height must forward.");
-    Assert(forwarded.SlotGridMaxScale == 0.9f, "SlotGrid max scale must forward.");
 }
 
 static void TestSlotGridGeometry_ResolvesSingleSlot()

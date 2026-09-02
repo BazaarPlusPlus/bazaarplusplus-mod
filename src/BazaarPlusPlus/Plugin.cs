@@ -56,7 +56,7 @@ public class Plugin : BaseUnityPlugin
 
             phase = PluginInitializationPhase.Composition;
             var gameBuild = GameBuildInfoResolver.Resolve();
-            _composition = new BppComposition(Logger, configFile, gameBuild);
+            _composition = new BppComposition(configFile, gameBuild);
 
             var services = _composition.Services;
             var dataRoot = services.Paths.DataRootDirectoryPath;

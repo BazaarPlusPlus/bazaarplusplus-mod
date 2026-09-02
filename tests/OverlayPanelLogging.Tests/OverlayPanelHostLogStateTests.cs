@@ -17,11 +17,21 @@ public sealed class OverlayPanelHostLogStateTests : IDisposable
         var state = new OverlayPanelHostLogState();
         var otherPanelTicks = 0;
 
-        state.ExecuteTick("LiveBuildPanel", () => throw new InvalidOperationException("first"));
-        state.ExecuteTick("LiveBuildPanel", () => throw new InvalidOperationException("second"));
-        state.ExecuteTick("HistoryPanel", () => otherPanelTicks++);
-        state.ExecuteTick("LiveBuildPanel", () => { });
-        state.ExecuteTick("LiveBuildPanel", () => { });
+        state.ExecuteTick(
+            "LiveBuildPanel",
+            (_, _) => throw new InvalidOperationException("first"),
+            0f,
+            false
+        );
+        state.ExecuteTick(
+            "LiveBuildPanel",
+            (_, _) => throw new InvalidOperationException("second"),
+            0f,
+            false
+        );
+        state.ExecuteTick("HistoryPanel", (_, _) => otherPanelTicks++, 0f, false);
+        state.ExecuteTick("LiveBuildPanel", (_, _) => { }, 0f, false);
+        state.ExecuteTick("LiveBuildPanel", (_, _) => { }, 0f, false);
 
         Assert.Equal(1, otherPanelTicks);
         Assert.Equal(
@@ -35,11 +45,16 @@ public sealed class OverlayPanelHostLogStateTests : IDisposable
     public void Unregister_forgets_tick_episode_without_emitting_recovery_Info()
     {
         var state = new OverlayPanelHostLogState();
-        state.ExecuteTick("LiveBuildPanel", () => throw new InvalidOperationException("failure"));
+        state.ExecuteTick(
+            "LiveBuildPanel",
+            (_, _) => throw new InvalidOperationException("failure"),
+            0f,
+            false
+        );
         BppLog.Reset();
 
         state.ForgetPanel("LiveBuildPanel");
-        state.ExecuteTick("LiveBuildPanel", () => { });
+        state.ExecuteTick("LiveBuildPanel", (_, _) => { }, 0f, false);
 
         Assert.Empty(BppLog.Events);
         Assert.Single(BppLog.StormRecoveries);

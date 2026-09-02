@@ -915,14 +915,10 @@ file sealed class FakePvpBattleCatalog(List<string> calls) : IPvpBattleCatalog
 {
     public void Save(PvpBattleManifest manifest) { }
 
-    public void Delete(string battleId) { }
-
     public void AttachToRun(string battleId, string runId) =>
         calls.Add($"attach:{battleId}:{runId}");
 
     public PvpBattleManifest? TryLoad(string battleId) => null;
-
-    public IEnumerable<string> ListBattleIds() => [];
 
     public IReadOnlyList<ReplayPayloadMaintenanceRecord> ListReplayMaintenanceInventory() => [];
 

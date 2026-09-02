@@ -129,6 +129,14 @@ public sealed class PluginLoggingTests
                 PluginFeatureId.VoiceSubtitlesInterop,
             ["BazaarPlusPlus.Game.VoiceSubtitles.VoiceSubtitlesModule"] =
                 PluginFeatureId.VoiceSubtitles,
+            ["BazaarPlusPlus.Game.CombatReplay.BazaarAgentCombatSummaryModule"] =
+                PluginFeatureId.BazaarAgentCombatSummary,
+            ["BazaarPlusPlus.Game.PostCombatImpact.PostCombatImpactModule"] =
+                PluginFeatureId.PostCombatImpact,
+            ["BazaarPlusPlus.Game.Supporters.SupporterCatalogModule"] = PluginFeatureId.Supporters,
+            ["BazaarPlusPlus.Game.RunLogging.RunLoggingModule"] = PluginFeatureId.RunLogging,
+            ["BazaarPlusPlus.Game.BundlePipeline.BundleSealCoordinator"] =
+                PluginFeatureId.BundleSeal,
         };
         foreach (var pair in features)
             Assert.Equal(pair.Value, PluginLogIdentity.FeatureId(pair.Key));

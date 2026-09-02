@@ -11,7 +11,7 @@ internal static class CombatStatusBarSettingsDockEntry
             BppSettingsDockOrder.CombatStatusBar,
             "CombatStatusBar",
             CombatStatusBarSettingsMenuLabel.Resolve,
-            _ => CombatStatusBarFeature.GetEnabledSettingValue(),
+            _ => CombatStatusBarFeature.IsEnabled(),
             (_, enabled) => CombatStatusBarFeature.SetEnabledSettingValue(enabled)
         );
 }

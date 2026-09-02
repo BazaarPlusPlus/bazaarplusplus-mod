@@ -45,7 +45,6 @@ internal sealed partial class CombatStatusBar
     internal static int TotalCombatFrames { get; private set; }
     internal static TimeSpan LastCombatLogicalElapsed { get; private set; }
     internal static bool HasCompletedCombatPlayback { get; private set; }
-    internal static ReadOnlySpan<float> CombatSpeedSteps => SpeedSteps;
 
     internal static void BeginCombatPlayback()
     {
