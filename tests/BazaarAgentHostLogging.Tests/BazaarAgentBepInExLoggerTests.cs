@@ -132,9 +132,11 @@ public sealed class BazaarAgentBepInExLoggerTests
         var adapter = new BazaarAgentBepInExLogger(source);
         var logEvent = severity switch
         {
-            BazaarAgentLogSeverity.Debug => BazaarAgentLogEvents.ListenerRestartStarted(
-                47900,
-                47901
+            BazaarAgentLogSeverity.Debug => BazaarAgentLogEvents.SceneProbeStateChanged(
+                "MainMenu",
+                sceneReady: true,
+                appStateNull: false,
+                profileLoaded: true
             ),
             BazaarAgentLogSeverity.Info => BazaarAgentLogEvents.HostInitialized(),
             BazaarAgentLogSeverity.Warning => BazaarAgentLogEvents.ContextDegraded(
@@ -267,7 +269,12 @@ public sealed class BazaarAgentBepInExLoggerTests
         logger.TryEmitDebug(() =>
         {
             factoryCalls++;
-            return BazaarAgentLogEvents.ListenerRestartStarted(47900, 47901);
+            return BazaarAgentLogEvents.SceneProbeStateChanged(
+                "MainMenu",
+                sceneReady: true,
+                appStateNull: false,
+                profileLoaded: true
+            );
         });
 
         Assert.Equal(0, factoryCalls);

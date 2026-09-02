@@ -173,7 +173,9 @@ public sealed class BazaarAgentHttpServerTests
         var pending = await Dequeue(fixture.Queue);
         Assert.Equal(BazaarAgentActionKind.SelectItem, pending.Command.ActionKind);
         Assert.Equal(new[] { "Socket_0" }, pending.Command.TargetSockets);
-        pending.SetResponse(new BazaarAgentServerResponse(200, "{\"status\":\"confirmed\"}"));
+        pending.SetResponse(
+            new BazaarAgentServerResponse(200, "{\"status\":\"confirmed\"}", "confirmed")
+        );
         var response = await posted;
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = JObject.Parse(await response.Content.ReadAsStringAsync());

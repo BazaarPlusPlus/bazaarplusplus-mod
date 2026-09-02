@@ -5,7 +5,6 @@ using System.Reflection;
 using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
-using Newtonsoft.Json.Linq;
 using Newtonsoft.Json.Serialization;
 
 namespace BazaarPlusPlus.BazaarAgent;
@@ -50,24 +49,6 @@ public sealed class BazaarAgentHttpServer : IDisposable
     private int _started;
 
     public int Port { get; }
-    public bool IsRunning => Volatile.Read(ref _started) == 1;
-
-    public BazaarAgentHttpServer(
-        int port,
-        Func<BazaarAgentContextSnapshot?> snapshotGetter,
-        BazaarAgentCommandQueue<BazaarAgentAction> queue,
-        IBazaarAgentLogger logger,
-        BazaarAgentActivityFeed? activityFeed = null
-    )
-        : this(
-            port,
-            snapshotGetter,
-            _ => snapshotGetter(),
-            queue,
-            logger,
-            requestIdFactory: BazaarAgentUlid.New,
-            activityFeed: activityFeed
-        ) { }
 
     public BazaarAgentHttpServer(
         int port,
@@ -633,8 +614,7 @@ public sealed class BazaarAgentHttpServer : IDisposable
             );
             return "{\"error\":\"resync-required\"}";
         }
-        var result = JToken.Parse(response.JsonBody);
-        var status = result.Value<string>("status") ?? "accepted";
+        var status = response.StatusValue ?? "accepted";
         var body = JsonConvert.SerializeObject(new { status, next = projection.View }, _json);
         await WriteV3Response(ctx, response.HttpStatus, snapshot, projection.SessionId, body)
             .ConfigureAwait(false);
@@ -982,20 +962,6 @@ public sealed class BazaarAgentHttpServer : IDisposable
         WriteErrorEnvelope(ctx, 400, "invalid", "malformed or empty json");
         return null;
     }
-
-    private static string BuildActionSummary(BazaarAgentAction action)
-    {
-        var target = string.IsNullOrWhiteSpace(action.CardInstanceId)
-            ? ""
-            : " for " + action.CardInstanceId;
-        return "Action " + action.ActionKind + target;
-    }
-
-    private static string BuildActionResultSummary(BazaarAgentAction action, int statusCode) =>
-        "Action "
-        + action.ActionKind
-        + " completed with HTTP "
-        + statusCode.ToString(CultureInfo.InvariantCulture);
 
     // How much of an over-cap request body gets drained after a 413 so the client can read the
     // response instead of hitting a TCP reset, and for how long. Beyond either bound, closing

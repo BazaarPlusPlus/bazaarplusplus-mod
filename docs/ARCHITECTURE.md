@@ -93,6 +93,8 @@ PvP battle evidence is a shared `Game/PvpBattles` module rather than a `GameInte
 
 BazaarAgent is optional and off by default. The host plugin declares `[BepInDependency(BppPluginMetadata.Guid)]`, reads `BazaarAgentGameBridge.Current`, creates a pure runtime controller, pumps it from `Update()`, and disposes it on destroy. It listens only on loopback at the fixed `127.0.0.1:47900`, serving `GET /v3/context`, `POST /v3/actions`, and a read-only activity browser under `GET /` and `GET /dashboard/`.
 
+`src/BazaarPlusPlus.BazaarAgent/Dashboard/dist` is a prebuilt artifact: its source is not in this repo, and the files are refreshed by checking in updated tracked assets rather than by a build step here.
+
 The v3 wire protocol — session and revision handshake, delta merge semantics, item reference format, action fields — is documented in `src/BazaarPlusPlus.BazaarAgent/AGENT_README.md`, next to the projector that implements it. That file is the contract; this one does not restate it.
 
 ## Per-feature detail

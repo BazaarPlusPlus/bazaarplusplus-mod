@@ -8,10 +8,17 @@ public sealed class BazaarAgentServerResponse
     public int HttpStatus { get; }
     public string JsonBody { get; }
 
-    public BazaarAgentServerResponse(int status, string body)
+    /// <summary>
+    /// The <c>status</c> value already carried by <see cref="JsonBody"/>, when the producer knows
+    /// it. Supplying it lets the v3 writer reuse the value instead of re-parsing the body.
+    /// </summary>
+    public string? StatusValue { get; }
+
+    public BazaarAgentServerResponse(int status, string body, string? statusValue = null)
     {
         HttpStatus = status;
         JsonBody = body;
+        StatusValue = statusValue;
     }
 }
 

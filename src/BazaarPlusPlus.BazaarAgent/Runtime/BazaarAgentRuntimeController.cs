@@ -31,13 +31,9 @@ public sealed class BazaarAgentRuntimeController : IDisposable
     private double _lastActionTime = double.NegativeInfinity;
     private double _lastListenerReconcileTime = double.NegativeInfinity;
     private BazaarAgentDecisionLog? _decisionLog;
-#if DEBUG
-    private BazaarAgentContextCapture? _contextCapture;
-#endif
     private BazaarAgentHttpServer? _http;
     private BazaarAgentCommandQueue<BazaarAgentAction>? _queue;
     private PendingActionObservation? _pendingActionObservation;
-    private int _currentPort = -1;
 
     public BazaarAgentRuntimeController(
         IBazaarAgentOptions options,
@@ -91,9 +87,6 @@ public sealed class BazaarAgentRuntimeController : IDisposable
                     _logger.TryEmit(BazaarAgentLogEvents.SnapshotReady(context.StateName));
                 if (previous is null || snapshot.TickId != previous.TickId)
                 {
-#if DEBUG
-                    TryCaptureContext(snapshot);
-#endif
                     _activityFeed.Publish(
                         "context.observed",
                         requestId: "",
@@ -123,19 +116,11 @@ public sealed class BazaarAgentRuntimeController : IDisposable
             return;
         _lastListenerReconcileTime = _clock.NowSeconds;
 
-        var desiredPort = BazaarAgentRuntimeDefaults.HttpListenerPort;
-        var desiredTimeoutMs = BazaarAgentRuntimeDefaults.ActionTimeoutMilliseconds;
-
-        if (_http is not null && desiredPort == _currentPort)
+        if (_http is not null)
             return;
 
-        if (_http is not null)
-        {
-            _logger.TryEmitDebug(() =>
-                BazaarAgentLogEvents.ListenerRestartStarted(_currentPort, desiredPort)
-            );
-            StopListener();
-        }
+        var desiredPort = BazaarAgentRuntimeDefaults.HttpListenerPort;
+        var desiredTimeoutMs = BazaarAgentRuntimeDefaults.ActionTimeoutMilliseconds;
 
         try
         {
@@ -149,7 +134,6 @@ public sealed class BazaarAgentRuntimeController : IDisposable
                 activityFeed: _activityFeed
             );
             _http.Start();
-            _currentPort = desiredPort;
             _listenerLogState.OnStartSucceeded(desiredPort, _logger);
         }
         catch (Exception ex)
@@ -181,7 +165,6 @@ public sealed class BazaarAgentRuntimeController : IDisposable
 
         _http = null;
         _queue = null;
-        _currentPort = -1;
     }
 
     private void DrainActionQueue()
@@ -252,8 +235,11 @@ public sealed class BazaarAgentRuntimeController : IDisposable
     )
     {
         _pendingActionObservation = null;
-        var body = BuildOkBody(confirmed ? "confirmed" : "accepted");
-        observation.Pending.SetResponse(new BazaarAgentServerResponse(confirmed ? 200 : 202, body));
+        var status = confirmed ? "confirmed" : "accepted";
+        var body = BuildOkBody(status);
+        observation.Pending.SetResponse(
+            new BazaarAgentServerResponse(confirmed ? 200 : 202, body, status)
+        );
         if (confirmed && _contextReader is IBazaarAgentBattleSummaryAcknowledger acknowledger)
             acknowledger.AcknowledgeLastBattle();
         LogDecision(
@@ -396,27 +382,6 @@ public sealed class BazaarAgentRuntimeController : IDisposable
 
     private BazaarAgentDecisionLog GetOrCreateDecisionLog() =>
         _decisionLog ??= new BazaarAgentDecisionLog(_options.DecisionLogRoot);
-
-#if DEBUG
-    private void TryCaptureContext(BazaarAgentContextSnapshot snapshot)
-    {
-        try
-        {
-            _contextCapture ??= new BazaarAgentContextCapture(_options.DecisionLogRoot);
-            _contextCapture.Capture(snapshot);
-        }
-        catch (Exception ex)
-        {
-            _logger.TryEmit(
-                BazaarAgentLogEvents.ContextCaptureFailed(
-                    snapshot.TickId,
-                    snapshot.Context.StateName,
-                    ex
-                )
-            );
-        }
-    }
-#endif
 
     private sealed class PendingActionObservation
     {
