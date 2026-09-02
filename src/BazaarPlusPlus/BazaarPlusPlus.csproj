@@ -54,6 +54,7 @@
   <PropertyGroup>
     <ProjectRoot>$(MSBuildThisFileDirectory)</ProjectRoot>
     <BPPInstallerSourcePath>$(ProjectRoot)/../../../bazaarplusplus-installer/src-tauri/resources</BPPInstallerSourcePath>
+    <HistoryDatabaseContractFile>$(ProjectRoot)/../BazaarPlusPlus.Storage/BazaarPlusPlus.history-database.json</HistoryDatabaseContractFile>
     <HostArchitecture>$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString().ToLowerInvariant())</HostArchitecture>
     <IsMacHost>$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))</IsMacHost>
     <IsWindowsHost>$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Windows)))</IsWindowsHost>
@@ -210,6 +211,7 @@
         Include="$(TargetDir)BazaarPlusPlus.Storage.dll"
         Condition="Exists('$(TargetDir)BazaarPlusPlus.Storage.dll')"
       />
+      <PluginManagedRuntimeFiles Include="$(HistoryDatabaseContractFile)" />
     </ItemGroup>
     <Delete Files="@(FilesToDelete)" />
     <ItemGroup Condition="'$(IsMacHost)' == 'true'">
@@ -354,6 +356,7 @@
         Include="$(TargetDir)BazaarPlusPlus.Storage.dll"
         Condition="Exists('$(TargetDir)BazaarPlusPlus.Storage.dll')"
       />
+      <PluginManagedRuntimeFiles Include="$(HistoryDatabaseContractFile)" />
     </ItemGroup>
     <ItemGroup>
       <InstallerFilesToDelete Include="$(BPPInstallerSourcePath)/SourceForBuild/$(BppReleasePlatform)/BepInEx/plugins/BazaarPlusPlus.BazaarAgent.dll" />
