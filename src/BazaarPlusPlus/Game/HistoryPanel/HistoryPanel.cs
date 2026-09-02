@@ -166,11 +166,6 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         Instance.RefreshLocalizationInternal();
     }
 
-    internal void OpenFromUiEntry()
-    {
-        OpenFromDockEntryInternal();
-    }
-
     private void OpenFromDockEntryInternal()
     {
         EnsureInitialized();

@@ -30,6 +30,4 @@ internal sealed class HistoryBattlePreviewData
     public BppItemBoard Board { get; }
 
     public string Signature { get; }
-
-    public bool HasRenderableCards => Board.Cards.Count > 0;
 }

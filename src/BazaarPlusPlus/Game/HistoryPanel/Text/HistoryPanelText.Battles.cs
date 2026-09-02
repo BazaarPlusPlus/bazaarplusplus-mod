@@ -6,11 +6,6 @@ namespace BazaarPlusPlus.Game.HistoryPanel;
 
 internal static partial class HistoryPanelText
 {
-    private static readonly LocalizedTextSet NoBattleSelectedText = new(
-        "No battle selected",
-        "未选择战斗"
-    );
-
     private static readonly LocalizedTextSet UnknownOpponentText = new(
         "Unknown Opponent",
         "未知对手"
@@ -26,23 +21,6 @@ internal static partial class HistoryPanelText
         "Selected",
         "当前战斗",
         "當前戰鬥"
-    );
-
-    private static readonly LocalizedTextSet PreviewUnavailablePrefixText = new(
-        "Replay unavailable:",
-        "回放不可用："
-    );
-
-    private static readonly LocalizedTextSet PreviewSelectBattleText = new(
-        "Select a battle to preview its recorded cards.",
-        "选择一场战斗以预览其记录卡牌。",
-        "選擇一場戰鬥以預覽其記錄卡牌。"
-    );
-
-    private static readonly LocalizedTextSet NoGhostBattlesText = new(
-        "Ghost battles can appear only after both players have successfully uploaded at least one bundle. Earlier battles are not backfilled.",
-        "只有双方都至少成功上传过一个 Bundle 后，后续战斗才可能出现；此前的历史战斗不会回填。",
-        "只有雙方都至少成功上傳過一個 Bundle 後，後續戰鬥才可能出現；此前的歷史戰鬥不會回填。"
     );
 
     private static readonly LocalizedTextSet SnapshotCountsUnknownText = new(
@@ -67,19 +45,11 @@ internal static partial class HistoryPanelText
         "挑戰者出局"
     );
 
-    internal static string NoBattleSelected() => Resolve(NoBattleSelectedText);
-
     internal static string UnknownOpponent() => Resolve(UnknownOpponentText);
 
     internal static string SelectBattleForFooter() => Resolve(SelectBattleForFooterText);
 
     internal static string SelectedBattle() => Resolve(SelectedBattleText);
-
-    internal static string PreviewUnavailablePrefix() => Resolve(PreviewUnavailablePrefixText);
-
-    internal static string PreviewSelectBattle() => Resolve(PreviewSelectBattleText);
-
-    internal static string NoGhostBattles() => Resolve(NoGhostBattlesText);
 
     internal static string SnapshotCountsUnknown() => Resolve(SnapshotCountsUnknownText);
 
@@ -103,34 +73,6 @@ internal static partial class HistoryPanelText
 
     internal static string GhostChallengedYou(string name) =>
         FormatSimple($"{name} challenged you", $"{name} 挑战了你", $"{name} 挑戰了你");
-
-    internal static string PlayerHeroPill(string shortCode)
-    {
-        var languageCode = L.CurrentLanguageCode;
-        if (LanguageCodeMatcher.IsChinese(languageCode))
-            return ResolveChinese($"我方 {shortCode}", $"我方 {shortCode}");
-
-        return $"YOU {shortCode}";
-    }
-
-    internal static string ParticipantSummary(
-        string playerHero,
-        string playerLevel,
-        string opponentHero,
-        string opponentLevel
-    )
-    {
-        var languageCode = L.CurrentLanguageCode;
-        if (LanguageCodeMatcher.IsChinese(languageCode))
-        {
-            return ResolveChinese(
-                $"我方 {playerHero} Lv{playerLevel}  |  对手 {opponentHero} Lv{opponentLevel}",
-                $"我方 {playerHero} Lv{playerLevel}  |  對手 {opponentHero} Lv{opponentLevel}"
-            );
-        }
-
-        return $"YOU {playerHero} Lv{playerLevel}  |  OPP {opponentHero} Lv{opponentLevel}";
-    }
 
     internal static string SnapshotSummary(
         int playerItems,
@@ -334,22 +276,6 @@ internal static partial class HistoryPanelText
         );
     }
 
-    internal static string DeletePayloadFailed(string battleId, string details)
-    {
-        return FormatSimple(
-            $"Failed to delete replay payload for battle {battleId}: {details}",
-            $"删除战斗 {battleId} 的回放负载失败：{details}"
-        );
-    }
-
-    internal static string PreviewSelectRunOrBattle()
-    {
-        return FormatSimple(
-            "Select a run or battle to preview recorded cards.",
-            "选择一个 run 或战斗以预览记录卡牌。"
-        );
-    }
-
     internal static string NoLocallyRenderableCards()
     {
         return FormatSimple(
@@ -366,13 +292,5 @@ internal static partial class HistoryPanelText
     internal static string LoadingPreview()
     {
         return FormatSimple("Loading preview...", "正在加载预览...");
-    }
-
-    internal static string PreviewBuildFailed()
-    {
-        return FormatSimple(
-            "Failed to build the selected battle preview.",
-            "构建所选战斗预览失败。"
-        );
     }
 }

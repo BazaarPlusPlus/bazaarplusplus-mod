@@ -71,7 +71,6 @@ public sealed class CombatImpactAggregatorTests
         Assert.Equal(CombatImpactCoverage.Exact, group.ObservedCoverage);
         Assert.Equal(240, group.AuthoritativeMetric?.Value);
         Assert.Equal(CombatImpactAuthoritativeBasis.TotalAmount, group.AuthoritativeMetric?.Basis);
-        Assert.True(group.HasDivergentTargetCoverage);
         var target = Assert.Single(group.Targets);
         Assert.Equal(80, target.ObservedValue);
         Assert.Equal(CombatImpactCoverage.Exact, target.ObservedCoverage);

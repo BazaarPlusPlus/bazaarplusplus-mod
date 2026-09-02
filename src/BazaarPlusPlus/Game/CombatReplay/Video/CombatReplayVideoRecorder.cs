@@ -391,11 +391,7 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
                 return;
             }
 
-            var pluginsDirectoryPath = services.Paths.PluginsDirectoryPath;
-            var gate = CombatReplayRecordingGate.Evaluate(
-                pluginsDirectoryPath,
-                VideoDirectory(services)
-            );
+            var gate = CombatReplayRecordingGate.Evaluate(VideoDirectory(services));
             if (!gate.CanRecord)
             {
                 CompletePreflightFailure(operation, MapGateBlocker(gate.Blocker));

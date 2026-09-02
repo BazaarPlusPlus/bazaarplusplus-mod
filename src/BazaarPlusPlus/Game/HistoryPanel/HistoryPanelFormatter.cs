@@ -25,13 +25,6 @@ internal static class HistoryPanelFormatter
         return runId.Length <= 14 ? runId : runId[..14];
     }
 
-    public static string FormatRunRecord(HistoryRunRecord run)
-    {
-        return run.Victories.HasValue || run.Losses.HasValue
-            ? HistoryPanelText.RunRecord(run.Victories ?? 0, run.Losses ?? 0)
-            : "-";
-    }
-
     public static RunOutcomeTier? GetRunOutcomeTier(HistoryRunRecord run)
     {
         if (!string.Equals(run.RawStatus, "completed", StringComparison.OrdinalIgnoreCase))
@@ -119,11 +112,6 @@ internal static class HistoryPanelFormatter
     public static string FormatDayOnly(int? day)
     {
         return HistoryPanelText.DayBadge(day);
-    }
-
-    public static string FormatDayHour(int? day, int? hour)
-    {
-        return HistoryPanelText.DayHourBadge(day, hour);
     }
 
     public static string? FormatRunDuration(HistoryRunRecord run)

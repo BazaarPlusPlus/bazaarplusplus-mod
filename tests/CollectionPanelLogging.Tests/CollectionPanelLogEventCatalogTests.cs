@@ -26,7 +26,6 @@ public sealed class CollectionPanelLogEventCatalogTests
             ["collection_panel.cleanup.degraded"] = "reason_code:Low:None",
             ["collection_panel.card.bind_degraded"] =
                 "stage:Low:None|template_id:High:None|reason_code:Low:None",
-            ["collection_panel.card.return_skipped"] = "kind:Low:None|reason_code:Low:None",
             ["collection_panel.dock_button.setup_failed"] =
                 "placement:Low:None|reason_code:Low:None",
             ["collection_panel.dock_layout.degraded"] = "reason_code:Low:None|blocker:High:None",

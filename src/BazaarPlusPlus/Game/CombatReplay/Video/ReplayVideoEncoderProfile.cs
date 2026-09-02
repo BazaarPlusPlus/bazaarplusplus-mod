@@ -12,29 +12,18 @@ internal enum VideoEncoderPlatform
 
 internal sealed class ReplayVideoEncoderProfile
 {
-    private ReplayVideoEncoderProfile(
-        string codec,
-        string pixelFormat,
-        int targetBitrateKbps,
-        int maxBitrateKbps,
-        int bufferSizeKbps
-    )
+    private ReplayVideoEncoderProfile(string codec, string pixelFormat, int targetBitrateKbps)
     {
         Codec = codec;
         PixelFormat = pixelFormat;
         TargetBitrateKbps = targetBitrateKbps;
-        MaxBitrateKbps = maxBitrateKbps;
-        BufferSizeKbps = bufferSizeKbps;
     }
 
     internal string Codec { get; }
     internal string PixelFormat { get; }
-    internal bool HardwareAccelerated => true;
     internal int? Crf => null;
     internal string Preset => "realtime-average-bitrate";
     internal int TargetBitrateKbps { get; }
-    internal int MaxBitrateKbps { get; }
-    internal int BufferSizeKbps { get; }
     internal string RateControlSummary => $"avg_bitrate={TargetBitrateKbps}k";
 
     internal static ReplayVideoEncoderProfile NativeForCurrentPlatform(
@@ -63,13 +52,7 @@ internal sealed class ReplayVideoEncoderProfile
     private static ReplayVideoEncoderProfile Create(string codec, int width, int height, int fps)
     {
         var targetKbps = CalculateTargetBitrateKbps(width, height, fps);
-        return new(
-            codec,
-            "nv12",
-            targetKbps,
-            (int)Math.Ceiling(targetKbps * 1.25d),
-            checked(targetKbps * 2)
-        );
+        return new(codec, "nv12", targetKbps);
     }
 
     internal static VideoEncoderPlatform DetectPlatform()

@@ -103,15 +103,6 @@ internal sealed partial class HistoryPanelUiToolkitView
         _previewContainer.style.marginTop = UiSpacing.ColumnGap;
         parent.Add(_previewContainer);
 
-        _previewImage = new Image();
-        _previewImage.scaleMode = ScaleMode.ScaleToFit;
-        _previewImage.style.position = Position.Absolute;
-        _previewImage.style.left = UiSpacing.Xs;
-        _previewImage.style.right = UiSpacing.Xs;
-        _previewImage.style.top = UiSpacing.Lg;
-        _previewImage.style.bottom = UiSpacing.Lg;
-        _previewContainer.Add(_previewImage);
-
         _previewStatusLabel = CreateLabel(
             Sizes.FontPreview,
             FontStyle.Normal,
@@ -127,20 +118,6 @@ internal sealed partial class HistoryPanelUiToolkitView
         _previewStatusLabel.style.maxHeight = Sizes.PanelStatusMaxHeight;
         _previewStatusLabel.style.overflow = Overflow.Hidden;
         _previewContainer.Add(_previewStatusLabel);
-
-        _previewDebugLabel = CreateLabel(
-            Sizes.FontCorner,
-            FontStyle.Bold,
-            Colors.HistoryPreviewDebugText
-        );
-        _previewDebugLabel.style.position = Position.Absolute;
-        _previewDebugLabel.style.right = UiSpacing.Xxl;
-        _previewDebugLabel.style.top = UiSpacing.Xl;
-        _previewDebugLabel.style.maxWidth = Sizes.StatusMaxWidth;
-        _previewDebugLabel.style.whiteSpace = WhiteSpace.NoWrap;
-        _previewDebugLabel.style.overflow = Overflow.Hidden;
-        _previewDebugLabel.style.display = DisplayStyle.None;
-        _previewContainer.Add(_previewDebugLabel);
     }
 
     private void BuildOperationRail(VisualElement parent)

@@ -11,7 +11,6 @@ internal sealed class HistoryPanelReplayService
 {
     private readonly Func<CombatReplayRuntime?> _runtimeAccessor;
     private readonly string _replayDirectoryPath;
-    private readonly string _pluginsDirectoryPath;
     private readonly string _videoDirectoryPath;
     private readonly GhostBattleSyncService? _ghostSyncService;
 
@@ -28,7 +27,8 @@ internal sealed class HistoryPanelReplayService
         // Paths are startup-stable strings (no Func wrappers). Null coalesces to empty so
         // downstream IsNullOrWhiteSpace checks stay fail-open without ArgumentNullException.
         _replayDirectoryPath = replayDirectoryPath ?? string.Empty;
-        _pluginsDirectoryPath = pluginsDirectoryPath ?? string.Empty;
+        // Positional ctor arity is pinned by scenario capsules; the path itself is no longer read.
+        _ = pluginsDirectoryPath;
         _videoDirectoryPath = videoDirectoryPath ?? string.Empty;
         _ghostSyncService = ghostSyncService;
     }
@@ -66,7 +66,7 @@ internal sealed class HistoryPanelReplayService
             return false;
         }
 
-        var gate = CombatReplayRecordingGate.Evaluate(_pluginsDirectoryPath, _videoDirectoryPath);
+        var gate = CombatReplayRecordingGate.Evaluate(_videoDirectoryPath);
         if (!gate.CanRecord)
         {
             reason = HistoryPanelText.RecordingUnavailable();

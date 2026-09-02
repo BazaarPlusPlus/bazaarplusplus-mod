@@ -68,9 +68,6 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     // imported-ghost path); the controller only learns battle ids on the local-saved path.
     public string? ActiveBattleId => _playbackPublisher?.ActiveSessionBattleId;
 
-    public bool IsReplayPlaybackActive =>
-        IsSavedReplayPlaybackActive || AppState.CurrentState is ReplayState;
-
     public bool IsSavedReplayPlaybackActive => _savedReplay.IsSavedReplayPlaybackActive;
 
     public bool IsReplayStartInProgress => _savedReplay.IsReplayStartInProgress;
@@ -185,16 +182,6 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         Events.StateChanged.RemoveListener(OnStateChanged);
         Events.ReplayStarted.RemoveListener(OnNativeReplayStarted);
         Events.ReplayEnded.RemoveListener(OnNativeReplayEnded);
-    }
-
-    public IReadOnlyList<PvpBattleManifest> ListRecentBattles()
-    {
-        return _controller?.ListRecentBattles() ?? Array.Empty<PvpBattleManifest>();
-    }
-
-    public PvpBattleManifest? GetLatestBattle()
-    {
-        return _controller?.GetLatestBattle();
     }
 
     public bool CanReplaySavedCombats(out string reason)
@@ -1560,15 +1547,6 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             _managedRecordingCompleted = completed;
             _managedRecordingFinalizing = false;
         }
-    }
-
-    public bool ReplayLatest()
-    {
-        var latest = _controller?.GetLatestBattle();
-        if (latest == null)
-            return false;
-
-        return ReplaySaved(latest.BattleId, recordVideo: false);
     }
 
     public bool ReplaySaved(string battleId, bool recordVideo)

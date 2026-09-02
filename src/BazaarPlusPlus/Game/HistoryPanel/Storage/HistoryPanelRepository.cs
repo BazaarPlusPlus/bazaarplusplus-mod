@@ -276,14 +276,6 @@ internal sealed partial class HistoryPanelRepository
         return records;
     }
 
-    public void ReplaceGhostBattles(
-        string localPlayerAccountId,
-        IReadOnlyList<GhostBattleImportRecord> battles
-    )
-    {
-        UpsertGhostBattles(localPlayerAccountId, battles);
-    }
-
     public void UpsertGhostBattles(
         string localPlayerAccountId,
         IReadOnlyList<GhostBattleImportRecord> battles

@@ -6,31 +6,10 @@ namespace BazaarPlusPlus.Game.HistoryPanel;
 
 internal static partial class HistoryPanelText
 {
-    private static readonly LocalizedTextSet RunsSectionSubtitleText = new(
-        "Choose one run to see its recorded battles.",
-        "选择一个 run 查看记录到的战斗。",
-        "選擇一個 run 檢視記錄到的戰鬥。"
-    );
-
     private static readonly LocalizedTextSet SelectRunSubtitleText = new(
         "Select a run to inspect its recorded battles.",
         "选择一个 run 查看其记录战斗。",
         "選擇一個 run 檢視其記錄戰鬥。"
-    );
-
-    private static readonly LocalizedTextSet NoRunsFoundText = new(
-        "No runs found yet.",
-        "还没有找到 runs。"
-    );
-
-    private static readonly LocalizedTextSet SelectRunFirstText = new(
-        "Select a run first.",
-        "请先选择一个 run。"
-    );
-
-    private static readonly LocalizedTextSet NoRecordedBattlesText = new(
-        "No recorded battles for this run.",
-        "这个 run 没有记录到战斗。"
     );
 
     private static readonly LocalizedTextSet AllFilterText = new("All", "全部");
@@ -53,15 +32,7 @@ internal static partial class HistoryPanelText
 
     private static readonly LocalizedTextSet UnknownText = new("Unknown", "未知");
 
-    internal static string RunsSectionSubtitle() => Resolve(RunsSectionSubtitleText);
-
     internal static string SelectRunSubtitle() => Resolve(SelectRunSubtitleText);
-
-    internal static string NoRunsFound() => Resolve(NoRunsFoundText);
-
-    internal static string SelectRunFirst() => Resolve(SelectRunFirstText);
-
-    internal static string NoRecordedBattles() => Resolve(NoRecordedBattlesText);
 
     internal static string FilterAll() => Resolve(AllFilterText);
 
@@ -82,8 +53,6 @@ internal static partial class HistoryPanelText
     internal static string Active() => Resolve(ActiveText);
 
     internal static string Unknown() => Resolve(UnknownText);
-
-    internal static string RunBattles(int count) => FormatCount(count, Battles());
 
     internal static string StatHealthShort() => FormatSimple("HP", "生命");
 
@@ -164,15 +133,6 @@ internal static partial class HistoryPanelText
         }
 
         return normalized.ToUpperInvariant();
-    }
-
-    internal static string RunWins(int count)
-    {
-        var languageCode = L.CurrentLanguageCode;
-        if (LanguageCodeMatcher.IsChinese(languageCode))
-            return ResolveChinese($"{count} 胜", $"{count} 勝");
-
-        return $"{count} wins";
     }
 
     internal static string SelectRunToDelete()

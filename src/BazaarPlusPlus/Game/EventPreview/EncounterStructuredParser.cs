@@ -68,12 +68,14 @@ internal static class EncounterStructuredParser
         return TryParseRewardFilterCore(source, () => ToToken(source));
     }
 
+    // The factory is invoked only if the runtime route fails, so a caller that has no token yet
+    // can hand over a lazy one instead of paying for JToken.FromObject up front.
     internal static EncounterRewardFilter? TryParseRewardFilterWithPreparedToken(
         object? source,
-        JToken? preparedToken
+        Func<JToken?> preparedToken
     )
     {
-        return TryParseRewardFilterCore(source, () => preparedToken);
+        return TryParseRewardFilterCore(source, preparedToken);
     }
 
     internal static JToken? TryPrepareToken(object? source) => ToToken(source);
@@ -109,47 +111,6 @@ internal static class EncounterStructuredParser
         }
 
         return null;
-    }
-
-    public static bool HasDealCardRewardAction(object? source)
-    {
-        foreach (var _ in EnumerateRuntimeDealCardActions(source))
-            return true;
-
-        var token = ToToken(source);
-        if (token == null)
-            return false;
-
-        foreach (var action in EnumerateObjects(token))
-            if (IsType(action, "TActionGameDealCards"))
-                return true;
-        return false;
-    }
-
-    public static bool HasDealCardRewardConstraints(object? source)
-    {
-        foreach (var runtimeAction in EnumerateRuntimeDealCardActions(source))
-        {
-            var spawnContext = ReadMemberValue(runtimeAction, "SpawnContext");
-            if (spawnContext != null && ParseRuntimeSpawnConstraints(spawnContext).Count > 0)
-                return true;
-        }
-
-        var token = ToToken(source);
-        if (token == null)
-            return false;
-
-        foreach (var action in EnumerateObjects(token))
-        {
-            if (!IsType(action, "TActionGameDealCards"))
-                continue;
-
-            var spawnContext = action["SpawnContext"];
-            if (spawnContext != null && ParseTokenSpawnConstraints(spawnContext).Count > 0)
-                return true;
-        }
-
-        return false;
     }
 
     // The number of choices the event actually presents (SelectionContext spawn limit);

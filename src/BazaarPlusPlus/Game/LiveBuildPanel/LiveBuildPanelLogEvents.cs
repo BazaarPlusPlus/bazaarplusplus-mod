@@ -33,7 +33,6 @@ internal enum LiveBuildCorpusSource
 internal enum LiveBuildCorpusReasonCode
 {
     WarmupFailed,
-    SynchronousFallback,
     StaleCache,
     EmbeddedFallback,
     EmbeddedMissing,

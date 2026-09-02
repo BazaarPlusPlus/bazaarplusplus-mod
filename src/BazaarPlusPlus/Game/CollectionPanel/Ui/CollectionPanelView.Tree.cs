@@ -601,15 +601,6 @@ internal sealed partial class CollectionPanelView
         }
     }
 
-    private static VisualElement CreateOperationSpacer()
-    {
-        var spacer = new VisualElement();
-        spacer.style.flexGrow = 1f;
-        spacer.style.flexShrink = 1f;
-        spacer.style.minWidth = UiSpacing.Md;
-        return spacer;
-    }
-
     private static Button CreateCloseButton(Action onClick)
     {
         var button = CreateButton(
