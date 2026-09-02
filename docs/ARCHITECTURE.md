@@ -91,7 +91,7 @@ PvP battle evidence is a shared `Game/PvpBattles` module rather than a `GameInte
 
 ## BazaarAgent Optional Host
 
-BazaarAgent is optional and off by default. The host plugin declares `[BepInDependency(BppPluginMetadata.Guid)]`, reads `BazaarAgentGameBridge.Current`, creates a pure runtime controller, pumps it from `Update()`, and disposes it on destroy. It listens only on loopback at the fixed `127.0.0.1:47900`, serving `GET /v3/context`, `POST /v3/actions`, and a read-only activity browser under `GET /` and `GET /dashboard/`.
+BazaarAgent is optional and off by default. The host plugin declares `[BepInDependency(BppPluginMetadata.Guid)]`, reads `BazaarAgentGameBridge.Current`, creates a pure runtime controller, pumps it from `Update()`, and disposes it on destroy. It listens only on loopback (port and routes: ADR-0002, `src/BazaarPlusPlus.BazaarAgent/AGENT_README.md`), and serves a read-only activity browser under `GET /` and `GET /dashboard/`.
 
 `src/BazaarPlusPlus.BazaarAgent/Dashboard/dist` is a prebuilt artifact: its source is not in this repo, and the files are refreshed by checking in updated tracked assets rather than by a build step here.
 

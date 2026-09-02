@@ -24,7 +24,7 @@ Each layer owns one thing, and links rather than restating: `CLAUDE.md` owns pro
 
 **Knowledge lands in its destination directly — there is no drafts buffer.** A design record, root-cause analysis, or decision analysis produced mid-session distills straight into MEMORY, an ADR, or ARCHITECTURE in the same session; remaining work goes to a GitHub issue; nothing is parked in the tree awaiting a later sweep.
 
-**Edit policy.** `ARCHITECTURE.md`, `architecture/`, `contracts/`, and `adr/` may be corrected the moment the code drifts. `MEMORY.md` and this file take dense one-line entries directly; the byte budgets below are what keep them curated.
+**Edit policy.** `ARCHITECTURE.md`, `architecture/`, `contracts/`, and `adr/` may be corrected the moment the code drifts. `MEMORY.md` and this file take dense one-line entries directly; the byte budgets below are what keep them curated. Prefer pointing at the test that pins a number over restating the number — a count in prose drifts silently.
 
 **Budgets are in bytes, not lines.** `CLAUDE.md` and `MEMORY.md` carry dense one-line entries, so a line count says nothing about what they cost an agent. The enforced ceilings live in `tests/Architecture.Tests/DocsHygieneTests.cs`; keeping under them means merging entries, not appending. `MEMORY.md`'s Gotchas section is exempt — that section is the reason the file exists, and compressing it to hit a budget defeats the budget.
 

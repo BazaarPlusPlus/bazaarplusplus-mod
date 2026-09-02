@@ -1,6 +1,6 @@
 # BazaarPlusPlus Mod
 
-In-game mod for *The Bazaar*. This glossary captures the project-specific vocabulary that recurs across features. General programming concepts are excluded. Definitions pin down what a term means and where its boundary sits; responsibilities and mechanics live in code and `docs/ARCHITECTURE.md`.
+In-game mod for *The Bazaar*. This glossary captures the project-specific vocabulary that recurs across features. Definitions pin down what a term means and where its boundary sits; responsibilities and mechanics live in code and `docs/ARCHITECTURE.md`.
 
 ## Run / encounters
 
