@@ -20,7 +20,6 @@ internal enum ReplayPlaybackReasonCode
     OpponentSkillsUnavailable,
     OpponentIdentityUnavailable,
     OpponentPortraitUnavailable,
-    OpponentPortraitCleanupFailed,
     PresentationWarmupFailed,
     AudioWarmupFailed,
     SoundtrackWarmupFailed,
@@ -87,15 +86,12 @@ internal enum ReplayWarmupStage
 {
     Presentation,
     AudioBanks,
-    Soundtrack,
     CombatVfx,
 }
 
 internal enum ReplayWarmupAssetReasonCode
 {
-    AssetUnavailable,
     AssetLoadFailed,
-    InvalidAssetKey,
 }
 
 internal enum CurrentReplayPresentationGateOutcome

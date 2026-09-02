@@ -1581,11 +1581,9 @@ file static class MediaEventCatalogTests
         ["combat_replay.video_recording.lifecycle_observed"] =
             "stage:Low:None|recording_id:High:Short|battle_id:High:Short|pending_count:High:None",
         ["combat_replay.video_capture.stats_observed"] =
-            "recording_id:High:Short|stage:Low:None|width:High:None|height:High:None|fps:Low:None|captured_frames:High:None|repeated_frames:High:None|dropped_frames:High:None|duration_ms:High:None|size_bytes:High:None|output_path:High:None|codec:Low:None|rate_control:Low:None|frame_bytes:High:None|pool_capacity:Low:None|queue_capacity:Low:None|pool_payload_bytes:High:None|pool_budget_exceeded:Low:None|readback_backpressure_skips:High:None|max_outstanding_readbacks:Low:None|readback_copy_p95_us:High:None|cfr_copy_p95_us:High:None|staging_buffer_bytes:High:None|max_readback_payload_bytes:High:None|render_texture_estimated_bytes:High:None",
+            "recording_id:High:Short|stage:Low:None|width:High:None|height:High:None|fps:Low:None|captured_frames:High:None|repeated_frames:High:None|dropped_frames:High:None|duration_ms:High:None|size_bytes:High:None|output_path:High:None|codec:Low:None|rate_control:Low:None|frame_bytes:High:None|pool_capacity:Low:None|queue_capacity:Low:None|pool_payload_bytes:High:None|pool_budget_exceeded:Low:None|cfr_copy_p95_us:High:None|staging_buffer_bytes:High:None|render_texture_estimated_bytes:High:None",
         ["combat_replay.video_capture.native_pipeline_observed"] =
             "recording_id:High:Short|stage:Low:None|backpressure_dropped_frames:High:None|dropped_frames:High:None|lease_misses:High:None|enqueue_rejects:High:None|pacer_resync_dropped_frames:High:None|max_in_flight:Low:None|native_frames_written:High:None|render_frame_p50_us:High:None|render_frame_p95_us:High:None|render_frame_p99_us:High:None|texture_copy_p50_us:High:None|texture_copy_p95_us:High:None|texture_copy_p99_us:High:None|battle_id:High:Short|encoder_name:Low:None",
-        ["combat_replay.video_capture.frame_degraded"] =
-            "recording_id:High:Short|stage:Low:None|reason_code:Low:None|sequence:High:None",
         ["combat_replay.video_recording.cleanup_failed"] =
             "recording_id:High:Short|stage:Low:None|path:High:None",
         ["combat_replay.video_mux.diagnostic_observed"] =
@@ -1616,8 +1614,8 @@ file static class MediaEventCatalogTests
             .Select(field => field.GetValue(null)!)
             .ToArray();
         TestReflection.Assert(
-            direct.Length == 12,
-            $"Expected 12 media events, got {direct.Length}."
+            direct.Length == 11,
+            $"Expected 11 media events, got {direct.Length}."
         );
 
         var actual = direct.ToDictionary(EventId, Schema, StringComparer.Ordinal);

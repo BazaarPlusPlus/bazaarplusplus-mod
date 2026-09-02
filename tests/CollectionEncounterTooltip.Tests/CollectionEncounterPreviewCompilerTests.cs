@@ -116,7 +116,9 @@ public sealed class EncounterPreviewCompilerTests
         Assert.NotNull(stepPlan.RewardFilter);
         Assert.True(result.Snapshot.TryGetTemplate(itemId, out var itemPlan));
         Assert.Null(itemPlan.RewardFilter);
-        Assert.Equal(new[] { eventId, stepId }, preparedIds);
+        // The step's reward resolves through the runtime action route, so the compiler never
+        // materializes its JToken; the item template is still never scanned for rewards.
+        Assert.Equal(new[] { eventId }, preparedIds);
     }
 
     private static TCardLocalization Localization(string title, string description) =>

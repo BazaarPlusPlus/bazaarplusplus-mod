@@ -31,13 +31,6 @@ internal static class HistoryPanelGhostBattleFilter
         return !dayMin10 || (battle.Day.HasValue && battle.Day.Value >= 10);
     }
 
-    public static HistoryPanelGhostBattleOutcome ResolveOutcomeForCompatibility(
-        HistoryBattleRecord battle
-    )
-    {
-        return ResolveOutcome(battle);
-    }
-
     private static HistoryPanelGhostBattleOutcome ResolveOutcome(HistoryBattleRecord battle)
     {
         if (string.Equals(battle.WinnerCombatantId, "Player", StringComparison.OrdinalIgnoreCase))

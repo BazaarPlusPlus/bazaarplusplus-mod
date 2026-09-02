@@ -521,14 +521,6 @@ internal sealed record CombatImpactGroup(
     internal CombatImpactPeriodicImpact? PeriodicImpact { get; init; }
 
     internal bool HasUnattributedTransitionValue { get; init; }
-
-    internal bool HasDivergentTargetCoverage =>
-        UnresolvedTargetCount > 0
-        || AuthoritativeMetric is { Basis: CombatImpactAuthoritativeBasis.TotalAmount } total
-            && (!ObservedValue.HasValue || Unit != total.Unit || ObservedValue.Value != total.Value)
-        || AuthoritativeMetric
-            is { Basis: CombatImpactAuthoritativeBasis.ApplicationCount } applications
-            && Count != applications.Value;
 }
 
 internal sealed record CombatImpactTriggerSource(
@@ -633,8 +625,6 @@ internal sealed record CombatImpactReport(
     IReadOnlyList<CombatImpactReceived> Received
 )
 {
-    internal IReadOnlyList<PeriodicAttributionGap> PeriodicResiduals { get; init; } = [];
-
     internal IReadOnlyList<CombatImpactProjectionDiagnostic> ProjectionDiagnostics { get; init; } =
     [];
 

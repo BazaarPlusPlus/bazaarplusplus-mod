@@ -131,7 +131,6 @@ internal static class BazaarAgentReplayRecorderWiring
         }
 
         var gate = CombatReplayRecordingGate.Evaluate(
-            services.Paths.PluginsDirectoryPath,
             PathConstants.CombatReplayVideos(services.Paths.RequireDataRoot())
         );
         if (!gate.CanRecord)

@@ -100,11 +100,6 @@ internal static partial class HistoryPanelText
         return FormatSimple($"Couldn't load history: {details}", $"载入对局失败：{details}");
     }
 
-    internal static string CurrentPlayerAccountUnavailable()
-    {
-        return FormatSimple("Current player account is unavailable.", "当前玩家账号不可用。");
-    }
-
     internal static string PanelUnavailable()
     {
         return FormatSimple("History panel is unavailable.", "历史面板不可用。");

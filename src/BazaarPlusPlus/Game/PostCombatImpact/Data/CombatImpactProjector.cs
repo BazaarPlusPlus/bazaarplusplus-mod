@@ -533,7 +533,6 @@ internal static class CombatImpactProjector
     {
         return report with
         {
-            PeriodicResiduals = periodic.Residuals,
             Sources = report
                 .Sources.Select(source =>
                     source with

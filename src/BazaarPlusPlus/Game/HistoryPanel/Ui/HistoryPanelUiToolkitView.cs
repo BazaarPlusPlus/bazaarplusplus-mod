@@ -72,9 +72,7 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
     private Label? _battlesTitle;
     private Label? _runsBattleSubtitle;
     private Label? _ghostOpponentEliminatedNotice;
-    private Image? _previewImage;
     private Label? _previewStatusLabel;
-    private Label? _previewDebugLabel;
     private VisualElement? _previewContainer;
     private Label? _resultPill;
     private Label? _dayPill;
@@ -438,16 +436,6 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
         }
     }
 
-    public void SetPreviewTexture(Texture? texture)
-    {
-        if (_previewImage == null)
-            return;
-
-        _previewImage.image = texture;
-        _previewImage.style.display = texture == null ? DisplayStyle.None : DisplayStyle.Flex;
-        _previewImage.MarkDirtyRepaint();
-    }
-
     private void SubmitAccountLink()
     {
         var code = CombinedAccountCode();
@@ -474,25 +462,6 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
         _previewStatusLabel.text = message ?? string.Empty;
         _previewStatusLabel.style.display =
             visible && !string.IsNullOrWhiteSpace(message) ? DisplayStyle.Flex : DisplayStyle.None;
-    }
-
-    public void SetPreviewDebug(string? message, bool visible)
-    {
-        if (_previewDebugLabel == null)
-            return;
-
-        _previewDebugLabel.text = message ?? string.Empty;
-        _previewDebugLabel.style.display =
-            visible && !string.IsNullOrWhiteSpace(message) ? DisplayStyle.Flex : DisplayStyle.None;
-    }
-
-    public void SetPreviewDebugVisible(bool visible)
-    {
-        if (_previewDebugLabel == null)
-            return;
-
-        if (_previewDebugLabel.style.display != DisplayStyle.None)
-            _previewDebugLabel.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
     }
 
     public void Dispose()

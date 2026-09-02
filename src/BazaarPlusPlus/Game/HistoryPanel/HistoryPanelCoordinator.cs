@@ -1188,24 +1188,4 @@ internal sealed class HistoryPanelCoordinator : IDisposable
     {
         _state.FilteredRunsDirty = true;
     }
-
-    // Kept as a thin alias on the coordinator so external test reflection that targets
-    // HistoryPanelCoordinator+GhostBattleOutcome / ResolveGhostBattleOutcome continues to compile.
-    // The actual matching logic lives in HistoryPanelGhostBattleFilter.
-    private static GhostBattleOutcome ResolveGhostBattleOutcome(HistoryBattleRecord battle)
-    {
-        return HistoryPanelGhostBattleFilter.ResolveOutcomeForCompatibility(battle) switch
-        {
-            HistoryPanelGhostBattleOutcome.Won => GhostBattleOutcome.Won,
-            HistoryPanelGhostBattleOutcome.Lost => GhostBattleOutcome.Lost,
-            _ => GhostBattleOutcome.Unknown,
-        };
-    }
-
-    private enum GhostBattleOutcome
-    {
-        Unknown,
-        Won,
-        Lost,
-    }
 }
