@@ -9,9 +9,7 @@ internal sealed class NativeTooltipControllerTopologyGeneration
 
     internal int Current => Volatile.Read(ref _generation);
 
-    internal void ObserveControllerAwake() => Interlocked.Increment(ref _generation);
-
-    internal void ObserveControllerDestroyed() => Interlocked.Increment(ref _generation);
+    internal void ObserveControllerLifecycleChange() => Interlocked.Increment(ref _generation);
 }
 
 /// <summary>Keeps one native-controller snapshot until topology or object lifetime invalidates it.</summary>

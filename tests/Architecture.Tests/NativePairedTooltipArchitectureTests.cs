@@ -119,8 +119,12 @@ public sealed class NativePairedTooltipArchitectureTests
         Assert.Contains("TooltipParentComponent.ShowAuxiliaryTooltipController", patchSource);
         Assert.Contains("CardTooltipController.ShowTooltipController", patchSource);
         Assert.Contains("AuxiliaryTooltipController.ShowAuxiliaryTooltipController", patchSource);
-        Assert.Contains("NativeTooltipSuppression.NotifyControllerAwake", patchSource);
-        Assert.Contains("NativeTooltipSuppression.NotifyControllerDestroyed", patchSource);
+        Assert.Contains("NativeTooltipSuppression.NotifyControllerLifecycleChanged", patchSource);
+        Assert.Equal(
+            4,
+            patchSource.Split("NativeTooltipSuppression.NotifyControllerLifecycleChanged").Length
+                - 1
+        );
 
         var featureOwnedCopies = Directory
             .EnumerateFiles(Path.Combine(sourceRoot, "Game"), "*.cs", SearchOption.AllDirectories)
