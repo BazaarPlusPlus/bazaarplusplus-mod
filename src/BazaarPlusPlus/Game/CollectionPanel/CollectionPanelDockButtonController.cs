@@ -1,8 +1,8 @@
 #nullable enable
 using BazaarPlusPlus.Game.Settings;
+using BazaarPlusPlus.GameInterop.Scenes;
 using BazaarPlusPlus.Infrastructure;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 namespace BazaarPlusPlus.Game.CollectionPanel;
@@ -101,7 +101,7 @@ internal sealed class CollectionPanelDockButtonController
     private void LateUpdate()
     {
         var shouldSync = _layoutSync.ShouldSync(
-            SceneManager.GetActiveScene().name,
+            ActiveSceneNameCache.Current,
             Time.realtimeSinceStartup
         );
         shouldSync |= _screenResizeSync.ShouldSync(Screen.width, Screen.height);
