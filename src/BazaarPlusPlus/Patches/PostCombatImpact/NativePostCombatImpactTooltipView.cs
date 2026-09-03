@@ -31,7 +31,6 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
     private const float DividerHeight = 2f;
     private const int NativeBottomPaddingReduction = 4;
     private const int NativeDenseBottomPaddingMaximum = 24;
-    private const float PlacementEpsilon = 0.5f;
     private const float VisibilityFadeDuration = 0.1f;
     private const float PanelTitleFontScale = 0.84f;
     private const float ModeLabelFontScale = 0.66f;

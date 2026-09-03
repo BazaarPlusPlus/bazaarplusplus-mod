@@ -96,7 +96,6 @@ internal enum CollectionPanelLoadSegment
 
 internal enum CollectionCardBindStage
 {
-    TemplateLookup,
     Bind,
 }
 

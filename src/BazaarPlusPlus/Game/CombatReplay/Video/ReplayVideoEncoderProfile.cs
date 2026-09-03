@@ -26,20 +26,6 @@ internal sealed class ReplayVideoEncoderProfile
     internal int TargetBitrateKbps { get; }
     internal string RateControlSummary => $"avg_bitrate={TargetBitrateKbps}k";
 
-    internal static ReplayVideoEncoderProfile NativeForCurrentPlatform(
-        int width,
-        int height,
-        int fps
-    ) =>
-        DetectPlatform() switch
-        {
-            VideoEncoderPlatform.MacOS => NativeVideoToolbox(width, height, fps),
-            VideoEncoderPlatform.Windows => NativeMediaFoundation(width, height, fps),
-            _ => throw new PlatformNotSupportedException(
-                "Replay video recording supports macOS and Windows."
-            ),
-        };
-
     internal static ReplayVideoEncoderProfile NativeVideoToolbox(int width, int height, int fps) =>
         Create("h264_videotoolbox", width, height, fps);
 

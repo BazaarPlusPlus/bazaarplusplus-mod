@@ -7,7 +7,6 @@ namespace BazaarPlusPlus.Game.Screenshots;
 internal enum ScreenshotCaptureReasonCode
 {
     Completed,
-    OutputPathUnavailable,
     ReadinessDeadline,
     TransitionFieldMissing,
     RevealProbeFailed,
@@ -42,17 +41,6 @@ internal enum ScreenshotCaptureCleanupStage
 [BppLogEventSource]
 internal static class ScreenshotCaptureLogEvents
 {
-    internal static readonly BppLogFieldDefinition InitializationFailedReasonCode = PublicField(
-        0,
-        "reason_code",
-        BppLogCardinality.Low
-    );
-    internal static readonly BppLogEventDefinition InitializationFailed = new(
-        BppLogFeatureScope.Screenshots,
-        "screenshots.capture.initialization_failed",
-        [InitializationFailedReasonCode]
-    );
-
     internal static readonly BppLogFieldDefinition ScreenshotId = PublicField(
         0,
         "screenshot_id",
@@ -244,17 +232,6 @@ internal static class ScreenshotCaptureLogEvents
 
 internal static class ScreenshotCaptureDiagnostics
 {
-    internal static void ReportInitializationFailed(Exception? exception = null)
-    {
-        var field = ScreenshotCaptureLogEvents.InitializationFailedReasonCode.Bind(
-            ScreenshotCaptureReasonCode.OutputPathUnavailable
-        );
-        if (exception == null)
-            BppLog.ErrorEvent(ScreenshotCaptureLogEvents.InitializationFailed, field);
-        else
-            BppLog.ErrorEvent(ScreenshotCaptureLogEvents.InitializationFailed, exception, field);
-    }
-
     internal static void ReportCleanupFailed(
         ScreenshotCaptureCleanupStage stage,
         string? screenshotId,

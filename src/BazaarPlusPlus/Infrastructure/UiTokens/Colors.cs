@@ -77,7 +77,6 @@ internal static class Colors
     public static Color HistoryEliminatedNoticeBorder => Rgba(0.94f, 0.70f, 0.28f, 0.48f);
     public static Color HistoryPreviewBackground => Rgba(0.07f, 0.09f, 0.12f, 0.99f);
     public static Color HistoryPreviewStatusText => Rgba(0.82f, 0.87f, 0.93f, 0.96f);
-    public static Color HistoryPreviewDebugText => Rgba(0.97f, 0.85f, 0.57f, 0.96f);
     public static Color HistoryFooterBackground => Rgba(0.10f, 0.12f, 0.16f, 0.98f);
     public static Color HistoryFooterSecondaryText => Rgba(0.72f, 0.77f, 0.84f, 0.94f);
 

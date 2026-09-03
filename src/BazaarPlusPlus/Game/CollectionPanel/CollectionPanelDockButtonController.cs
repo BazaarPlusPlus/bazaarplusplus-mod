@@ -11,7 +11,6 @@ internal sealed class CollectionPanelDockButtonController
     : MonoBehaviour,
         IBppNativeSettingsButtonCloneOwner
 {
-    private const string LogCategory = "CollectionPanelDockButton";
     private const int ScreenResizeSyncFrameCount = 6;
     private const int LayoutImmediateSyncFrameCount = 2;
 
