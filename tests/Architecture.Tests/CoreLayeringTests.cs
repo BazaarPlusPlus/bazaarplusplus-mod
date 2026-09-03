@@ -1,5 +1,4 @@
 #nullable enable
-using System.Xml.Linq;
 using Xunit;
 
 namespace Architecture.Tests;
@@ -56,9 +55,8 @@ public sealed class CoreLayeringTests
     {
         AssertNoImports(
             Path.Combine(MainSourceRoot(), "GameInterop"),
-            "GameInterop must not depend on feature or BazaarAgent namespaces.",
-            "BazaarPlusPlus.Game.",
-            "BazaarPlusPlus.BazaarAgent"
+            "GameInterop must not depend on feature namespaces.",
+            "BazaarPlusPlus.Game."
         );
     }
 
@@ -173,61 +171,22 @@ public sealed class CoreLayeringTests
     }
 
     [Fact]
-    public void BazaarAgent_core_has_only_portable_dependencies()
+    public void Replay_state_exit_stays_owned_by_the_combat_replay_runtime()
     {
         var repoRoot = RepoRoot();
-        var projectRoot = Path.Combine(repoRoot, "src", "BazaarPlusPlus.BazaarAgent");
-        AssertNoImports(
-            projectRoot,
-            "BazaarAgent core must stay independent from the game and plugin hosts.",
-            "UnityEngine",
-            "BepInEx",
-            "HarmonyLib",
-            "TheBazaar",
-            "BazaarGame",
-            "BazaarPlusPlus.Game",
-            "BazaarPlusPlus.BazaarAgentHost"
-        );
-
-        var project = XDocument.Load(
-            Path.Combine(projectRoot, "BazaarPlusPlus.BazaarAgent.csproj")
-        );
-        var packages = project
-            .Descendants("PackageReference")
-            .Select(element => (string?)element.Attribute("Include"))
-            .Where(value => value != null)
-            .ToHashSet(StringComparer.Ordinal);
-        Assert.Equal(
-            new HashSet<string>(StringComparer.Ordinal)
-            {
-                "NETStandard.Library",
-                "Newtonsoft.Json",
-            },
-            packages!
-        );
-        Assert.Empty(project.Descendants("ProjectReference"));
-    }
-
-    [Fact]
-    public void Optional_BazaarAgent_host_does_not_leak_into_the_main_plugin()
-    {
-        var repoRoot = RepoRoot();
-        var mainProject = File.ReadAllText(
-            Path.Combine(repoRoot, "src", "BazaarPlusPlus", "BazaarPlusPlus.csproj")
-        );
-        Assert.DoesNotContain(
-            "ProjectReference Include=\"../BazaarPlusPlus.BazaarAgent",
-            mainProject
-        );
-
-        var hostRoot = Path.Combine(repoRoot, "src", "BazaarPlusPlus.BazaarAgentHost");
-        var illegalReplayExits = SourceFiles(hostRoot)
+        const string owner = "src/BazaarPlusPlus/Game/CombatReplay/CombatReplayRuntime.cs";
+        var illegalReplayExits = SourceFiles(MainSourceRoot())
             .Where(file =>
-                File.ReadAllText(file).Contains("ReplayState.Exit(", StringComparison.Ordinal)
+                File.ReadAllText(file).Contains("ExitRecapReplayState(", StringComparison.Ordinal)
             )
             .Select(file => Relative(repoRoot, file))
+            .Where(path => !string.Equals(path, owner, StringComparison.Ordinal))
             .ToArray();
-        AssertNoViolations("Only the main game bridge may exit replay state.", illegalReplayExits);
+        AssertNoViolations(
+            "CombatReplayRuntime.TryContinueReplay is the only programmatic ReplayState exit; "
+                + "video finalization depends on it.",
+            illegalReplayExits
+        );
     }
 
     [Fact]
@@ -248,8 +207,6 @@ public sealed class CoreLayeringTests
             "BazaarPlusPlus.ModApi",
             "BazaarPlusPlus.Storage",
             "BazaarPlusPlus.Localization",
-            "BazaarPlusPlus.BazaarAgent",
-            "BazaarPlusPlus.BazaarAgentHost",
         };
         foreach (var project in expectedProjects)
         {

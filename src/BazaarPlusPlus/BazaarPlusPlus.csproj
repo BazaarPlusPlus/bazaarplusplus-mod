@@ -171,13 +171,6 @@
   >
     <Message Text="[BazaarPlusPlus] Building for Debug" Importance="high" />
     <ItemGroup>
-      <!-- Scrub only the optional BazaarAgent assemblies (a default build must remove
-           them). Everything else this target ships is re-copied below with
-           SkipUnchangedFiles, which pre-deleting would defeat. -->
-      <FilesToDelete Include="$(GamePath)\BepInEx\plugins\BazaarPlusPlus.BazaarAgent.dll" />
-      <FilesToDelete Include="$(GamePath)\BepInEx\plugins\BazaarPlusPlus.BazaarAgentHost.dll" />
-    </ItemGroup>
-    <ItemGroup>
       <PluginManagedRuntimeFiles Include="$(TargetDir)Microsoft.Data.Sqlite.dll" />
       <PluginManagedRuntimeFiles Include="$(TargetDir)SQLitePCLRaw.batteries_v2.dll" />
       <PluginManagedRuntimeFiles Include="$(TargetDir)SQLitePCLRaw.core.dll" />
@@ -213,7 +206,6 @@
       />
       <PluginManagedRuntimeFiles Include="$(HistoryDatabaseContractFile)" />
     </ItemGroup>
-    <Delete Files="@(FilesToDelete)" />
     <ItemGroup Condition="'$(IsMacHost)' == 'true'">
       <StaleMacRecordingFile Include="$(GamePath)/BepInEx/plugins/ffmpeg" />
       <StaleMacRecordingFile Include="$(GamePath)/BepInEx/plugins/ffmpeg-LICENSE.txt" />
@@ -358,11 +350,6 @@
       />
       <PluginManagedRuntimeFiles Include="$(HistoryDatabaseContractFile)" />
     </ItemGroup>
-    <ItemGroup>
-      <InstallerFilesToDelete Include="$(BPPInstallerSourcePath)/SourceForBuild/$(BppReleasePlatform)/BepInEx/plugins/BazaarPlusPlus.BazaarAgent.dll" />
-      <InstallerFilesToDelete Include="$(BPPInstallerSourcePath)/SourceForBuild/$(BppReleasePlatform)/BepInEx/plugins/BazaarPlusPlus.BazaarAgentHost.dll" />
-    </ItemGroup>
-    <Delete Files="@(InstallerFilesToDelete)" />
     <Copy
       SourceFiles="$(TargetDir)$(TargetName).dll"
       DestinationFiles="$(BPPInstallerSourcePath)/SourceForBuild/$(BppReleasePlatform)/BepInEx/plugins/$(TargetName).dll"

@@ -58,48 +58,6 @@ public sealed class EncounterPreviewModuleTests : IDisposable
     }
 
     [Fact]
-    public void BazaarAgent_preview_reuses_event_evaluation_and_returns_plain_text()
-    {
-        var source = new object();
-        var runtime = new FakeRuntime(source)
-        {
-            CurrentHero = EHero.Jules,
-            Inventory = new EncounterInventory(Array.Empty<EncounterInventoryCard>()),
-        };
-        using var module = Module(runtime, PublishedRegistry(source, Snapshot()));
-        var preview = new BazaarAgentEncounterPreview(module);
-
-        var content = preview.ResolveEvent(EventId, "Pick one");
-
-        Assert.NotNull(content);
-        Assert.Contains("Jules Step", content);
-        Assert.Contains("Take it", content);
-        Assert.DoesNotContain("<", content);
-    }
-
-    [Fact]
-    public void BazaarAgent_preview_reuses_step_evaluation_and_returns_plain_text()
-    {
-        var source = new object();
-        var runtime = new FakeRuntime(source)
-        {
-            DayTierResolution = GameDataDayTierResolution.Available(
-                day: 7,
-                GameDataDayTierTable.FromWeights(0.99f, 0f, 0f, 0.01f)!
-            ),
-        };
-        using var module = Module(runtime, PublishedRegistry(source, DayTierStepSnapshot()));
-        var preview = new BazaarAgentEncounterPreview(module);
-
-        var content = preview.ResolveStep(StepId, "Get an item");
-
-        Assert.NotNull(content);
-        Assert.Contains("Bronze 99%", content);
-        Assert.Contains("Diamond 1%", content);
-        Assert.DoesNotContain("<", content);
-    }
-
-    [Fact]
     public void Dynamic_state_is_read_by_the_module_for_each_query()
     {
         var source = new object();

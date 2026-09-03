@@ -25,10 +25,6 @@
 - BazaarDB 截图上传默认关闭；启用后终局截图快照推到 V5 后端，由 BazaarDB 队列拉取。
 - Anonymous Mode 可将本地玩家名替换为 `Anonymous`。
 
-**BazaarAgent（外部集成，默认不构建、不安装）**
-
-独立的 host BepInEx 插件，在本地回环 `127.0.0.1:47900` 提供 HTTP 服务：外部工具可读取当前决策上下文并发起动作，浏览器打开 `http://127.0.0.1:47900/` 可实时查看协议活动。mod 本身不做任何策略决策。需要时用 `./run.sh build --with-bazaaragent` 构建；默认构建不产出（并主动清除）host dll。详见 [docs/ARCHITECTURE.md#bazaaragent-optional-host](docs/ARCHITECTURE.md#bazaaragent-optional-host)。
-
 ## 安装（玩家）
 
 前提：已安装《The Bazaar》与 [BepInEx 5](https://github.com/BepInEx/BepInEx)。
@@ -63,7 +59,7 @@
 
 | 命令 | 范围 |
 |---|---|
-| `./run.sh test` | 默认套件：12 个 xUnit 工程，完全离线、无副作用 |
+| `./run.sh test` | 默认套件：10 个 xUnit 工程，完全离线、无副作用 |
 | `./run.sh test-compat` | 兼容性前提测试，需要本机有 Managed / 反编译输入，缺失项会报告跳过 |
 | `./run.sh test-corpus <path>` | 可选的 replay 证据语料验收，必须显式提供 corpus |
 
@@ -80,8 +76,7 @@
 |---|---|
 | `src/BazaarPlusPlus/` | 主插件工程。`Plugin.cs` 为 BepInEx 入口，feature wiring 走 `BppComposition.cs` 组合根，其下按 `Core/`、`GameInterop/`、`Game/`、`Patches/`、`Infrastructure/`、`Data/` 分层 |
 | `src/BazaarPlusPlus.ModApi/` `…Storage/` `…Localization/` | HTTP 客户端、本地持久化、本地化引擎，三个零 game/Unity/BepInEx 依赖的独立程序集 |
-| `src/BazaarPlusPlus.BazaarAgent/` `…BazaarAgentHost/` | 可选的 BazaarAgent 纯核心与 host 插件 |
-| `tests/` | 12 个默认 xUnit 测试宿主、兼容性清单、`ScenarioRunner.Tests` 逐子进程执行的场景 capsule、需显式 corpus 的 `CombatImpact.Corpus` 离线验收 |
+| `tests/` | 10 个默认 xUnit 测试宿主、兼容性清单、`ScenarioRunner.Tests` 逐子进程执行的场景 capsule、需显式 corpus 的 `CombatImpact.Corpus` 离线验收 |
 | `decompiled/` | 游戏 DLL 的 ILSpy 反编译输出，只读参考 |
 | `run.sh` | 本地构建、测试、格式化和反编译的统一入口 |
 

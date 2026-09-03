@@ -25,8 +25,6 @@ public sealed class CombatReplayLogEventCatalogTests
                 "recording_id:High:Short|outcome:Low:None|expected_items:Low:None|visible_items:Low:None|face_up_items:Low:None|settled_items:Low:None|expected_skills:Low:None|registered_skills:Low:None|ready_skills:Low:None|elapsed_ms:High:None",
             ["combat_replay.playback.request_rejected"] =
                 "source:Low:None|reason_code:Low:None|battle_id:High:Short",
-            ["combat_replay.external_record.accepted"] =
-                "request_id:High:Short|battle_id:High:Short|source:Low:None",
             ["combat_replay.playback.started"] =
                 "battle_id:High:Short|source:Low:None|record_video:Low:None",
             ["combat_replay.playback.succeeded"] = PlaybackTerminalSchema,
