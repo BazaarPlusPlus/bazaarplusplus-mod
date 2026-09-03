@@ -20,7 +20,6 @@ public static class RunLogSchema
     public const string BundleSealJobsTableName = "bundle_seal_jobs";
     public const string BundleOutboxTableName = "bundle_outbox";
     public const string CaptureSourceEndOfRunAuto = "end_of_run_auto";
-    public const string GameModeRanked = "Ranked";
 
     public static int CurrentSchemaVersion => LocalDatabaseSchemaVersion;
     public static string DatabaseFileName => PathConstants.RunLogDatabaseFileName;

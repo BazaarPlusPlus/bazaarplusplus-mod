@@ -29,14 +29,6 @@ internal sealed class EncounterInventory
         _cards = cards;
     }
 
-    public bool OwnsTemplate(Guid templateId)
-    {
-        foreach (var card in _cards)
-            if (card.TemplateId == templateId)
-                return true;
-        return false;
-    }
-
     public int CountMatchingTemplates(IReadOnlyList<Guid> anyOfIds)
     {
         var count = 0;

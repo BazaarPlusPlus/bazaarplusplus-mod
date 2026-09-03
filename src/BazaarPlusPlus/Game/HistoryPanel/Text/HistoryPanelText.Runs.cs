@@ -78,9 +78,6 @@ internal static partial class HistoryPanelText
             day.HasValue ? $"{day.Value}天" : "?天"
         );
 
-    internal static string DayHourBadge(int? day, int? hour) =>
-        $"{DayBadge(day)} {HourBadge(hour)}";
-
     internal static string RunOutcomeBubbleLabel(RunOutcomeTier tier)
     {
         return tier switch
@@ -100,15 +97,6 @@ internal static partial class HistoryPanelText
             return ResolveChinese($"{items} 物品 · {skills} 技能", $"{items} 物品 · {skills} 技能");
 
         return $"{items} {Pluralize(items, "item", "items")} · {skills} {Pluralize(skills, "skill", "skills")}";
-    }
-
-    internal static string RunRecord(int wins, int losses)
-    {
-        var languageCode = L.CurrentLanguageCode;
-        if (LanguageCodeMatcher.IsChinese(languageCode))
-            return ResolveChinese($"{wins}胜 - {losses}负", $"{wins}勝 - {losses}負");
-
-        return $"{wins}W - {losses}L";
     }
 
     internal static string RankLabel(string? rank, int? rating = null)

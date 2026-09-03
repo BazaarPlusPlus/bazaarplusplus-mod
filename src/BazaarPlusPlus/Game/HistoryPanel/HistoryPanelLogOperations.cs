@@ -45,7 +45,6 @@ internal enum HistoryPanelReplayReasonCode
     ReplayRejected,
     ReplayDirectoryUnavailable,
     GhostDownloadUnavailable,
-    GhostDownloadLinkFailed,
     GhostDownloadFailed,
     GhostArtifactInvalid,
     GhostBattleMismatch,

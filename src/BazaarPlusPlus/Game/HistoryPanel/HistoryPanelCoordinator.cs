@@ -88,7 +88,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         _requestUiRefresh();
     }
 
-    public void RefreshSectionOnEntry()
+    private void RefreshSectionOnEntry()
     {
         RefreshData();
 
@@ -96,7 +96,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
             _ = TrySyncGhostBattlesAsync();
     }
 
-    public void RefreshData()
+    private void RefreshData()
     {
         ClearTransientStatus();
         ClearDeleteRunConfirmation();
@@ -142,7 +142,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         _requestPreviewRefresh();
     }
 
-    public void RefreshGhostData()
+    private void RefreshGhostData()
     {
         ClearTransientStatus();
         _state.GhostBattles.Clear();

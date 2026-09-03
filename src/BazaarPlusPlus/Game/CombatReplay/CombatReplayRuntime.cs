@@ -64,10 +64,6 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
     public static CombatReplayRuntime? Instance { get; private set; }
 
-    // Sourced from the playback session (BeginSession sets it for both the local-saved and the
-    // imported-ghost path); the controller only learns battle ids on the local-saved path.
-    public string? ActiveBattleId => _playbackPublisher?.ActiveSessionBattleId;
-
     public bool IsSavedReplayPlaybackActive => _savedReplay.IsSavedReplayPlaybackActive;
 
     public bool IsReplayStartInProgress => _savedReplay.IsReplayStartInProgress;

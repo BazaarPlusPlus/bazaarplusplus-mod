@@ -51,7 +51,6 @@ internal static class Sizes
     public const float ServerHealthButtonWidth = 108f;
     public const float CloseButtonWidth = 96f;
     public const float StatusHeight = 24f;
-    public const float StatusMaxWidth = 220f;
     public const float PanelStatusMaxHeight = 64f;
     public const float DetailTextMaxHeight = 42f;
     public const float DetailNoticeMaxHeight = 48f;

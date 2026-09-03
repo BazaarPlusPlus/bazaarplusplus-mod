@@ -4,21 +4,6 @@ namespace BazaarPlusPlus.Game.HistoryPanel;
 
 internal sealed partial class HistoryPanel
 {
-    private void RefreshSectionOnEntry()
-    {
-        _coordinator?.RefreshSectionOnEntry();
-    }
-
-    private void RefreshData()
-    {
-        _coordinator?.RefreshData();
-    }
-
-    private void RefreshGhostData()
-    {
-        _coordinator?.RefreshGhostData();
-    }
-
     private void SetSectionMode(HistorySectionMode mode)
     {
         _coordinator?.SetSectionMode(mode);
@@ -47,11 +32,6 @@ internal sealed partial class HistoryPanel
     private void SelectBattle(int index)
     {
         _coordinator?.SelectBattle(index);
-    }
-
-    private void LoadBattlesForSelectedRun()
-    {
-        _coordinator?.RefreshData();
     }
 
     private bool CanReplaySelectedBattle(out string reason)
