@@ -33,8 +33,8 @@
       Link="BppSettingsDockDefinition.cs"
     />
     <Compile
-      Include="..\..\src\BazaarPlusPlus\Game\CombatStatusBar\CombatStatusBar.SettingsMenuLabel.cs"
-      Link="CombatStatusBar.SettingsMenuLabel.cs"
+      Include="..\..\src\BazaarPlusPlus\Game\CombatStatusBar\CombatStatusBarSettingsMenuLabel.cs"
+      Link="CombatStatusBarSettingsMenuLabel.cs"
     />
     <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CombatStatusBar\CombatStatusBar.State.cs"
@@ -45,12 +45,12 @@
       Link="CombatStatusBar.RoundedSprite.cs"
     />
     <Compile
-      Include="..\..\src\BazaarPlusPlus\Game\ItemEnchantPreview\EnchantPreview.SettingsMenuLabel.cs"
-      Link="EnchantPreview.SettingsMenuLabel.cs"
+      Include="..\..\src\BazaarPlusPlus\Game\ItemEnchantPreview\EnchantPreviewSettingsMenuLabel.cs"
+      Link="EnchantPreviewSettingsMenuLabel.cs"
     />
     <Compile
-      Include="..\..\src\BazaarPlusPlus\Game\NameOverride\NameOverride.SettingsMenuLabel.cs"
-      Link="NameOverride.SettingsMenuLabel.cs"
+      Include="..\..\src\BazaarPlusPlus\Game\NameOverride\NameOverrideSettingsMenuLabel.cs"
+      Link="NameOverrideSettingsMenuLabel.cs"
     />
     <Compile
       Include="..\..\src\BazaarPlusPlus\Core\GameState\IGameStateProbe.cs"
