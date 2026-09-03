@@ -9,7 +9,7 @@ The documentation inventory, and the rules for changing it. When to open each do
 - [../CONTEXT.md](../CONTEXT.md) — the glossary.
 - [adr/](adr/) — decision records.
 - [contracts/](contracts/) — wire and payload formats that outlive any one implementation.
-- [agents/](agents/) — per-repo config for the engineering skills.
+- [agents/](agents/) — how agents use this repo: the issue tracker, the glossary, and the `CLAUDE.md` rule-admission policy.
 - [../README.md](../README.md) — the human entry point: features, install, quick start.
 
 ## Decision records

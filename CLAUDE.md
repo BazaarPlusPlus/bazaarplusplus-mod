@@ -5,11 +5,11 @@ How to work in this repository (`AGENTS.md` is a symlink to this file). This fil
 | When you are about to | Read |
 |---|---|
 | Touch any code | `docs/MEMORY.md` |
-| Name a concept, in code or an issue title | `CONTEXT.md` |
+| Name a domain concept | `CONTEXT.md` |
 | Find who owns or constructs something | `docs/ARCHITECTURE.md` |
 | Reopen a settled decision | `docs/adr/` |
-| File, read, or label an issue | `docs/agents/issue-tracker.md` |
-| Write, promote, or delete a document | `docs/README.md` |
+| File or update a GitHub issue | `docs/agents/issue-tracker.md` |
+| Add, move, or delete a document | `docs/README.md` |
 | Propose a rule for this file | `docs/agents/rules-hygiene.md` |
 
 ## Build & Test Commands

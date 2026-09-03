@@ -76,7 +76,7 @@
 |---|---|
 | `src/BazaarPlusPlus/` | 主插件工程。`Plugin.cs` 为 BepInEx 入口，feature wiring 走 `BppComposition.cs` 组合根，其下按 `Core/`、`GameInterop/`、`Game/`、`Patches/`、`Infrastructure/`、`Data/` 分层 |
 | `src/BazaarPlusPlus.ModApi/` `…Storage/` `…Localization/` | HTTP 客户端、本地持久化、本地化引擎，三个零 game/Unity/BepInEx 依赖的独立程序集 |
-| `tests/` | 10 个默认 xUnit 测试宿主、兼容性清单、`ScenarioRunner.Tests` 逐子进程执行的场景 capsule、需显式 corpus 的 `CombatImpact.Corpus` 离线验收 |
+| `tests/` | 默认 xUnit 测试宿主、兼容性清单、`ScenarioRunner.Tests` 逐子进程执行的场景 capsule、需显式 corpus 的 `CombatImpact.Corpus` 离线验收 |
 | `decompiled/` | 游戏 DLL 的 ILSpy 反编译输出，只读参考 |
 | `run.sh` | 本地构建、测试、格式化和反编译的统一入口 |
 

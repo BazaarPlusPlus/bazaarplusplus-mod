@@ -2,7 +2,7 @@
 
 How the plugin is assembled: startup and teardown order, the layer and assembly boundaries, the seams that more than one feature consumes, and where runtime data lives. Per-feature detail is disclosed under [architecture/](architecture/) — this file covers only what holds across features.
 
-Terms used here are defined in [../CONTEXT.md](../CONTEXT.md). Why a boundary is where it is lives in [adr/](adr/).
+Terms used here are defined in [../CONTEXT.md](../CONTEXT.md). Why a boundary is where it is lives in [adr/](adr/), indexed one line each in [MEMORY.md](MEMORY.md).
 
 ## Runtime Shape
 
@@ -68,6 +68,7 @@ Each of these is consumed by two or more features. Reaching around one to re-imp
 | Remote embedded catalogs | `Infrastructure/RemoteEmbeddedCatalog/` | voice lines, ten-win builds, supporters |
 | Atomic payload files | `Infrastructure/` `FileBackedPayloadStore<T>` | combat replay, ghost payloads |
 | Deduped async loads | `Infrastructure/` `AsyncLoadCache<TKey,TValue>` | hero and encounter portrait providers |
+| Active scene name | `GameInterop/Scenes/ActiveSceneNameCache.cs` | Collection dock button, replay recording button |
 
 `RemoteEmbeddedCatalog<T>` owns cache → embedded → remote loading with feature-supplied freshness: single-flight warm and refresh, per-caller cancellation over shared flights, typed outcomes, atomic cache writes, retry re-arming, monotonic publication, and generation-guarded disposal. A queued cold-start refresh takes ownership atomically when its refresh flight begins, so cancelling the originating warm flight before that handoff prevents the remote operation. Feature observers are serialized against disposal on a separate gate, so `TryGet` never waits for feature-side logging or index rebuilds.
 
@@ -99,5 +100,3 @@ PvP battle evidence is a shared `Game/PvpBattles` module rather than a `GameInte
 | Hotkey bindings and settings dock rows | [architecture/input-and-settings.md](architecture/input-and-settings.md) |
 | Fonts, localization, voice subtitles, supporter attribution | [architecture/text.md](architecture/text.md) |
 | The V5 bundle wire format | [contracts/run-payload-v5.md](contracts/run-payload-v5.md) |
-
-Rationale and rejected alternatives live in [adr/](adr/); the index is in [README.md](README.md).
