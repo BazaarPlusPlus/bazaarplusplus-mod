@@ -58,25 +58,19 @@ internal interface INativeTooltipSuppressionLease : IDisposable
 internal sealed class NativeTooltipSuppressionOwnershipCore
 {
     private readonly int[] _leaseCounts = new int[3];
-    private int _totalLeaseCount;
 
-    internal bool IsActive => _totalLeaseCount > 0;
+    internal bool IsActive => _leaseCounts[0] > 0 || _leaseCounts[1] > 0 || _leaseCounts[2] > 0;
 
     internal void Acquire(NativeTooltipSuppressionOwner owner)
     {
-        var index = OwnerIndex(owner);
-        _leaseCounts[index]++;
-        _totalLeaseCount++;
+        _leaseCounts[OwnerIndex(owner)]++;
     }
 
     internal bool Release(NativeTooltipSuppressionOwner owner)
     {
         var index = OwnerIndex(owner);
-        if (_leaseCounts[index] == 0)
-            return !IsActive;
-
-        _leaseCounts[index]--;
-        _totalLeaseCount--;
+        if (_leaseCounts[index] > 0)
+            _leaseCounts[index]--;
         return !IsActive;
     }
 
@@ -102,14 +96,12 @@ internal static class NativeTooltipSuppression
     private static readonly NativeTooltipControllerTopologyGeneration ControllerTopology = new();
     private static readonly List<AuxiliaryCanvasGate> AuxiliaryGates = new();
     private static bool? _requiredShowGatesInstalled;
-    private static int _activeLeaseCount;
+    private static bool _suppressionActive;
 
-    internal static bool IsActive => Volatile.Read(ref _activeLeaseCount) > 0;
+    internal static bool IsActive => Volatile.Read(ref _suppressionActive);
 
-    internal static void NotifyControllerAwake() => ControllerTopology.ObserveControllerAwake();
-
-    internal static void NotifyControllerDestroyed() =>
-        ControllerTopology.ObserveControllerDestroyed();
+    internal static void NotifyControllerLifecycleChanged() =>
+        ControllerTopology.ObserveControllerLifecycleChange();
 
     internal static void CapturePatchCapabilities()
     {
@@ -128,7 +120,7 @@ internal static class NativeTooltipSuppression
         lock (Gate)
         {
             Ownership.Acquire(owner);
-            Volatile.Write(ref _activeLeaseCount, _activeLeaseCount + 1);
+            Volatile.Write(ref _suppressionActive, Ownership.IsActive);
         }
 
         try
@@ -538,10 +530,8 @@ internal static class NativeTooltipSuppression
         var restoreGates = false;
         lock (Gate)
         {
-            var before = Ownership.LeaseCount(owner);
             restoreGates = Ownership.Release(owner);
-            if (before > 0)
-                Volatile.Write(ref _activeLeaseCount, Math.Max(0, _activeLeaseCount - 1));
+            Volatile.Write(ref _suppressionActive, Ownership.IsActive);
         }
 
         if (!restoreGates)

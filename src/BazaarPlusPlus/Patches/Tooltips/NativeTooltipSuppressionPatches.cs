@@ -15,7 +15,7 @@ internal static class NativeTooltipSuppressionCardControllerAwakePatch
         ?? throw new MissingMethodException(typeof(CardTooltipController).FullName, "Awake");
 
     [HarmonyPostfix]
-    private static void Postfix() => NativeTooltipSuppression.NotifyControllerAwake();
+    private static void Postfix() => NativeTooltipSuppression.NotifyControllerLifecycleChanged();
 }
 
 [HarmonyPatch]
@@ -26,14 +26,14 @@ internal static class NativeTooltipSuppressionAuxiliaryControllerAwakePatch
         ?? throw new MissingMethodException(typeof(AuxiliaryTooltipController).FullName, "Awake");
 
     [HarmonyPostfix]
-    private static void Postfix() => NativeTooltipSuppression.NotifyControllerAwake();
+    private static void Postfix() => NativeTooltipSuppression.NotifyControllerLifecycleChanged();
 }
 
 [HarmonyPatch(typeof(CardTooltipController), nameof(CardTooltipController.OnDestroy))]
 internal static class NativeTooltipSuppressionCardControllerDestroyPatch
 {
     [HarmonyPrefix]
-    private static void Prefix() => NativeTooltipSuppression.NotifyControllerDestroyed();
+    private static void Prefix() => NativeTooltipSuppression.NotifyControllerLifecycleChanged();
 }
 
 [HarmonyPatch(typeof(BaseTooltipController), nameof(BaseTooltipController.OnDestroy))]
@@ -43,7 +43,7 @@ internal static class NativeTooltipSuppressionAuxiliaryControllerDestroyPatch
     private static void Prefix(BaseTooltipController __instance)
     {
         if (__instance is AuxiliaryTooltipController)
-            NativeTooltipSuppression.NotifyControllerDestroyed();
+            NativeTooltipSuppression.NotifyControllerLifecycleChanged();
     }
 }
 

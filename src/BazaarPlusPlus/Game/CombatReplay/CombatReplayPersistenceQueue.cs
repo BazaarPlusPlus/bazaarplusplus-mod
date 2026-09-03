@@ -21,8 +21,6 @@ internal sealed class CombatReplayPersistenceQueue : IDisposable
     private readonly Task _worker;
     private int _outstandingPersistenceCount;
     private int _pendingSaveCount;
-    private int _stopRequested;
-    private int _stopAcceptingNewWork;
     private int _disposeStarted;
     private int _cleanupStarted;
     private CombatReplayPersistenceRequest? _inFlight;
@@ -76,7 +74,7 @@ internal sealed class CombatReplayPersistenceQueue : IDisposable
 
         lock (_lifecycleGate)
         {
-            if (Volatile.Read(ref _stopAcceptingNewWork) == 1 || _shutdown.IsCancellationRequested)
+            if (Volatile.Read(ref _disposeStarted) == 1)
                 throw new ObjectDisposedException(nameof(CombatReplayPersistenceQueue));
 
             _pending.Enqueue(new CombatReplayPersistenceRequest(payload, manifest));
@@ -102,8 +100,6 @@ internal sealed class CombatReplayPersistenceQueue : IDisposable
             if (Interlocked.Exchange(ref _disposeStarted, 1) == 1)
                 return;
 
-            Volatile.Write(ref _stopAcceptingNewWork, 1);
-            Volatile.Write(ref _stopRequested, 1);
             _signal.Release();
         }
 
@@ -239,7 +235,7 @@ internal sealed class CombatReplayPersistenceQueue : IDisposable
 
     private bool ShouldExitWorkerLoop()
     {
-        return Volatile.Read(ref _stopRequested) == 1
+        return Volatile.Read(ref _disposeStarted) == 1
             && _pending.IsEmpty
             && Volatile.Read(ref _pendingSaveCount) == 0;
     }

@@ -182,24 +182,24 @@ internal static class EndOfRunCaptureSamplingPerformanceTests
 
         _ = cache.GetOrRefresh(topology.Current, controller => controller.Alive, Scan);
         controllers = [new FakeController()];
-        topology.ObserveControllerAwake();
+        topology.ObserveControllerLifecycleChange();
         _ = cache.GetOrRefresh(topology.Current, controller => controller.Alive, Scan);
         Assert(
             scans == 2,
-            "A same-count controller replacement must invalidate through its Awake signal."
+            "A same-count controller replacement must invalidate through its lifecycle signal."
         );
 
         controllers = [.. controllers, new FakeController()];
-        topology.ObserveControllerAwake();
+        topology.ObserveControllerLifecycleChange();
         _ = cache.GetOrRefresh(topology.Current, controller => controller.Alive, Scan);
         Assert(
             scans == 3,
             "A controller created below unchanged direct parent topology must invalidate the cache."
         );
 
-        topology.ObserveControllerDestroyed();
+        topology.ObserveControllerLifecycleChange();
         _ = cache.GetOrRefresh(topology.Current, controller => controller.Alive, Scan);
-        Assert(scans == 4, "Destroy lifecycle signals must invalidate the controller snapshot.");
+        Assert(scans == 4, "A further lifecycle signal must invalidate the controller snapshot.");
     }
 
     private static void Tooltip_audit_skips_only_inactive_non_authoritative_controllers()
