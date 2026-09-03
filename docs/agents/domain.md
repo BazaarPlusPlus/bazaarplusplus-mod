@@ -13,7 +13,3 @@ If the concept you need isn't in the glossary yet, that's a signal — either yo
 If your output contradicts an existing ADR, surface it explicitly rather than silently overriding:
 
 > _Contradicts ADR-0003 (preserve behavior-specific boundaries) — but worth reopening because…_
-
-## Repo-specific note
-
-The documentation inventory and the rules for changing it live in `docs/README.md`.
