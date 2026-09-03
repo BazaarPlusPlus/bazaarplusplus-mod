@@ -17,18 +17,8 @@ public sealed class LoggingGovernanceTests
         RegexOptions.CultureInvariant
     );
 
-    private static readonly Regex LegacyAgentLoggerCall = new(
-        @"\.(?<member>Info|Warning|Error)\s*\(",
-        RegexOptions.CultureInvariant
-    );
-
     private static readonly Regex LegacyStorageLoggerCall = new(
         @"\??\.(?<member>Warn|Error)\s*\(",
-        RegexOptions.CultureInvariant
-    );
-
-    private static readonly Regex LegacyHostAgentLoggerCall = new(
-        @"\b(?:logger|_logger)\.(?<member>Info|Warning|Error)\s*\(",
         RegexOptions.CultureInvariant
     );
 
@@ -74,7 +64,6 @@ public sealed class LoggingGovernanceTests
     private static readonly HashSet<string> ApprovedBepInExAdapters = new(StringComparer.Ordinal)
     {
         "BazaarPlusPlus/Infrastructure/BppLog.cs",
-        "BazaarPlusPlus.BazaarAgentHost/BazaarAgentBepInExLogger.cs",
     };
 
     [Fact]
@@ -226,20 +215,10 @@ public sealed class LoggingGovernanceTests
     }
 
     [Fact]
-    public void Agent_and_Storage_free_text_ports_are_absent()
+    public void Storage_free_text_port_is_absent()
     {
-        var agentRoot = Path.Combine(RepoRoot(), "src", "BazaarPlusPlus.BazaarAgent");
-        var hostRoot = Path.Combine(RepoRoot(), "src", "BazaarPlusPlus.BazaarAgentHost");
         var storageRoot = Path.Combine(RepoRoot(), "src", "BazaarPlusPlus.Storage");
 
-        AssertNoFingerprints(
-            FingerprintMatches(agentRoot, LegacyAgentLoggerCall, relativeTo: agentRoot),
-            "The BazaarAgent free-text logger surface is prohibited."
-        );
-        AssertNoFingerprints(
-            FingerprintMatches(hostRoot, LegacyHostAgentLoggerCall, relativeTo: hostRoot),
-            "The BazaarAgent Host free-text logger surface is prohibited."
-        );
         AssertNoFingerprints(
             FingerprintMatches(storageRoot, LegacyStorageLoggerCall, relativeTo: storageRoot),
             "The Storage free-text logger surface is prohibited."
@@ -273,29 +252,6 @@ public sealed class LoggingGovernanceTests
     }
 
     [Fact]
-    public void BazaarAgent_logger_port_accepts_only_governed_events()
-    {
-        var ports = File.ReadAllText(
-            Path.Combine(
-                RepoRoot(),
-                "src",
-                "BazaarPlusPlus.BazaarAgent",
-                "Contract",
-                "BazaarAgentPorts.cs"
-            )
-        );
-
-        Assert.Contains("void Emit(BazaarAgentLogEvent logEvent);", ports);
-        Assert.DoesNotMatch(
-            new Regex(
-                @"void\s+(?:Info|Warning|Error)\s*\(\s*string",
-                RegexOptions.CultureInvariant
-            ),
-            ports
-        );
-    }
-
-    [Fact]
     public void Log_shaped_calls_exist_only_in_approved_adapters()
     {
         var sourceRoot = Path.Combine(RepoRoot(), "src");
@@ -310,58 +266,6 @@ public sealed class LoggingGovernanceTests
             actual,
             "Direct BepInEx writes are restricted to approved adapters; generic log-shaped calls "
                 + "outside those adapters are prohibited."
-        );
-    }
-
-    [Fact]
-    public void BazaarAgentHost_bootstrap_uses_the_structured_adapter_before_bridge_access()
-    {
-        var source = File.ReadAllText(
-            Path.Combine(
-                RepoRoot(),
-                "src",
-                "BazaarPlusPlus.BazaarAgentHost",
-                "BazaarAgentHostPlugin.cs"
-            )
-        );
-        var adapter = source.IndexOf(
-            "new BazaarAgentBepInExLogger(Logger)",
-            StringComparison.Ordinal
-        );
-        var bridge = source.IndexOf("BazaarAgentGameBridge.Current", StringComparison.Ordinal);
-
-        Assert.True(adapter >= 0 && bridge >= 0 && adapter < bridge);
-        Assert.Contains("BazaarAgentLogEvents.HostInitializationFailed()", source);
-        Assert.Contains("BazaarAgentLogEvents.HostInitialized()", source);
-        Assert.DoesNotContain("Logger.Log", source);
-    }
-
-    [Fact]
-    public void BazaarAgent_dispatcher_returns_typed_failures_without_logging()
-    {
-        var source = File.ReadAllText(
-            Path.Combine(
-                RepoRoot(),
-                "src",
-                "BazaarPlusPlus.BazaarAgentHost",
-                "BazaarAgentGameActionDispatcher.cs"
-            )
-        );
-
-        Assert.DoesNotContain("IBazaarAgentLogger", source);
-        Assert.DoesNotContain("_logger", source);
-        Assert.Contains("BazaarAgentDispatchDiagnostic.DispatcherException", source);
-        Assert.Contains(
-            "DiagnosticException",
-            File.ReadAllText(
-                Path.Combine(
-                    RepoRoot(),
-                    "src",
-                    "BazaarPlusPlus.BazaarAgent",
-                    "Contract",
-                    "BazaarAgentPorts.cs"
-                )
-            )
         );
     }
 

@@ -67,7 +67,6 @@ internal sealed class BppComposition : IDisposable
     private readonly SettingsDockEntryRegistry _settingsDockRegistry = new();
     private readonly RunLifecycleModule _runLifecycle;
     private readonly CombatReplayModule _combatReplayModule;
-    private readonly BazaarAgentCombatSummaryModule _bazaarAgentCombatSummaryModule;
     private readonly CombatStatusBarModule _combatStatusBarModule;
     private readonly PostCombatImpactModule _postCombatImpactModule;
     private readonly RunLoggingModule _runLoggingModule;
@@ -121,7 +120,6 @@ internal sealed class BppComposition : IDisposable
 
         _runLifecycle = new RunLifecycleModule(_eventBus, _gameStateProbe, _runContext);
         _combatReplayModule = new CombatReplayModule(_eventBus);
-        _bazaarAgentCombatSummaryModule = new BazaarAgentCombatSummaryModule(_eventBus);
         _combatStatusBarModule = new CombatStatusBarModule(_eventBus, _runContext);
         _postCombatImpactModule = new PostCombatImpactModule(_eventBus, _staticCardMapProvider);
         _voiceSubtitlesModule = new VoiceSubtitlesModule(_paths.RequireDataRoot());
@@ -161,7 +159,6 @@ internal sealed class BppComposition : IDisposable
 
         _featureRegistry.Register(_runLifecycle);
         _featureRegistry.Register(_combatReplayModule);
-        _featureRegistry.Register(_bazaarAgentCombatSummaryModule);
         _featureRegistry.Register(_combatStatusBarModule);
         _featureRegistry.Register(_postCombatImpactModule);
         _featureRegistry.Register(_voiceSubtitlesInteropModule);
@@ -277,24 +274,6 @@ internal sealed class BppComposition : IDisposable
                 (c, s) => c.Initialize(s.Config, s.EncounterState, _nativeCardPreviewHost)
             )
         );
-
-        // Publish the public game-interop facades for the out-of-process BazaarAgent host
-        // plugin (it declares [BepInDependency(BazaarPlusPlus)] and therefore loads after us).
-        // BazaarPlusPlus does not reference the agent module; the host reads the facades through
-        // BazaarAgentGameBridge. Published unconditionally — they are passive accessors that
-        // nothing reads unless the host plugin is installed. The recorder's runtime accessor is
-        // lazy on purpose: CombatReplayRuntime is attached after this constructor runs.
-        BazaarAgentGameBridge.Current = new BazaarAgentGameProbe(_encounterStateProbe, _runContext);
-        BazaarAgentGameBridge.CurrentRecorder = BazaarAgentReplayRecorderWiring.Create(
-            () => _combatReplayModule.Runtime,
-            _services
-        );
-        BazaarAgentGameBridge.CurrentEncounterPreview = new BazaarAgentEncounterPreview(
-            _encounterPreviewModule
-        );
-        BazaarAgentGameBridge.CurrentCombatEncounterPreview =
-            new BazaarAgentCombatEncounterPreview();
-        BazaarAgentGameBridge.CurrentBattleSummarySource = _bazaarAgentCombatSummaryModule;
     }
 
     public void AttachCombatReplayRuntime(CombatReplayRuntime runtime) =>
@@ -309,11 +288,6 @@ internal sealed class BppComposition : IDisposable
 
     public void Dispose()
     {
-        BazaarAgentGameBridge.Current = null;
-        BazaarAgentGameBridge.CurrentRecorder = null;
-        BazaarAgentGameBridge.CurrentEncounterPreview = null;
-        BazaarAgentGameBridge.CurrentCombatEncounterPreview = null;
-        BazaarAgentGameBridge.CurrentBattleSummarySource = null;
         _featureRegistry.Stop();
         _endOfRunCaptureWorkflow.Dispose();
         _encounterPreviewModule.Dispose();

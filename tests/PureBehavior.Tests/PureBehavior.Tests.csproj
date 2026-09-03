@@ -28,6 +28,7 @@
     <Compile Include="../../src/BazaarPlusPlus/GameInterop/CardPreview/NativeCardPreviewScopeDisposal.cs" />
     <Compile Include="../../src/BazaarPlusPlus/GameInterop/CardPreview/NativeCardPreviewPoolSettlement.cs" />
     <Compile Include="../../src/BazaarPlusPlus/GameInterop/AssetLoading/NativeAssetLoaderInvocation.cs" />
+    <Compile Include="../../src/BazaarPlusPlus/GameInterop/Cards/CardDescriptionTextNormalizer.cs" />
     <Compile Include="../../src/BazaarPlusPlus/GameInterop/CardPreview/NativeCardPreviewHoverState.cs" />
     <Compile Include="../../src/BazaarPlusPlus/GameInterop/CardPreview/NativeTooltipRefreshTransaction.cs" />
     <Compile Include="../../src/BazaarPlusPlus/GameInterop/CardPreview/NativePreviewSessionActions.cs" />

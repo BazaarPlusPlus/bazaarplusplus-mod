@@ -1,4 +1,4 @@
-# ADR-0005: One Destroy chip covers the full destroy-mechanic cluster
+# ADR-0004: One Destroy chip covers the full destroy-mechanic cluster
 
 Status: Accepted
 

@@ -1,8 +1,5 @@
 # Build output
 dist/
-# The BazaarAgent dashboard is an intentionally versioned runtime asset, embedded in its DLL.
-!src/BazaarPlusPlus.BazaarAgent/Dashboard/dist/
-!src/BazaarPlusPlus.BazaarAgent/Dashboard/dist/**
 bin/
 obj/
 native/windows/build/

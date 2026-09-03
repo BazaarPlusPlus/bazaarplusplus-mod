@@ -1,7 +1,7 @@
 using BazaarPlusPlus.GameInterop.Cards;
 using Xunit;
 
-namespace BazaarPlusPlus.BazaarAgent.Tests;
+namespace BazaarPlusPlus.PureBehavior.Tests;
 
 public sealed class CardDescriptionTextNormalizerTests
 {

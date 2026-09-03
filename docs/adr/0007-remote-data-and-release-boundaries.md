@@ -1,4 +1,4 @@
-# ADR-0008: Remote data separates runtime catalogs, release manifests, and build seed fetch
+# ADR-0007: Remote data separates runtime catalogs, release manifests, and build seed fetch
 
 Status: Accepted
 

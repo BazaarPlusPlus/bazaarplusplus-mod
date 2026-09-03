@@ -68,8 +68,6 @@ internal static class PluginLogIdentity
                 PluginFeatureId.VoiceSubtitlesInterop,
             "BazaarPlusPlus.Game.VoiceSubtitles.VoiceSubtitlesModule" =>
                 PluginFeatureId.VoiceSubtitles,
-            "BazaarPlusPlus.Game.CombatReplay.BazaarAgentCombatSummaryModule" =>
-                PluginFeatureId.BazaarAgentCombatSummary,
             "BazaarPlusPlus.Game.PostCombatImpact.PostCombatImpactModule" =>
                 PluginFeatureId.PostCombatImpact,
             "BazaarPlusPlus.Game.Supporters.SupporterCatalogModule" => PluginFeatureId.Supporters,

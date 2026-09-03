@@ -1849,7 +1849,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             _savedReplay.OnStartFailed();
             // Unconditional: PublishEnded only publishes the event when "starting" was
             // published, but it must always clear the session (battle id) for a failed start.
-            // Cleanup order is explicit on this path (ADR-0009) — not shared with state-exit.
+            // Cleanup order is explicit on this path (ADR-0003) — not shared with state-exit.
             var ended = ReplayPlaybackCleanup.PublishThenCleanup(
                 () => _playbackPublisher!.PublishEnded("start-failed", failed: true),
                 (stage, cleanupException) =>
@@ -1946,7 +1946,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         var ownership = _savedReplay.BeginReplayStateExit(now);
         var operation = _activePlaybackOperation ?? _completedPlaybackOperationAwaitingExit;
         _completedPlaybackOperationAwaitingExit = null;
-        // Cleanup order is explicit on this path (ADR-0009) — not shared with start-failure.
+        // Cleanup order is explicit on this path (ADR-0003) — not shared with start-failure.
         var ended = ReplayPlaybackCleanup.PublishThenCleanup(
             () =>
                 _playbackPublisher?.PublishEnded(
@@ -2037,7 +2037,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         // intercepts the normal transition), so OnStateChanged's PublishEnded never fires for
         // them. Emit it here too, otherwise the video recorder never gets the "ended" signal and
         // leaves its platform encoder on a never-finalized file (no moov atom -> unplayable MP4).
-        // Cleanup order is explicit on this path (ADR-0009) — not shared with start-failure.
+        // Cleanup order is explicit on this path (ADR-0003) — not shared with start-failure.
         var operation = _activePlaybackOperation ?? _completedPlaybackOperationAwaitingExit;
         _completedPlaybackOperationAwaitingExit = null;
         var ended = ReplayPlaybackCleanup.PublishThenCleanup(

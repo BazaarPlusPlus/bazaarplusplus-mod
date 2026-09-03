@@ -9,9 +9,7 @@ Domain constraints that must stay true in the system.
 - MessagePack-serialized DTOs in the Unity/Mono runtime must keep their whole serialized graph `public`.
 - Key game entities (cards, merchants, trainers) by their stable template GUID, never by display name or `ArtKey` substring. [`src/BazaarPlusPlus/GameInterop/Cards/PackageIdentity.cs`]
 - Package-card identity is `EHiddenTag.Package` only, resolved via `PackageIdentity.IsPackage` — never name or `ArtKey` heuristics. Collection classification and the package-merchant tooltip depend on that single resolver. [`src/BazaarPlusPlus/GameInterop/Cards/PackageIdentity.cs`]
-- Bump both `RunLogSchema` version constants together for a column or data change carried by the versioned migration block; there is no separate upload-payload version. Index and trigger DDL needs no bump — it lands in `BootstrapSql`, which `EnsureInitialized` re-executes on every open. [`src/BazaarPlusPlus.Storage/RunLog/RunLogSchema.cs` | ADR-0007]
-- The mod carries **no play policy**: transport and validation only. All agent strategy lives in the external `bazaarplusplus-agent`. [ADR-0002]
-- The BazaarAgent external contract is v3 — `GET /v3/context` and `POST /v3/actions` are the only decision routes. Wire field names and delta-merge semantics are pinned in `src/BazaarPlusPlus.BazaarAgent/AGENT_README.md`; keep that file in step with the projector. [ADR-0002 | ADR-0003]
+- Bump both `RunLogSchema` version constants together for a column or data change carried by the versioned migration block; there is no separate upload-payload version. Index and trigger DDL needs no bump — it lands in `BootstrapSql`, which `EnsureInitialized` re-executes on every open. [`src/BazaarPlusPlus.Storage/RunLog/RunLogSchema.cs` | ADR-0006]
 - CJK text that renders as tofu is routed through `NativeGameTypography`, which applies the game's native serif/sans and extends BPP-owned text with a CJK fallback chain. Fix the font route, not the copy. [`src/BazaarPlusPlus/GameInterop/Fonts/NativeGameTypography.cs`]
 - Mod-authored user-facing strings use `LocalizedTextSet` (en + zh-Hans, optional zh-Hant + de/pt/ko/it; anything else falls back to English). [`src/BazaarPlusPlus.Localization/LocalizedTextSet.cs`]
 - A categorized degradation event includes the category field in its `BppLogStormPolicy` key — a shared key lets one category's failure suppress every later category during the storm window. [`src/BazaarPlusPlus/Infrastructure/Logging/Core/BppLogSchema.cs`]
@@ -23,14 +21,13 @@ Domain constraints that must stay true in the system.
 One line each, full record in [adr/](adr/). A line here exists to stop a settled question from being reopened; the ADR says why.
 
 - ADR-0001: Expose run/encounter state via on-demand `IEncounterStateProbe`, not an event-sourced timeline tracker.
-- ADR-0002: BazaarAgent is its own BepInEx plugin depending on BazaarPlusPlus — dependency inverted, fixed loopback `127.0.0.1:47900`.
-- ADR-0003: Replay exit is explicit and single-owner. The V1 replay-control endpoints were removed; the agent `Continue` Flow action is emitted only at `finishedAwaitingContinue`, and `CombatReplayRuntime.TryContinueReplay` is the only programmatic `ReplayState` exit.
-- ADR-0004: Keep behavior-specific seams and reject cosmetic unifications — the three Core seams, HistoryPanel async/state ownership, distinct tooltip normalizers, catalog-local facet snapshots, evidence-free registration-order rules.
-- ADR-0005: One Collection `Destroy` chip covers the whole destroy-mechanic cluster on base templates; `TTriggerOnCardRepaired` is deliberately excluded.
-- ADR-0006: Timing invariants live in pure decision cores, not MonoBehaviour glue. Staged start commits, the two-phase exit decision, the single-owner suppression latch, the null-outcome no-op, and the two-point dispose contract are load-bearing.
-- ADR-0007: Outbound Mod API rules have protocol and persistence owners — one Run Bundle contract, one response parser, session-owned transport, a pure seal-convergence core, a Storage-owned bundle queue.
-- ADR-0008: Remote data separates runtime catalogs, the release manifest, and build-time seed fetch into three lifecycles.
-- ADR-0009: Combat Impact numbers are ledger entries — dimension/basis/coverage/provenance on every value, per-view conservation only, typed residuals never dropped, activation batches are observations (not trigger counts), attribution graph-driven (never card-GUID constants).
+- ADR-0002: Replay exit is explicit and single-owner — `CombatReplayRuntime.TryContinueReplay` is the only programmatic `ReplayState` exit; ghost payloads are stored in recorder perspective, stamped by `PerspectiveVersion`.
+- ADR-0003: Keep behavior-specific seams and reject cosmetic unifications — the three Core seams, HistoryPanel async/state ownership, distinct tooltip normalizers, catalog-local facet snapshots, evidence-free registration-order rules.
+- ADR-0004: One Collection `Destroy` chip covers the whole destroy-mechanic cluster on base templates; `TTriggerOnCardRepaired` is deliberately excluded.
+- ADR-0005: Timing invariants live in pure decision cores, not MonoBehaviour glue. Staged start commits, the two-phase exit decision, the single-owner suppression latch, the null-outcome no-op, and the two-point dispose contract are load-bearing.
+- ADR-0006: Outbound Mod API rules have protocol and persistence owners — one Run Bundle contract, one response parser, session-owned transport, a pure seal-convergence core, a Storage-owned bundle queue.
+- ADR-0007: Remote data separates runtime catalogs, the release manifest, and build-time seed fetch into three lifecycles.
+- ADR-0008: Combat Impact numbers are ledger entries — dimension/basis/coverage/provenance on every value, per-view conservation only, typed residuals never dropped, activation batches are observations (not trigger counts), attribution graph-driven (never card-GUID constants).
 
 ## Durable knowledge
 
@@ -45,7 +42,7 @@ Reach for these before writing a new one.
 
 - Reuse the game's native UI components (`CardPreviewBase.SetUp` and the like) and existing prior art instead of hand-rolling a render or upload chain.
 - Mod-appended tooltip text goes through `BppTooltipSections`, which clones the tooltip's own passive-text block at 0.75 font scale, keyed per controller and purpose. [`src/BazaarPlusPlus/Patches/Tooltips/BppTooltipSections.cs`]
-- Keep Unity-adjacent logic free of Unity types and Compile-Include it into a test project — no InternalsVisibleTo needed. `OverlayLifecycleCore`, `HotkeyBindingPathCore`, `AsyncLoadCache`, `CollectionCardFitMath`, and `SavedReplayLifecycle` reach zero-ManagedPath. `CollectionViewState` does not: it uses `BazaarGameShared` types, so its test project still references the game assemblies. [ADR-0006]
+- Keep Unity-adjacent logic free of Unity types and Compile-Include it into a test project — no InternalsVisibleTo needed. `OverlayLifecycleCore`, `HotkeyBindingPathCore`, `AsyncLoadCache`, `CollectionCardFitMath`, and `SavedReplayLifecycle` reach zero-ManagedPath. `CollectionViewState` does not: it uses `BazaarGameShared` types, so its test project still references the game assemblies. [ADR-0005]
 
 ## Gotchas
 
@@ -78,8 +75,8 @@ Each of these failed silently, or reported something misleading, at least once.
 - BPP settings dock buttons are clones of native dock buttons that must avoid native-button bounds and re-sync geometry for several frames after a screen-size change. [`src/BazaarPlusPlus/Game/Settings/BppDockButtonVisuals.cs`]
 - Aspect-fallback collection cards (no measurable frame or raw-image bounds) hold size via a one-shot `SetSizeWithCurrentAnchors` plus the per-cell bounds cache. This path shipped without in-game smoke; on card-size drift, apply the fallback documented in the fitter header. [`src/BazaarPlusPlus/Game/CollectionPanel/Grid/NativeCardCellFitter.cs`]
 - The native end-of-run reveal uses `CreateRawGraph`, whose delay roots have no `ScriptPlayableOutput` and therefore never complete — cards stay FaceDown and screenshot readiness never fires. `EndOfRunRawRevealCompletionPatch` injects a port-1 output per root; keep it. [`src/BazaarPlusPlus/Patches/EndOfRun/EndOfRunRawRevealCompletionPatch.cs`]
-- `BackgroundUploadPump.OnDestroy` is a two-point dispose: release arm subscriptions first, dispose the session only after the drain callback. Merging them lets an in-flight `RunAttemptAsync` hit disposed resources. [`src/BazaarPlusPlus/Game/Upload/BackgroundUploadPump.cs` | ADR-0006]
-- Scenario capsules construct HistoryPanel types positionally, so their ctor shape is pinned behavior: `HistoryPanelDependencies`' single ctor stays guard-free direct assignment (null guards break it at construction) and `HistoryPanelReplayService` keeps its discarded `pluginsDirectoryPath` parameter to hold arity. [`src/BazaarPlusPlus/Game/HistoryPanel/HistoryPanelDependencies.cs` | `src/BazaarPlusPlus/Game/HistoryPanel/HistoryPanelReplayService.cs` | ADR-0004]
+- `BackgroundUploadPump.OnDestroy` is a two-point dispose: release arm subscriptions first, dispose the session only after the drain callback. Merging them lets an in-flight `RunAttemptAsync` hit disposed resources. [`src/BazaarPlusPlus/Game/Upload/BackgroundUploadPump.cs` | ADR-0005]
+- Scenario capsules construct HistoryPanel types positionally, so their ctor shape is pinned behavior: `HistoryPanelDependencies`' single ctor stays guard-free direct assignment (null guards break it at construction) and `HistoryPanelReplayService` keeps its discarded `pluginsDirectoryPath` parameter to hold arity. [`src/BazaarPlusPlus/Game/HistoryPanel/HistoryPanelDependencies.cs` | `src/BazaarPlusPlus/Game/HistoryPanel/HistoryPanelReplayService.cs` | ADR-0003]
 - `run.sh` defaults `DOTNET_SYSTEM_NET_DISABLEIPV6=1`, override-preserving, so unusable advertised IPv6 routes cannot stall build-time downloads. [`run.sh`]
 - `rg 'new TypeName('` misses target-typed `new(...)` call sites, so a "zero call sites" grep proves nothing; prove a deletion by deleting (CLAUDE.md, Build & Test). [`tests/PureBehavior.Tests/PureBehavior.Tests.csproj`]
 - `src/` and `tests/` both set `BppEnableWarningGate`, so `TreatWarningsAsErrors` turns an unused using (IDE0005) or an unread private field (CS0414) into a build error. [`Directory.Build.props` | `src/Directory.Build.props`]

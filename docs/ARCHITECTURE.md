@@ -8,7 +8,7 @@ Terms used here are defined in [../CONTEXT.md](../CONTEXT.md). Why a boundary is
 
 `Plugin.Awake()` resolves the game build channel via `GameBuildInfoResolver`, creates `BppComposition`, installs static facades such as `BppLog`, `BppPatchHost`, localization, settings dock entries, supporters, and hotkeys, applies Harmony patches per patch class, starts feature modules, builds the owner-scoped Mod API session and separate BazaarDB-link client, then mounts Unity components onto the plugin `GameObject` (`src/BazaarPlusPlus/Plugin.cs`).
 
-`BppComposition` is the manual composition root — there is no DI container. It receives the resolved `IGameBuildInfo` and wires feature modules through `BppFeatureRegistry`, Unity components through `BppMountableRegistry`, and in-game settings rows through `SettingsDockEntryRegistry` (`src/BazaarPlusPlus/BppComposition.cs`). Simple components mount through `ComponentMount<T>`; a bespoke mount exists only where a feature owns additional dependencies or object lifecycles, and `CombatReplayRuntime` is the bootstrap exception because other modules need it before mountables run. It also publishes the passive BazaarAgent game facades through `BazaarAgentGameBridge`, so the optional host plugin can consume them without the main plugin referencing the agent core.
+`BppComposition` is the manual composition root — there is no DI container. It receives the resolved `IGameBuildInfo` and wires feature modules through `BppFeatureRegistry`, Unity components through `BppMountableRegistry`, and in-game settings rows through `SettingsDockEntryRegistry` (`src/BazaarPlusPlus/BppComposition.cs`). Simple components mount through `ComponentMount<T>`; a bespoke mount exists only where a feature owns additional dependencies or object lifecycles, and `CombatReplayRuntime` is the bootstrap exception because other modules need it before mountables run.
 
 Three ordering facts in this file are load-bearing, because each one fails silently when reordered:
 
@@ -26,7 +26,7 @@ Newer-only combat events and enum members stay behind runtime adapters in `GameI
 
 ## Assemblies And Boundaries
 
-Four assemblies ship unconditionally; two more ship only with `./run.sh build --with-bazaaragent`.
+Four assemblies ship.
 
 | Assembly | Contents |
 |---|---|
@@ -34,10 +34,8 @@ Four assemblies ship unconditionally; two more ship only with `./run.sh build --
 | `BazaarPlusPlus.ModApi.dll` | HTTP client, routes, DTOs, MessagePack/gzip helpers for the mod backend |
 | `BazaarPlusPlus.Storage.dll` | SQLite schema, repositories, path interfaces, local persistence models |
 | `BazaarPlusPlus.Localization.dll` | localization resolution engine, language and mode helpers |
-| `BazaarPlusPlus.BazaarAgent.dll` (optional) | pure HTTP transport, action DTOs, validation, queues, runtime controller |
-| `BazaarPlusPlus.BazaarAgentHost.dll` (optional) | separate BepInEx plugin that reads `BazaarAgentGameBridge` and pumps the controller from Unity lifecycle methods |
 
-`ModApi`, `Storage`, and `Localization` keep **zero game, Unity, and BepInEx references**, and the BazaarAgent pure core keeps to `System` + `Newtonsoft.Json`. Both invariants are enforced by architecture tests, not by the compiler.
+`ModApi`, `Storage`, and `Localization` keep **zero game, Unity, and BepInEx references** — an invariant enforced by architecture tests, not by the compiler.
 
 Inside the main assembly:
 
@@ -51,7 +49,7 @@ Inside the main assembly:
 
 The main project targets `netstandard2.1`, uses C# 12, and publicizes game assemblies, so `internal` game members are accessible. Remote seed data is declared in `RemoteEmbeddedData.targets` and delegates transport to `build/RemoteEmbeddedDataFetcher`; the shared version is `BppVersion` in `Directory.Build.props`.
 
-Architecture tests ratchet dependency boundaries, shared ownership, BazaarAgent isolation, and test/build safety contracts (`tests/Architecture.Tests/`). Concrete composition behavior remains in `tests/CompositionRuntime.Tests/` and is compiled by `RuntimeIntegration.Tests`: feature start/stop is fault-isolated, while `BppMountableRegistry.MountAll` deliberately is not.
+Architecture tests ratchet dependency boundaries, shared ownership, and test/build safety contracts (`tests/Architecture.Tests/`). Concrete composition behavior remains in `tests/CompositionRuntime.Tests/` and is compiled by `RuntimeIntegration.Tests`: feature start/stop is fault-isolated, while `BppMountableRegistry.MountAll` deliberately is not.
 
 ## Shared Seams
 
@@ -77,7 +75,7 @@ Operational logging is governed: features emit through closed `BppLogFeatureScop
 
 ## Data And File Locations
 
-Runtime data that BazaarPlusPlus owns is rooted at `<GameRoot>/BazaarPlusPlusV5/`. `BepInExPathProvider` exposes that single root, and storage and feature modules derive the SQLite database, bundle outbox, replay, ghost payload, screenshot, video, voice, LiveBuild, supporter, Encounter Preview, and BazaarAgent paths from it. No runtime cache uses the process temporary directory.
+Runtime data that BazaarPlusPlus owns is rooted at `<GameRoot>/BazaarPlusPlusV5/`. `BepInExPathProvider` exposes that single root, and storage and feature modules derive the SQLite database, bundle outbox, replay, ghost payload, screenshot, video, voice, LiveBuild, supporter, and Encounter Preview paths from it. No runtime cache uses the process temporary directory.
 
 V5 uses a fresh, non-migrating SQLite schema. Beyond run facts, events, battles, snapshots, screenshots, and replay-video metadata it holds `bundle_seal_jobs` and a non-FK `bundle_outbox`; ghost rows carry remote bundle identity, presigned URL and expiry, and replay state. V4 sync cursors, dirty/checkpoint upload state, and independent screenshot upload state do not exist (`src/BazaarPlusPlus.Storage/RunLog/RunLogSchema.cs`).
 
@@ -88,14 +86,6 @@ An in-memory event bus decouples runtime coordination between feature modules re
 `RunLoggingModule` is the feature-owned event intake. `Start` creates its replicated/queued store chain and session manager only after composition construction succeeds, subscribes once to run lifecycle, run initialization, PvP recording, and replay-drained events, then maps a matching `PVPCombat` manifest directly to persistence. Battles attach to the stable active or deferred run id before the event append and checkpoint. Interrupted runs stay resumable; normal completion owns an active, cancellable two-second replay-persistence deadline; `Stop` is a quiescence barrier that forces any deferred completion before unsubscribing and disposing the store. No Run Logging `MonoBehaviour` is mounted.
 
 PvP battle evidence is a shared `Game/PvpBattles` module rather than a `GameInterop` adapter — it captures local and opponent identities and board snapshots from live game state and net messages.
-
-## BazaarAgent Optional Host
-
-BazaarAgent is optional and off by default. The host plugin declares `[BepInDependency(BppPluginMetadata.Guid)]`, reads `BazaarAgentGameBridge.Current`, creates a pure runtime controller, pumps it from `Update()`, and disposes it on destroy. It listens only on loopback (port and routes: ADR-0002, `src/BazaarPlusPlus.BazaarAgent/AGENT_README.md`), and serves a read-only activity browser under `GET /` and `GET /dashboard/`.
-
-`src/BazaarPlusPlus.BazaarAgent/Dashboard/dist` is a prebuilt artifact: its source is not in this repo, and the files are refreshed by checking in updated tracked assets rather than by a build step here.
-
-The v3 wire protocol — session and revision handshake, delta merge semantics, item reference format, action fields — is documented in `src/BazaarPlusPlus.BazaarAgent/AGENT_README.md`, next to the projector that implements it. That file is the contract; this one does not restate it.
 
 ## Per-feature detail
 
@@ -109,6 +99,5 @@ The v3 wire protocol — session and revision handshake, delta merge semantics, 
 | Hotkey bindings and settings dock rows | [architecture/input-and-settings.md](architecture/input-and-settings.md) |
 | Fonts, localization, voice subtitles, supporter attribution | [architecture/text.md](architecture/text.md) |
 | The V5 bundle wire format | [contracts/run-payload-v5.md](contracts/run-payload-v5.md) |
-| The BazaarAgent v3 protocol | `src/BazaarPlusPlus.BazaarAgent/AGENT_README.md` |
 
 Rationale and rejected alternatives live in [adr/](adr/); the index is in [README.md](README.md).

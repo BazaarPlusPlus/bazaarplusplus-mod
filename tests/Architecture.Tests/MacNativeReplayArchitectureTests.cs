@@ -279,38 +279,6 @@ public sealed class MacNativeReplayArchitectureTests
             );
         Assert.Contains("macos", releaseValidation.ToString(), StringComparison.Ordinal);
         Assert.Contains("windows", releaseValidation.ToString(), StringComparison.Ordinal);
-
-        var hostProject = XDocument.Load(
-            Path.Combine(
-                RepoRoot(),
-                "src",
-                "BazaarPlusPlus.BazaarAgentHost",
-                "BazaarPlusPlus.BazaarAgentHost.csproj"
-            )
-        );
-        var hostReleaseCopy = hostProject
-            .Descendants()
-            .Single(element =>
-                element.Name.LocalName == "Target"
-                && element.Attribute("Name")?.Value == "CopyHostToInstallerSource"
-            );
-        var hostCopy = Assert.Single(
-            hostReleaseCopy.Descendants(),
-            element => element.Name.LocalName == "Copy"
-        );
-        Assert.Contains("$(BppReleasePlatform)", hostCopy.ToString());
-
-        var hostReleasePackage = hostProject
-            .Descendants()
-            .Single(element =>
-                element.Name.LocalName == "Target"
-                && element.Attribute("Name")?.Value == "PackageHostInstallerSource"
-            );
-        var hostZip = Assert.Single(
-            hostReleasePackage.Descendants(),
-            element => element.Name.LocalName == "ZipDirectory"
-        );
-        Assert.Contains("$(BppReleasePlatform)", hostZip.ToString());
     }
 
     [Fact]
@@ -407,9 +375,6 @@ public sealed class MacNativeReplayArchitectureTests
                 "HistoryPanel",
                 "HistoryPanelReplayService.cs"
             )
-        );
-        AssertNativeProbeIsSynchronous(
-            Path.Combine(RepoRoot(), "src", "BazaarPlusPlus", "BazaarAgentReplayRecorderWiring.cs")
         );
     }
 
