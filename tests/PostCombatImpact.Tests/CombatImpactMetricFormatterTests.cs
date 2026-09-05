@@ -638,7 +638,7 @@ public sealed class CombatImpactMetricFormatterTests
     }
 
     [Fact]
-    public void Authoritative_bases_do_not_retype_observed_duration_or_invent_counts()
+    public void Native_count_controls_stay_internal_while_gameplay_totals_remain_visible()
     {
         var applications = new CombatImpactAuthoritativeMetric(
             CombatImpactKind.Haste,
@@ -677,13 +677,14 @@ public sealed class CombatImpactMetricFormatterTests
                 canReconcileApplicationCount: true
             ),
         };
-        var affectedCards = matching with
+        var nonComparableCount = matching with
         {
-            Count = 7,
+            Count = 23,
+            ObservedValue = 69000,
             AuthoritativeMetric = new CombatImpactAuthoritativeMetric(
                 CombatImpactKind.Haste,
                 "HasteAmount",
-                10,
+                24,
                 CombatImpactValueUnit.Applications,
                 CombatImpactAuthoritativeBasis.ApplicationCount
             ),
@@ -722,27 +723,25 @@ public sealed class CombatImpactMetricFormatterTests
         };
 
         Assert.Equal("×10 · 9.50s", CombatImpactMetricFormatter.Group(matching, chinese: false));
-        Assert.Equal(
-            "×7 · 9.50s · 10 applications",
-            CombatImpactMetricFormatter.Group(divergent, chinese: false)
-        );
-        Assert.Equal(
-            "×7 · 9.50s · 生效 10 次",
-            CombatImpactMetricFormatter.Group(divergent, chinese: true)
-        );
+        Assert.Equal("×7 · 9.50s", CombatImpactMetricFormatter.Group(divergent, chinese: false));
+        Assert.Equal("×7 · 9.50s", CombatImpactMetricFormatter.Group(divergent, chinese: true));
         Assert.Equal("×10 · 9.50s", CombatImpactMetricFormatter.Group(estimated, chinese: false));
         Assert.Equal("×10 · 9.50s", CombatImpactMetricFormatter.Group(estimated, chinese: true));
         Assert.Equal(
-            "9.50s · 1 application",
+            "9.50s",
             CombatImpactMetricFormatter.Group(singularApplication, chinese: false)
         );
         Assert.Equal(
-            "×7 · 9.50s · 10 cards affected",
-            CombatImpactMetricFormatter.Group(affectedCards, chinese: false)
+            "9.50s",
+            CombatImpactMetricFormatter.Group(singularApplication, chinese: true)
         );
         Assert.Equal(
-            "×7 · 9.50s · 影响 10 张卡牌",
-            CombatImpactMetricFormatter.Group(affectedCards, chinese: true)
+            "×23 · 69s",
+            CombatImpactMetricFormatter.Group(nonComparableCount, chinese: false)
+        );
+        Assert.Equal(
+            "×23 · 69s",
+            CombatImpactMetricFormatter.Group(nonComparableCount, chinese: true)
         );
         Assert.Equal(
             "76 total",

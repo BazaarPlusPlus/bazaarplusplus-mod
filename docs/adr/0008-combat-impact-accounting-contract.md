@@ -10,7 +10,8 @@ Combat Impact used to place effect applications, activation observations, amount
 
 Every displayed number carries dimension, basis, coverage, and provenance in the `CombatImpactEvent` ledger.
 
-- Additive breakdowns require the same dimension and basis. An incomplete breakdown renders `attributed N / total M` with every non-zero remainder bucket; zero attribution renders the total plus `breakdown unavailable`.
+- Additive breakdowns require the same dimension and basis; every non-zero remainder bucket stays in the internal ledger. Attribution gaps and accounting diagnostics are not player-facing tooltip copy.
+- Native application-count controls stay internal, even when comparable. The tooltip shows the recorded effect count and gameplay amount or duration without appending a second count such as `cards affected` or `applications`. Native damage, healing, and shield amounts remain gameplay totals to display ([formatter](../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactMetricFormatter.cs)).
 - Conservation is per view. The received view intentionally omits hero/player targets, so no caused-versus-received grand total exists ([tests](../../tests/PostCombatImpact.Tests/CombatImpactAggregatorTests.cs)).
 - `ObservedActivationBatchCount` is a distinct trigger-source/frame observation, never an exact trigger count or an application count ([models](../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactModels.cs)).
 - Producer-assigned `CombatImpactTriggerScope` distinguishes external, self, trigger-fallback, no-evidence, unattributed, and not-applicable provenance. Rejected trigger, target, source, and value evidence survives as typed residuals.
