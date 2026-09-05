@@ -15,12 +15,6 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/BazaarPlusPlus/BazaarPlusPlus.csproj" />
-    <Reference Include="BazaarGameShared">
-      <HintPath>$(ManagedPath)/BazaarGameShared.dll</HintPath>
-    </Reference>
-    <Reference Include="BazaarGameClient">
-      <HintPath>$(ManagedPath)/BazaarGameClient.dll</HintPath>
-    </Reference>
     <Reference Include="UnityEngine.CoreModule">
       <HintPath>$(ManagedPath)/UnityEngine.CoreModule.dll</HintPath>
     </Reference>
