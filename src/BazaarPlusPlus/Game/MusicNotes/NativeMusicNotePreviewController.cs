@@ -1,5 +1,6 @@
 #nullable enable
 using BazaarGameClient.Domain.Models.Cards;
+using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Domain.Cards.Socket;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.Input;
@@ -9,18 +10,17 @@ using UnityEngine;
 
 namespace BazaarPlusPlus.Game.MusicNotes;
 
-// The game already renders placed notes above items outside combat. Shift adds only the
-// implied sockets, including occupied ones, using native assets, animation and async cleanup.
+// Preview all unlocked sockets, with brighter native effects for placed, matching notes.
 internal sealed class NativeMusicNotePreviewController : MonoBehaviour
 {
     private static readonly System.Reflection.FieldInfo? CatalogField = AccessTools.Field(
         typeof(BoardManager),
         "_socketEffectVfxCatalog"
     );
-    private readonly List<MusicNoteSpawnPlacement> _placements = [];
-    private readonly List<MusicNoteSpawnPlacement> _shown = [];
     private BoardManager? _board;
-    private MusicNoteSpawnHintPresenter? _presenter;
+    private NativeMusicNotePreviewLayer? _implied;
+    private NativeMusicNotePreviewLayer? _placed;
+    private NativeMusicNotePreviewLayer? _active;
     private float _nextRefresh;
 
     private void Update()
@@ -53,7 +53,7 @@ internal sealed class NativeMusicNotePreviewController : MonoBehaviour
             return;
         _nextRefresh = Time.unscaledTime + 0.15f;
 
-        if (_presenter == null)
+        if (_implied == null)
         {
             if (
                 CatalogField?.GetValue(board) is not SocketEffectVfxCatalog catalog
@@ -61,13 +61,18 @@ internal sealed class NativeMusicNotePreviewController : MonoBehaviour
             )
                 return;
             // Do not borrow BoardManager's presenter: native card hover clears that instance.
-            _presenter = new MusicNoteSpawnHintPresenter(catalog);
+            _implied = new NativeMusicNotePreviewLayer(catalog, 0.3f);
+            _placed = new NativeMusicNotePreviewLayer(catalog, 0.6f);
+            _active = new NativeMusicNotePreviewLayer(catalog, 1f);
         }
 
-        _placements.Clear();
+        _implied.Placements.Clear();
+        _placed!.Placements.Clear();
+        _active!.Placements.Clear();
         var player = Data.Run.Player;
         var container = player.Socket.Container;
         var placed = new int?[container.Sockets.Length];
+        var active = new bool[placed.Length];
         foreach (var entity in Data.Entities.Values)
         {
             if (
@@ -81,41 +86,59 @@ internal sealed class NativeMusicNotePreviewController : MonoBehaviour
             )
             {
                 placed[(int)socket] = (int)note.MusicNote;
+                var hand = player.Hand?.Container?.Sockets;
+                var item =
+                    hand != null && (int)socket < hand.Length ? hand[(int)socket] as ICard : null;
+                active[(int)socket] = MusicNoteActivation.IsSatisfied(note, item, Data.Run, effect);
             }
         }
         var letters = MusicNoteSocketInference.Resolve(placed);
         for (var i = 0; i < letters.Length; i++)
         {
-            // Placed notes already have native visuals. Item/non-note-effect occupancy does
-            // not suppress an inferred letter; only locked sockets are excluded.
-            if (placed[i].HasValue || letters[i] is not int letter || container.IsSocketLocked(i))
+            if (letters[i] is not int letter || container.IsSocketLocked(i))
                 continue;
             var target = board.GetItemSocketController((EContainerSocketId)i, ECombatantId.Player);
             if (target != null && target.gameObject.activeInHierarchy)
-                _placements.Add(new MusicNoteSpawnPlacement((EMusicNote)letter, target.transform));
+            {
+                var layer =
+                    !placed[i].HasValue ? _implied
+                    : active[i] ? _active
+                    : _placed;
+                layer.Placements.Add(
+                    new MusicNoteSpawnPlacement((EMusicNote)letter, target.transform)
+                );
+            }
         }
 
-        if (_placements.SequenceEqual(_shown))
-            return;
-        _shown.Clear();
-        _shown.AddRange(_placements);
-        _presenter.Show(_placements);
+        _implied.Refresh();
+        _placed.Refresh();
+        _active.Refresh();
+    }
+
+    private void LateUpdate()
+    {
+        _implied?.ApplyBrightness();
+        _placed?.ApplyBrightness();
+        _active?.ApplyBrightness();
     }
 
     private void Clear()
     {
-        if (_shown.Count != 0)
-            _presenter?.Clear();
-        _shown.Clear();
+        _implied?.Clear();
+        _placed?.Clear();
+        _active?.Clear();
         _nextRefresh = 0f;
     }
 
     private void Release()
     {
-        _presenter?.Dispose();
-        _presenter = null;
+        _implied?.Dispose();
+        _placed?.Dispose();
+        _active?.Dispose();
+        _implied = null;
+        _placed = null;
+        _active = null;
         _board = null;
-        _shown.Clear();
         _nextRefresh = 0f;
     }
 
