@@ -22,6 +22,7 @@ internal sealed class NativeMusicNotePreviewController : MonoBehaviour
     private BoardManager? _board;
     private MusicNoteSpawnHintPresenter? _presenter;
     private float _nextRefresh;
+    private readonly NativeMusicNoteBackgroundPreview _nativeBackgrounds = new();
 
     private void Update()
     {
@@ -68,6 +69,7 @@ internal sealed class NativeMusicNotePreviewController : MonoBehaviour
         var player = Data.Run.Player;
         var container = player.Socket.Container;
         var placed = new int?[container.Sockets.Length];
+        _nativeBackgrounds.BeginRefresh();
         foreach (var entity in Data.Entities.Values)
         {
             if (
@@ -81,8 +83,13 @@ internal sealed class NativeMusicNotePreviewController : MonoBehaviour
             )
             {
                 placed[(int)socket] = (int)note.MusicNote;
+                if (!container.IsSocketLocked((int)socket))
+                    _nativeBackgrounds.Show(
+                        Data.CardAndSkillLookup.GetCardController(effect) as SocketEffectController
+                    );
             }
         }
+        _nativeBackgrounds.EndRefresh();
         var letters = MusicNoteSocketInference.Resolve(placed);
         for (var i = 0; i < letters.Length; i++)
         {
@@ -104,6 +111,7 @@ internal sealed class NativeMusicNotePreviewController : MonoBehaviour
 
     private void Clear()
     {
+        _nativeBackgrounds.Restore();
         if (_shown.Count != 0)
             _presenter?.Clear();
         _shown.Clear();
@@ -112,6 +120,7 @@ internal sealed class NativeMusicNotePreviewController : MonoBehaviour
 
     private void Release()
     {
+        _nativeBackgrounds.Restore();
         _presenter?.Dispose();
         _presenter = null;
         _board = null;
