@@ -22,6 +22,7 @@ internal sealed class NativeMusicNotePreviewController : MonoBehaviour
     private NativeMusicNotePreviewLayer? _placed;
     private NativeMusicNotePreviewLayer? _active;
     private float _nextRefresh;
+    private readonly NativeMusicNoteVisualSuppression _nativeVisuals = new();
 
     private void Update()
     {
@@ -61,8 +62,8 @@ internal sealed class NativeMusicNotePreviewController : MonoBehaviour
             )
                 return;
             // Do not borrow BoardManager's presenter: native card hover clears that instance.
-            _implied = new NativeMusicNotePreviewLayer(catalog, 0.3f);
-            _placed = new NativeMusicNotePreviewLayer(catalog, 0.6f);
+            _implied = new NativeMusicNotePreviewLayer(catalog, 0.7f);
+            _placed = new NativeMusicNotePreviewLayer(catalog, 0.9f);
             _active = new NativeMusicNotePreviewLayer(catalog, 1f);
         }
 
@@ -73,6 +74,7 @@ internal sealed class NativeMusicNotePreviewController : MonoBehaviour
         var container = player.Socket.Container;
         var placed = new int?[container.Sockets.Length];
         var active = new bool[placed.Length];
+        var nativeNotes = new SocketEffectController?[placed.Length];
         foreach (var entity in Data.Entities.Values)
         {
             if (
@@ -86,6 +88,8 @@ internal sealed class NativeMusicNotePreviewController : MonoBehaviour
             )
             {
                 placed[(int)socket] = (int)note.MusicNote;
+                nativeNotes[(int)socket] =
+                    Data.CardAndSkillLookup.GetCardController(effect) as SocketEffectController;
                 var hand = player.Hand?.Container?.Sockets;
                 var item =
                     hand != null && (int)socket < hand.Length ? hand[(int)socket] as ICard : null;
@@ -93,6 +97,7 @@ internal sealed class NativeMusicNotePreviewController : MonoBehaviour
             }
         }
         var letters = MusicNoteSocketInference.Resolve(placed);
+        _nativeVisuals.BeginRefresh();
         for (var i = 0; i < letters.Length; i++)
         {
             if (letters[i] is not int letter || container.IsSocketLocked(i))
@@ -107,8 +112,10 @@ internal sealed class NativeMusicNotePreviewController : MonoBehaviour
                 layer.Placements.Add(
                     new MusicNoteSpawnPlacement((EMusicNote)letter, target.transform)
                 );
+                _nativeVisuals.Suppress(nativeNotes[i]);
             }
         }
+        _nativeVisuals.EndRefresh();
 
         _implied.Refresh();
         _placed.Refresh();
@@ -127,6 +134,7 @@ internal sealed class NativeMusicNotePreviewController : MonoBehaviour
         _implied?.Clear();
         _placed?.Clear();
         _active?.Clear();
+        _nativeVisuals.Restore();
         _nextRefresh = 0f;
     }
 
@@ -135,6 +143,7 @@ internal sealed class NativeMusicNotePreviewController : MonoBehaviour
         _implied?.Dispose();
         _placed?.Dispose();
         _active?.Dispose();
+        _nativeVisuals.Restore();
         _implied = null;
         _placed = null;
         _active = null;

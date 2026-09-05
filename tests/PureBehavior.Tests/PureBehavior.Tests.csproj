@@ -15,6 +15,7 @@
   <ItemGroup>
     <Compile Include="../AsyncLoadCache.Tests/*.cs" />
     <Compile Include="../../src/BazaarPlusPlus/Game/MusicNotes/MusicNoteSocketInference.cs" />
+    <Compile Include="../../src/BazaarPlusPlus/Game/MusicNotes/MusicNoteVisualLease.cs" />
     <Compile Include="../GraphicsUpscaling.Tests/*.cs" />
     <Compile Include="../NativeAssetLoading.Tests/*.cs" />
     <Compile Include="../NativeCardPreviewHost.Tests/*.cs" />
