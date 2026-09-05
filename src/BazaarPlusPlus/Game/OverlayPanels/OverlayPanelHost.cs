@@ -15,7 +15,7 @@ internal sealed class OverlayPanelHost : MonoBehaviour
     private readonly OverlayLifecycleCore _core = new();
     private readonly OverlayPanelHostLogState _logState = new();
     private readonly List<OverlayPanelRegistration> _registrations = new();
-    private int _sceneTokenHandle;
+    private Scene _sceneTokenScene;
     private bool _sceneTokenLoaded;
     private string _sceneToken = string.Empty;
 
@@ -128,18 +128,18 @@ internal sealed class OverlayPanelHost : MonoBehaviour
     private bool ReadIsInCombat() =>
         _logState.ReadIsInCombat(static () => TheBazaar.Data.IsInCombat);
 
-    // name/path/buildIndex are fixed for a given scene handle, so the token string is rebuilt
-    // only when the active scene (or its loaded flag) actually changes.
+    // Compare Scene values, not Scene.handle: Unity 6 changed that getter's return type
+    // from int to SceneHandle. The equality operator's ABI is stable across both versions.
     private string GetSceneToken(Scene scene)
     {
         if (
             _sceneToken.Length != 0
-            && _sceneTokenHandle == scene.handle
+            && _sceneTokenScene == scene
             && _sceneTokenLoaded == scene.isLoaded
         )
             return _sceneToken;
 
-        _sceneTokenHandle = scene.handle;
+        _sceneTokenScene = scene;
         _sceneTokenLoaded = scene.isLoaded;
         _sceneToken = $"{scene.name}|{scene.path}|{scene.buildIndex}|{scene.isLoaded}";
         return _sceneToken;

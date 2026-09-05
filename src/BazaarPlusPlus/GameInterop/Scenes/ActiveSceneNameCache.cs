@@ -10,7 +10,7 @@ namespace BazaarPlusPlus.GameInterop.Scenes;
 /// </summary>
 internal static class ActiveSceneNameCache
 {
-    private static int _handle;
+    private static Scene _scene;
     private static bool _loaded;
     private static bool _hasName;
     private static string _name = string.Empty;
@@ -20,10 +20,10 @@ internal static class ActiveSceneNameCache
         get
         {
             var scene = SceneManager.GetActiveScene();
-            if (_hasName && _handle == scene.handle && _loaded == scene.isLoaded)
+            if (_hasName && _scene == scene && _loaded == scene.isLoaded)
                 return _name;
 
-            _handle = scene.handle;
+            _scene = scene;
             _loaded = scene.isLoaded;
             _name = scene.name;
             _hasName = true;
