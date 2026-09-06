@@ -4,6 +4,120 @@ namespace EncounterTooltip.Tests;
 
 public class EncounterRequirementTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Outcome_query_pool_preserves_runtime_tier_behaviors(bool groupBehavior)
+    {
+        var behaviors = new BazaarGameShared.Domain.Spawning.SpawnBehaviors.ITSpawnBehavior[]
+        {
+            new BazaarGameShared.Domain.Spawning.SpawnBehaviors.TSpawnBehaviorTier
+            {
+                Tiers = new() { BazaarGameShared.Domain.Core.Types.ETier.Gold },
+            },
+            new BazaarGameShared.Domain.Spawning.SpawnBehaviors.TSpawnBehaviorInheritTier(),
+        };
+        var source = new
+        {
+            SelectionContext = new
+            {
+                SpawnContext = new
+                {
+                    SelectionMethod = "Random",
+                    Behaviors = groupBehavior ? null : behaviors,
+                    Groups = new[]
+                    {
+                        new
+                        {
+                            RandomWeight = 9,
+                            Behaviors = groupBehavior ? behaviors : null,
+                            Filters = new[]
+                            {
+                                new
+                                {
+                                    Constraints = new
+                                    {
+                                        Types = new[]
+                                        {
+                                            BazaarGameShared.Domain.Core.Types.ECardType.Item,
+                                        },
+                                        IsNot = false,
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        };
+
+        // The compiler prepares runtime objects before parsing the event groups.
+        var token = EncounterStructuredParser.TryPrepareToken(source);
+        Assert.True(EncounterStructuredParser.TryParseEventOutcomeGroups(token, out var groups));
+        var reward = Assert.Single(Assert.Single(groups).QueryPools).Filter;
+        Assert.NotNull(reward);
+        Assert.Equal(new[] { BazaarGameShared.Domain.Core.Types.ETier.Gold }, reward.Tiers);
+        Assert.False(reward.UsesDayTierTable);
+        Assert.False(reward.UsesDayTierDistribution);
+    }
+
+    [Theory]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    [InlineData(6)]
+    [InlineData(7)]
+    [InlineData(9)]
+    [InlineData(10)]
+    public void Treasure_chest_day_ranges_admit_only_one_monster_group(int day)
+    {
+        var token = Newtonsoft.Json.Linq.JObject.Parse(
+            """
+            { "SelectionContext": { "SpawnContext": {
+              "SelectionMethod": "Random", "Groups": []
+            } } }
+            """
+        );
+        var groupsToken = (Newtonsoft.Json.Linq.JArray)
+            token.SelectToken("SelectionContext.SpawnContext.Groups")!;
+        // GameData treasure chest monster brackets: [2,4), [4,7), [7,10), [10,infinity).
+        foreach (var (lower, upper) in new[] { (2, 4), (4, 7), (7, 10), (10, int.MaxValue) })
+        {
+            groupsToken.Add(
+                Newtonsoft.Json.Linq.JObject.FromObject(
+                    new
+                    {
+                        RandomWeight = 1,
+                        Filters = new[] { new { Ids = new[] { Guid.NewGuid() } } },
+                        Prerequisites = new[]
+                        {
+                            new
+                            {
+                                Conditions = new
+                                {
+                                    CurrentDay = lower,
+                                    ComparisonOperator = "GreaterThanOrEqual",
+                                },
+                            },
+                            new
+                            {
+                                Conditions = new
+                                {
+                                    CurrentDay = upper,
+                                    ComparisonOperator = "LessThan",
+                                },
+                            },
+                        },
+                    }
+                )
+            );
+        }
+
+        Assert.True(EncounterStructuredParser.TryParseEventOutcomeGroups(token, out var groups));
+        var active = Assert.Single(groups, group => group.DayCondition!.Value.Matches(day));
+        Assert.Equal(1u, active.Weight);
+    }
+
     private static readonly Guid PackageId = Guid.Parse("b0000000-0000-0000-0000-000000000001");
 
     // Farai's delivery outcomes: the group only rolls while you do NOT own the
