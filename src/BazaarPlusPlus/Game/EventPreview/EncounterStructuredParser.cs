@@ -3,6 +3,7 @@ using System.Collections;
 using System.Reflection;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Spawning;
+using BazaarGameShared.Domain.Spawning.SpawnBehaviors;
 using BazaarPlusPlus.GameInterop.DayTiers;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -176,6 +177,8 @@ internal static class EncounterStructuredParser
                             // Constraints arrive as a single (possibly ConstraintAnd)
                             // object; enumerate to its leaf constraint objects.
                             var constraints = new SpawnConstraints();
+                            AddTokenBehaviors(constraints, spawnContext["Behaviors"]);
+                            AddTokenBehaviors(constraints, group["Behaviors"]);
                             foreach (var constraintObject in EnumerateObjects(constraintsToken))
                                 if (LooksLikeTokenConstraintObject(constraintObject))
                                     constraints.AddTokenConstraintObject(constraintObject);
@@ -216,6 +219,7 @@ internal static class EncounterStructuredParser
         if (token == null || token.Type == JTokenType.Null)
             return null;
 
+        var conditions = new List<EncounterDayCondition>();
         foreach (var obj in EnumerateObjects(token))
         {
             if (obj["CurrentDay"] == null)
@@ -229,9 +233,15 @@ internal static class EncounterStructuredParser
             )
                 ? parsedComparison.ToString()
                 : "Equal";
-            return new EncounterDayCondition(day, comparison);
+            conditions.Add(new EncounterDayCondition(day, comparison));
         }
-        return null;
+        return conditions.Count == 0
+            ? null
+            : new EncounterDayCondition(
+                conditions[0].Day,
+                conditions[0].Comparison,
+                conditions.Skip(1).ToArray()
+            );
     }
 
     private static void AppendStepReferencesFromGroup(
@@ -535,7 +545,15 @@ internal static class EncounterStructuredParser
             {
                 JToken token => token,
                 string json when !string.IsNullOrWhiteSpace(json) => JToken.Parse(json),
-                _ => JToken.FromObject(source),
+                _ => JToken.FromObject(
+                    source,
+                    JsonSerializer.Create(
+                        new JsonSerializerSettings
+                        {
+                            Converters = { new SpawnBehaviorTokenConverter() },
+                        }
+                    )
+                ),
             };
         }
         catch (Exception ex) when (ex is JsonException || ex is InvalidOperationException)
@@ -549,6 +567,35 @@ internal static class EncounterStructuredParser
         var type = obj["$type"]?.ToString();
         return !string.IsNullOrWhiteSpace(type)
             && type!.EndsWith(typeName, StringComparison.Ordinal);
+    }
+
+    // Prepared plans must retain behavior identity: parameterless behaviors and
+    // fixed-tier behaviors cannot be recovered from ordinary runtime JSON alone.
+    private sealed class SpawnBehaviorTokenConverter : JsonConverter
+    {
+        public override bool CanConvert(Type objectType) =>
+            typeof(ITSpawnBehavior).IsAssignableFrom(objectType);
+
+        public override bool CanRead => false;
+
+        public override void WriteJson(JsonWriter writer, object? value, JsonSerializer serializer)
+        {
+            if (value == null)
+            {
+                writer.WriteNull();
+                return;
+            }
+            var token = JObject.FromObject(value);
+            token["$type"] = value.GetType().Name;
+            token.WriteTo(writer);
+        }
+
+        public override object? ReadJson(
+            JsonReader reader,
+            Type objectType,
+            object? existingValue,
+            JsonSerializer serializer
+        ) => throw new NotSupportedException();
     }
 
     private static IEnumerable<JObject> EnumerateObjects(JToken token)

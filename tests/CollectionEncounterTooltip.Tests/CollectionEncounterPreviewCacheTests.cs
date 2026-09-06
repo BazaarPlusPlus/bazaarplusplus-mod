@@ -24,7 +24,12 @@ public sealed class EncounterPreviewCacheTests : IDisposable
         Assert.NotNull(actual);
         Assert.Equal(expected.EventCount, actual.EventCount);
         Assert.Equal(expected.TemplateCount, actual.TemplateCount);
-        Assert.True(actual.TryGetEvent(EventId, out _));
+        Assert.True(actual.TryGetEvent(EventId, out var eventPlan));
+        var dayCondition = Assert.Single(eventPlan.ChoiceGroups).DayCondition!.Value;
+        Assert.True(dayCondition.Matches(4));
+        Assert.True(dayCondition.Matches(6));
+        Assert.False(dayCondition.Matches(3));
+        Assert.False(dayCondition.Matches(7));
         Assert.True(actual.TryGetTemplate(StepId, out var step));
         Assert.Equal("Take the reward", step.Description.FallbackText);
         Assert.NotNull(step.RewardFilter);
@@ -153,7 +158,12 @@ public sealed class EncounterPreviewCacheTests : IDisposable
             {
                 new EncounterChoiceGroupData(
                     isRandomPool: false,
-                    new[] { new EncounterStepReference(StepId) }
+                    new[] { new EncounterStepReference(StepId) },
+                    new EncounterDayCondition(
+                        4,
+                        "GreaterThanOrEqual",
+                        new[] { new EncounterDayCondition(7, "LessThan") }
+                    )
                 ),
             }
         );
