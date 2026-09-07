@@ -111,6 +111,16 @@ internal sealed class CombatImpactCorpusCatalog
                 continue;
             var tier = seed.Tier ?? template.StartingTier;
             var activeAbilities = ActiveAbilities(template, tier, seed.Enchantment);
+            var activeAuras = template is IHasTierData auraTiered
+                ? auraTiered.GetAuraTemplatesByTier(tier).ToList()
+                : template.Auras.Values.ToList();
+            if (
+                seed.Enchantment is { } enchantment
+                && template is TCardItem auraItem
+                && auraItem.Enchantments?.TryGetValue(enchantment, out var enchantmentTemplate)
+                    == true
+            )
+                activeAuras.AddRange(enchantmentTemplate.Auras.Values);
             var attributeTypes = ReadAbilityAttributeTypes(template, seed.Enchantment);
             entities[seed.InstanceId] = new CombatImpactEntity(
                 seed.InstanceId,
@@ -136,7 +146,19 @@ internal sealed class CombatImpactCorpusCatalog
                 ),
                 CriticalTriggerAbilitiesByEffectId: CombatImpactCriticalTriggerReader.Read(
                     activeAbilities
-                )
+                ),
+                AuraAttributeModifiersByEffectId: CombatImpactAbilityAttributeModifierReader.ReadAuras(
+                    activeAuras
+                ),
+                ReferenceValuedAuraEffectIds: activeAuras
+                    .Where(aura =>
+                        aura.Action
+                            is BazaarGameShared.Domain.Effect.AuraActions.TAuraActionCardModifyAttribute modifier
+                        && modifier.Value
+                            is BazaarGameShared.Domain.Values.ReferenceValues.ITReferenceValue
+                    )
+                    .Select(aura => aura.Id)
+                    .ToArray()
             );
         }
 
@@ -384,6 +406,9 @@ internal static class CombatImpactCorpusProjection
             diagnostics.Count,
             diagnostics.Sum(item => item.ClaimantCount),
             diagnostics.Count(item =>
+                item.Resolution == CombatImpactAttributeTransitionResolution.AuraOverlap.ToString()
+            ),
+            diagnostics.Count(item =>
                 item.Resolution
                 == CombatImpactAttributeTransitionResolution.SingleClaimantNet.ToString()
             ),
@@ -433,7 +458,9 @@ internal static class CombatImpactCorpusProjection
             diagnostics
                 .Where(item =>
                     item.Resolution
-                    == CombatImpactAttributeTransitionResolution.ConcurrentResidual.ToString()
+                        == CombatImpactAttributeTransitionResolution.ConcurrentResidual.ToString()
+                    || item.Resolution
+                        == CombatImpactAttributeTransitionResolution.AuraOverlap.ToString()
                 )
                 .ToArray()
         );
@@ -564,6 +591,7 @@ internal sealed record CardAttributeAttributionCorpusReport(
     int ImplicitPlayerEffects,
     int DiagnosticGroups,
     int DiagnosedClaimants,
+    int AuraOverlapGroups,
     int SingleClaimantGroups,
     int ConcurrentExactGroups,
     int SingleUnknownSolvedGroups,
