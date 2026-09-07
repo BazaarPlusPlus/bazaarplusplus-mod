@@ -3,6 +3,7 @@ using BazaarGameShared.Domain.Core;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Effect;
 using BazaarGameShared.Domain.Effect.Actions;
+using BazaarGameShared.Domain.Effect.AuraActions;
 using BazaarGameShared.Domain.Targeting;
 using BazaarGameShared.Domain.Values;
 using BazaarGameShared.Domain.Values.ReferenceValues;
@@ -740,8 +741,14 @@ internal static class CombatImpactProjector
         events
             .Where(item =>
                 item.Kind == CombatImpactKind.AttributeChange
-                && item.Surface == CombatImpactEventSurface.CardAttribute
-                && item.IsUnattributedTransitionClaimant
+                && item.Surface
+                    is CombatImpactEventSurface.CardAttribute
+                        or CombatImpactEventSurface.PlayerAttribute
+                && (
+                    item.IsUnattributedTransitionClaimant
+                    || item.AttributeTransitionResolution
+                        == CombatImpactAttributeTransitionResolution.AuraOverlap
+                )
                 && item.TriggerFrameIndex.HasValue
                 && item.UnattributedTransitionValue.HasValue
             )
@@ -758,17 +765,31 @@ internal static class CombatImpactProjector
                     .Distinct()
                     .Take(2)
                     .ToArray();
-                return values.Length == 1
-                    ? new CombatImpactAttributeTransitionResidual(
-                        group.Key.FrameIndex,
-                        group.Key.TargetId,
-                        group.Key.NativeAttributeKey,
-                        values[0],
-                        group.Key.Unit,
-                        group.Count(),
-                        CombatImpactAttributeTransitionResidualReason.ConcurrentAttributionUnavailable
-                    )
-                    : null;
+                if (values.Length != 1)
+                    return null;
+                var auraOverlap = group.Any(item =>
+                    item.AttributeTransitionResolution
+                    == CombatImpactAttributeTransitionResolution.AuraOverlap
+                );
+                return new CombatImpactAttributeTransitionResidual(
+                    group.Key.FrameIndex,
+                    group.Key.TargetId,
+                    group.Key.NativeAttributeKey,
+                    auraOverlap
+                        ? SaturatingInt(
+                            (long)values[0]
+                                - group.Sum(item => (long)item.Value.GetValueOrDefault())
+                        )
+                        : values[0],
+                    group.Key.Unit,
+                    group.Count(),
+                    auraOverlap
+                        ? CombatImpactAttributeTransitionResidualReason.AuraOverlap
+                        : CombatImpactAttributeTransitionResidualReason.ConcurrentAttributionUnavailable
+                )
+                {
+                    Surface = group.First().Surface,
+                };
             })
             .Where(residual => residual != null)
             .Cast<CombatImpactAttributeTransitionResidual>()
@@ -802,6 +823,11 @@ internal static class CombatImpactProjector
                 var resolution =
                     group.Any(item =>
                         item.AttributeTransitionResolution
+                        == CombatImpactAttributeTransitionResolution.AuraOverlap
+                    )
+                        ? CombatImpactAttributeTransitionResolution.AuraOverlap
+                    : group.Any(item =>
+                        item.AttributeTransitionResolution
                         == CombatImpactAttributeTransitionResolution.ConcurrentResidual
                     )
                         ? CombatImpactAttributeTransitionResolution.ConcurrentResidual
@@ -819,10 +845,11 @@ internal static class CombatImpactProjector
                 var attributedValue = SaturatingInt(
                     group.Where(item => item.Value.HasValue).Sum(item => (long)item.Value!.Value)
                 );
-                var residualValue =
-                    resolution == CombatImpactAttributeTransitionResolution.ConcurrentResidual
-                        ? SaturatingInt((long)netValues[0] - attributedValue)
-                        : 0;
+                var residualValue = resolution
+                    is CombatImpactAttributeTransitionResolution.ConcurrentResidual
+                        or CombatImpactAttributeTransitionResolution.AuraOverlap
+                    ? SaturatingInt((long)netValues[0] - attributedValue)
+                    : 0;
                 return new CombatImpactAttributeTransitionDiagnostic(
                     group.Key.FrameIndex,
                     group.Key.TargetId,
@@ -2100,8 +2127,14 @@ internal static class CombatImpactProjector
         CombatSimEventEffectAuraExecuted effect,
         IReadOnlyDictionary<string, CombatImpactEntity> entities,
         out ECardAttributeType attributeType
-    ) =>
-        TryResolveEffectAttributeType(
+    )
+    {
+        if (TryResolveAuraModifier(effect, entities, out var modifier))
+        {
+            attributeType = modifier.AttributeType;
+            return true;
+        }
+        return TryResolveEffectAttributeType(
             effect.Source?.Value,
             effect.TriggerSource?.Value,
             effect.EffectId,
@@ -2109,6 +2142,50 @@ internal static class CombatImpactProjector
             static entity => entity.AuraAttributeTypesByEffectId,
             out attributeType
         );
+    }
+
+    private static bool TryResolveAuraModifier(
+        CombatSimEventEffectAuraExecuted aura,
+        IReadOnlyDictionary<string, CombatImpactEntity> entities,
+        out TAuraActionCardModifyAttribute modifier
+    )
+    {
+        foreach (var id in new[] { aura.Source?.Value, aura.TriggerSource?.Value })
+            if (
+                id != null
+                && entities.TryGetValue(id, out var entity)
+                && entity.AuraAttributeModifiersByEffectId?.TryGetValue(
+                    aura.EffectId,
+                    out modifier!
+                ) == true
+            )
+                return true;
+        modifier = null!;
+        return false;
+    }
+
+    private static bool AuraTouches(CombatSimEventEffectAuraExecuted aura, string? targetId) =>
+        aura
+            .AppliedTo.Concat(aura.RemovedFrom)
+            .Any(target =>
+                string.Equals(ResolveTargetId(target), targetId, StringComparison.Ordinal)
+            );
+
+    private static bool HasAuraClaim(
+        CombatSimFrame frame,
+        string? targetId,
+        ECardAttributeType attribute,
+        IReadOnlyDictionary<string, CombatImpactEntity> entities
+    ) =>
+        frame
+            .Events.OfType<CombatSimEventEffectAuraExecuted>()
+            .Any(aura =>
+                AuraTouches(aura, targetId)
+                && (
+                    !TryResolveAuraAttributeType(aura, entities, out var expected)
+                    || expected == attribute
+                )
+            );
 
     private static bool TryResolveEffectAttributeType(
         string? directSourceId,
@@ -2256,7 +2333,19 @@ internal static class CombatImpactProjector
                                 && IsDisplayableAuraPlayerAttribute(change.AttributeType)
                             )
                             .ToArray();
-                        if (playerChanges?.Length == 1 && entities.ContainsKey(playerId))
+                        if (
+                            playerChanges?.Length == 1
+                            && entities.ContainsKey(playerId)
+                            && !frame
+                                .Events.OfType<CombatSimEventEffectExecuted>()
+                                .Any(item =>
+                                    string.Equals(
+                                        ResolveTargetId(item.Target),
+                                        playerId,
+                                        StringComparison.Ordinal
+                                    )
+                                )
+                        )
                         {
                             playerCandidates.Add(
                                 new AuraPlayerAttributeCandidate(
@@ -2340,7 +2429,18 @@ internal static class CombatImpactProjector
             foreach (
                 var candidate in candidates
                     .GroupBy(candidate => (candidate.TargetId, candidate.Change.AttributeType))
-                    .Where(group => group.Count() == 1)
+                    .Where(group =>
+                        group.Count() == 1
+                        && frame
+                            .Events.OfType<CombatSimEventEffectAuraExecuted>()
+                            .Count(aura =>
+                                AuraTouches(aura, group.Key.TargetId)
+                                && (
+                                    !TryResolveAuraAttributeType(aura, entities, out var attribute)
+                                    || attribute == group.Key.AttributeType
+                                )
+                            ) == 1
+                    )
                     .Select(group => group.Single())
             )
             {
@@ -2552,7 +2652,7 @@ internal static class CombatImpactProjector
         var targetId = ResolveTargetId(candidate.Target);
         var claimCount = executed.Count(item =>
             string.Equals(ResolveTargetId(item.Target), targetId, StringComparison.Ordinal)
-            && ClaimsTransition(item.ActionType, transition)
+            && ClaimsTransition(item, transition, entities)
         );
         if (
             transition.Domain == ImpactTransitionDomain.PlayerAttribute
@@ -2570,7 +2670,13 @@ internal static class CombatImpactProjector
             );
         }
 
-        return claimCount == 1;
+        return claimCount == 1
+            && !(
+                transition.Domain == ImpactTransitionDomain.PlayerAttribute
+                && frame
+                    .Events.OfType<CombatSimEventEffectAuraExecuted>()
+                    .Any(aura => AuraTouches(aura, targetId))
+            );
     }
 
     private static string? ResolveCardActionCostTargetId(
@@ -3020,6 +3126,31 @@ internal static class CombatImpactProjector
                 return ResolvedImpactValue.Empty(kind, item.ActionType);
 
             var change = changes[0];
+            if (
+                frame
+                    .Events.OfType<CombatSimEventEffectAuraExecuted>()
+                    .Any(aura => AuraTouches(aura, ResolveTargetId(item.Target)))
+            )
+                return new ResolvedImpactValue(
+                    null,
+                    UnitFor(change.AttributeType.ToString()),
+                    change.AttributeType.ToString(),
+                    false,
+                    CombatImpactValueBasis.None
+                )
+                {
+                    Surface = CombatImpactEventSurface.PlayerAttribute,
+                    IsUnattributedTransitionClaimant = true,
+                    UnattributedTransitionValue = change.Delta,
+                    AttributeTransitionNetValue = change.Delta,
+                    AttributeTransitionResolution =
+                        CombatImpactAttributeTransitionResolution.AuraOverlap,
+                    AttributeTransitionFailureReasons =
+                    [
+                        CombatImpactAttributeTransitionFailureReason.AuraOverlap,
+                    ],
+                    AttributeTransitionUnresolvedClaimantCount = 1,
+                };
             return new ResolvedImpactValue(
                 change.Delta,
                 UnitFor(change.AttributeType.ToString()),
@@ -3044,7 +3175,10 @@ internal static class CombatImpactProjector
             if (
                 !IsAttributableCardAttribute(expectedAttribute)
                 || !cardUpdate.Attributes.TryGetValue(expectedAttribute, out var expectedChange)
-                || expectedChange.Delta == 0
+                || (
+                    expectedChange.Delta == 0
+                    && !HasAuraClaim(frame, cardTarget.Target.Value, expectedAttribute, entities)
+                )
             )
                 return ResolvedImpactValue.Empty(kind, item.ActionType);
             cardChange = expectedChange;
@@ -3060,6 +3194,15 @@ internal static class CombatImpactProjector
                 return ResolvedImpactValue.Empty(kind, item.ActionType);
             cardChange = cardChanges[0];
         }
+        if (HasAuraClaim(frame, cardTarget.Target.Value, cardChange.AttributeType, entities))
+            return ResolveAuraOverlappingCardTransition(
+                frame,
+                item,
+                executed,
+                entities,
+                cardAttributes,
+                cardChange
+            );
         if (
             TryResolveConcurrentConfiguredCardAttributeTransition(
                 item,
@@ -3135,6 +3278,119 @@ internal static class CombatImpactProjector
             AttributeTransitionNetValue = cardChange.Delta,
             AttributeTransitionResolution =
                 CombatImpactAttributeTransitionResolution.SingleClaimantNet,
+        };
+    }
+
+    private static ResolvedImpactValue ResolveAuraOverlappingCardTransition(
+        CombatSimFrame frame,
+        CombatSimEventEffectExecuted item,
+        IReadOnlyList<CombatSimEventEffectExecuted> executed,
+        IReadOnlyDictionary<string, CombatImpactEntity> entities,
+        IReadOnlyDictionary<string, Dictionary<ECardAttributeType, int>> cardAttributes,
+        CombatSimCardAttributeUpdate change
+    )
+    {
+        var targetId = ResolveTargetId(item.Target);
+        var claim = new ImpactTransitionClaim(
+            ImpactTransitionDomain.CardAttribute,
+            (int)change.AttributeType
+        );
+        var claimants = executed
+            .Where(candidate =>
+                string.Equals(ResolveTargetId(candidate.Target), targetId, StringComparison.Ordinal)
+                && ClaimsTransition(candidate, claim, entities)
+            )
+            .ToArray();
+        // A frame update is a net result, not an execution's operand. Only independent
+        // additive actions can be separated from an additive aura without event-local state.
+        var additiveAuras = frame
+            .Events.OfType<CombatSimEventEffectAuraExecuted>()
+            .Where(aura =>
+                AuraTouches(aura, targetId)
+                && (
+                    !TryResolveAuraAttributeType(aura, entities, out var attribute)
+                    || attribute == change.AttributeType
+                )
+            )
+            .All(aura =>
+                TryResolveAuraModifier(aura, entities, out var modifier)
+                && modifier.Operation
+                    is EAttributeModifierOperation.Add
+                        or EAttributeModifierOperation.Subtract
+            );
+        if (
+            targetId != null
+            && entities.TryGetValue(targetId, out var targetEntity)
+            && targetEntity.AuraAttributeModifiersByEffectId?.Values.Any(modifier =>
+                modifier.AttributeType == change.AttributeType
+                && modifier.Operation
+                    is not (EAttributeModifierOperation.Add or EAttributeModifierOperation.Subtract)
+            ) == true
+        )
+            additiveAuras = false;
+        int? amount = null;
+        if (
+            additiveAuras
+            && claimants.All(candidate =>
+                TryResolveAbilityAttributeModifier(candidate, entities, out _, out var modifier)
+                && modifier.Operation
+                    is EAttributeModifierOperation.Add
+                        or EAttributeModifierOperation.Subtract
+            )
+        )
+        {
+            var stableReference =
+                TryResolveAbilityAttributeModifier(
+                    item,
+                    entities,
+                    out var sourceId,
+                    out var modifier
+                )
+                && !(
+                    modifier.Value is TReferenceValueCardAttribute reference
+                    && frame.CardUpdates.TryGetValue(
+                        InstanceId.TryParse(sourceId),
+                        out var sourceUpdate
+                    )
+                    && sourceUpdate.Attributes.TryGetValue(
+                        reference.AttributeType,
+                        out var sourceChange
+                    )
+                    && sourceChange.Delta != 0
+                );
+            if (
+                stableReference
+                && TryResolveConfiguredCardAttributeDelta(
+                    item,
+                    entities,
+                    cardAttributes,
+                    change.AttributeType,
+                    out var delta,
+                    out _
+                )
+            )
+                amount = delta;
+        }
+        return new ResolvedImpactValue(
+            amount,
+            UnitFor(change.AttributeType.ToString()),
+            change.AttributeType.ToString(),
+            false,
+            amount.HasValue
+                ? CombatImpactValueBasis.ConfiguredActionAmount
+                : CombatImpactValueBasis.None
+        )
+        {
+            Surface = CombatImpactEventSurface.CardAttribute,
+            IsUnattributedTransitionClaimant = !amount.HasValue,
+            UnattributedTransitionValue = change.Delta,
+            AttributeTransitionNetValue = change.Delta,
+            AttributeTransitionResolution = CombatImpactAttributeTransitionResolution.AuraOverlap,
+            AttributeTransitionFailureReasons =
+            [
+                CombatImpactAttributeTransitionFailureReason.AuraOverlap,
+            ],
+            AttributeTransitionUnresolvedClaimantCount = amount.HasValue ? 0 : 1,
         };
     }
 
@@ -3682,6 +3938,13 @@ internal static class CombatImpactProjector
                 || (int)attributeType == transition.Attribute;
         }
 
+        // Generic player modifiers are competing writers too. Without an effect-local
+        // attribute mapping, none may consume the same net player delta independently.
+        if (
+            effect.ActionType == EActionCommandType.PlayerModifyAttribute
+            && transition.Domain == ImpactTransitionDomain.PlayerAttribute
+        )
+            return true;
         return ClaimsTransition(effect.ActionType, transition);
     }
 

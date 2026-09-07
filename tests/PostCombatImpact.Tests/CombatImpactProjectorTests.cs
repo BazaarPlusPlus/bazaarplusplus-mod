@@ -12,7 +12,7 @@ using Xunit;
 
 namespace PostCombatImpact.Tests;
 
-public sealed class CombatImpactProjectorTests
+public sealed partial class CombatImpactProjectorTests
 {
     [Fact]
     public void F_minor_reconstructs_tempo_from_haste_item_uses_on_the_f_note()
@@ -5097,7 +5097,7 @@ public sealed class CombatImpactProjectorTests
     }
 
     [Fact]
-    public void Generic_player_modifier_does_not_block_a_specific_attribute_transition()
+    public void Unknown_player_modifier_prevents_assigning_the_whole_delta_to_a_specific_action()
     {
         var simulation = new CombatSim();
         simulation
@@ -5129,8 +5129,7 @@ public sealed class CombatImpactProjectorTests
 
         var report = CombatImpactProjector.Project(simulation, Entities());
 
-        Assert.Equal(
-            9,
+        Assert.Null(
             Assert
                 .Single(
                     Assert.Single(report.Sources, source => source.Entity.Id == "source").Groups
@@ -5181,8 +5180,9 @@ public sealed class CombatImpactProjectorTests
         var groups = Assert.Single(report.Sources).Groups;
 
         Assert.Equal(2, groups.Count);
-        Assert.Equal(
-            2,
+        // The generic action has no metadata here: it may also contribute to Regen.
+        // Only the otherwise-unclaimed max-health transition is identifiable.
+        Assert.Null(
             Assert
                 .Single(groups, group => group.NativeAttributeKey == "RegenApplyAmount")
                 .ObservedValue
@@ -5540,7 +5540,7 @@ public sealed class CombatImpactProjectorTests
     }
 
     [Fact]
-    public void Aura_does_not_duplicate_an_explicit_modifier_transition()
+    public void Unresolved_aura_overlap_preserves_the_transition_without_assigning_it_to_the_execution()
     {
         var simulation = new CombatSim();
         var target = InstanceId.TryParse("target");
@@ -5572,11 +5572,14 @@ public sealed class CombatImpactProjectorTests
             },
         };
 
-        var source = Assert.Single(CombatImpactProjector.Project(simulation, Entities()).Sources);
+        var report = CombatImpactProjector.Project(simulation, Entities());
+        var source = Assert.Single(report.Sources);
         var group = Assert.Single(source.Groups);
 
         Assert.Equal(1, group.Count);
-        Assert.Equal(187, group.ObservedValue);
+        Assert.Null(group.ObservedValue);
+        Assert.True(group.HasUnattributedTransitionValue);
+        Assert.Equal(187, Assert.Single(report.AttributeTransitionDiagnostics).ResidualValue);
     }
 
     [Theory]
