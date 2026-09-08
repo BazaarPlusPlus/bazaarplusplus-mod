@@ -218,8 +218,18 @@ public sealed class CoreLayeringTests
 
         var directoryProps = File.ReadAllText(Path.Combine(repoRoot, "Directory.Build.props"));
         Assert.Contains("build/ManagedPath.props", directoryProps, StringComparison.Ordinal);
-        var projectOverrides = Directory
-            .EnumerateFiles(repoRoot, "*.csproj", SearchOption.AllDirectories)
+        // Enumerate from the project roots, never the repo root: an embedded worktree under
+        // .claude/ holds a stale checkout whose csproj still declares <ManagedPath>.
+        var projectRoots = new[]
+        {
+            Path.Combine(repoRoot, "src"),
+            Path.Combine(repoRoot, "tests"),
+            Path.Combine(repoRoot, "build"),
+        };
+        var projectOverrides = projectRoots
+            .SelectMany(root =>
+                Directory.EnumerateFiles(root, "*.csproj", SearchOption.AllDirectories)
+            )
             .Where(path =>
                 File.ReadAllText(path).Contains("<ManagedPath>", StringComparison.Ordinal)
             )
