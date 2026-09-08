@@ -1,11 +1,9 @@
-using System.Reflection;
 using System.Runtime.CompilerServices;
 using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.GameState;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.BilingualItemNames;
-using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.EventPreview;
 using BazaarPlusPlus.Game.HistoryPanel;
 using BazaarPlusPlus.Game.Input;
@@ -499,7 +497,6 @@ public class SettingsDockRegistryTests
             registry.Register(FixedSupporterListSettingsDockEntry.Create());
             VoiceSubtitlesSettingsDockEntry.RegisterAll(registry);
             registry.Register(ChineseLocaleModeSettingsDockEntry.Create(new InMemoryBppEventBus()));
-            registry.Register(CombatStatusBarSettingsDockEntry.Create());
             registry.Register(BilingualItemNamesSettingsDockEntry.Create());
             registry.Register(new EndOfRunScreenshotSettingsDockEntry());
             registry.Register(new HistoryPanelSettingsDockEntry());
@@ -515,13 +512,12 @@ public class SettingsDockRegistryTests
                 .OrderBy(entry => entry.Order)
                 .ToArray();
 
-            Assert.Equal(Enumerable.Range(0, 17), presented.Select(entry => entry.Order));
+            Assert.Equal(Enumerable.Range(0, 16), presented.Select(entry => entry.Order));
             Assert.Equal(
                 new[]
                 {
                     "NameOverride",
                     "StreamMode",
-                    "CombatStatusBar",
                     "BilingualItemNames",
                     "EventPreview",
                     "QuestPreview",
@@ -544,26 +540,28 @@ public class SettingsDockRegistryTests
                 presented.Select(entry => entry.Definition.ControlKind).ToArray()
             );
             Assert.Equal(
-                new[]
+                new (string Left, string? Right)[]
                 {
-                    (Left: "NameOverride", Right: "StreamMode"),
-                    (Left: "CombatStatusBar", Right: "BilingualItemNames"),
-                    (Left: "EventPreview", Right: "QuestPreview"),
-                    (Left: "EndOfRunScreenshot", Right: "BazaarDbUpload"),
+                    ("NameOverride", "StreamMode"),
+                    ("BilingualItemNames", "EventPreview"),
+                    ("QuestPreview", "EndOfRunScreenshot"),
+                    ("BazaarDbUpload", null),
                 },
                 groups.Select(group =>
                     (
                         Left: presented[group.LeftIndex].Definition.Key,
-                        Right: presented[group.RightIndex!.Value].Definition.Key
+                        Right: group.RightIndex.HasValue
+                            ? presented[group.RightIndex.Value].Definition.Key
+                            : null
                     )
                 )
             );
             Assert.All(
-                presented.Take(8),
+                presented.Take(7),
                 entry => Assert.Equal(BppSettingsControlKind.Toggle, entry.Definition.ControlKind)
             );
             Assert.All(
-                presented.Skip(8).Take(7),
+                presented.Skip(7).Take(8),
                 entry => Assert.Equal(BppSettingsControlKind.Choice, entry.Definition.ControlKind)
             );
             Assert.Equal(BppSettingsControlKind.Action, presented[^1].Definition.ControlKind);
@@ -1174,14 +1172,6 @@ public class SettingsDockRegistryTests
         "false>true>false"
     )]
     [InlineData(
-        "CombatStatusBar",
-        BppSettingsDockOrder.CombatStatusBar,
-        "Combat Status Bar",
-        "战斗状态",
-        "OFF>ON>OFF",
-        "false>true>false"
-    )]
-    [InlineData(
         "BilingualItemNames",
         BppSettingsDockOrder.BilingualItemNames,
         "Bilingual Names",
@@ -1258,19 +1248,12 @@ public class SettingsDockRegistryTests
             Path.GetTempPath(),
             $"bpp-cycling-dock-contract-{key}-{Guid.NewGuid():N}.cfg"
         );
-        var servicesField = typeof(CombatStatusBar).GetField(
-            "_services",
-            BindingFlags.NonPublic | BindingFlags.Static
-        )!;
-        var previousServices = servicesField.GetValue(null);
-
         try
         {
             L.Install(new TestLanguageProvider(), new TestLocaleModeProvider());
             var configFile = new ConfigFile(configPath, saveOnInit: false);
             var config = new BppConfig();
             config.Initialize(configFile);
-            servicesField.SetValue(null, new ContractTestServices(config));
 
             var entry = CreateCyclingEntry(key);
             var definition = entry.Build(config);
@@ -1302,7 +1285,6 @@ public class SettingsDockRegistryTests
         }
         finally
         {
-            servicesField.SetValue(null, previousServices);
             if (File.Exists(configPath))
                 File.Delete(configPath);
         }
@@ -1340,7 +1322,6 @@ public class SettingsDockRegistryTests
             "UpgradePreviewActivation" => UpgradePreviewActivationSettingsDockEntry.Create(),
             "EventPreview" => EventPreviewSettingsDockEntry.Create(),
             "QuestPreview" => QuestPreviewSettingsDockEntry.Create(() => { }),
-            "CombatStatusBar" => CombatStatusBarSettingsDockEntry.Create(),
             "BilingualItemNames" => BilingualItemNamesSettingsDockEntry.Create(),
             "ChineseLocaleMode" => ChineseLocaleModeSettingsDockEntry.Create(
                 new InMemoryBppEventBus()

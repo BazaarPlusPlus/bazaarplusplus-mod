@@ -18,7 +18,9 @@ public sealed class SettingsLogEventCatalogTests
         var actual = definitions.ToDictionary(x => x.EventId, Describe, StringComparer.Ordinal);
         var expected = new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            ["combat_status_bar.config.loaded"] = "enabled:Low:None|speed_multiplier:Low:None",
+            ["combat_status_bar.config.loaded"] = "speed_multiplier:Low:None",
+            ["combat_status_bar.native_skin.ready"] = "",
+            ["combat_status_bar.native_skin.unavailable"] = "",
             ["settings.hotkey.degraded"] =
                 "action_id:Low:None|binding_path:High:Hash|reason_code:Low:None",
             ["settings.dock_sprite.degraded"] = "reason_code:Low:None|resource_id:Low:None",

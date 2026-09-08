@@ -20,8 +20,6 @@ internal sealed class BppConfig : IBppConfig
 
     public ConfigEntry<bool>? EnableQuestPreviewConfig { get; private set; }
 
-    public ConfigEntry<bool>? EnableCombatStatusBarConfig { get; private set; }
-
     public ConfigEntry<bool>? EnableBilingualItemNamesConfig { get; private set; }
 
     public ConfigEntry<bool>? EnableVoiceSubtitlesConfig { get; private set; }
@@ -96,12 +94,6 @@ internal sealed class BppConfig : IBppConfig
             false,
             "Whether to show quest completion reward effects and aggregate-item missing-type hints in native tooltips."
         );
-        EnableCombatStatusBarConfig = config.Bind(
-            "CombatStatusBar",
-            "Enabled",
-            false,
-            "Whether to show the combat status bar with elapsed time, speed controls, and pause controls"
-        );
         EnableBilingualItemNamesConfig = config.Bind(
             "BilingualItemNames",
             "Enabled",
@@ -148,7 +140,7 @@ internal sealed class BppConfig : IBppConfig
             "CombatStatusBar",
             "SpeedMultiplier",
             1.0f,
-            "Default combat playback speed multiplier. The speed buttons cycle between 0.50, 0.67, and 1.00."
+            "Default combat playback speed multiplier. The speed button cycles between 0.50, 0.67, and 1.00."
         );
         EndOfRunScreenshotEnabledConfig = config.Bind(
             "Screenshots",

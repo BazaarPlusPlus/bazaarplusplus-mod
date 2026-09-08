@@ -27,5 +27,9 @@
       Include="../../src/BazaarPlusPlus/Game/Lobby/RandomHeroPool/RandomHeroPoolStateFactory.cs"
       Link="RandomHeroPool/RandomHeroPoolStateFactory.cs"
     />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/Lobby/RandomHeroPool/RandomHeroPoolNativeController.cs"
+      Link="RandomHeroPool/RandomHeroPoolNativeController.cs"
+    />
   </ItemGroup>
 </Project>

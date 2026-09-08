@@ -3,6 +3,7 @@ using System.Reflection;
 using BazaarPlusPlus.Game.EventPreview;
 using BazaarPlusPlus.Game.Supporters;
 using BazaarPlusPlus.GameInterop.Localization;
+using BazaarPlusPlus.GameInterop.StaticCards;
 using BazaarPlusPlus.Infrastructure.Logging;
 using BazaarPlusPlus.Patches.NameOverride;
 using Xunit;
@@ -39,10 +40,13 @@ public sealed class ContentLogEventCatalogTests
             .Concat(Definitions(typeof(BilingualItemNamesLogEvents)))
             .Concat(Definitions(typeof(EventPreviewLogEvents)))
             .Concat(Definitions(typeof(NameOverrideLogEvents)))
+            .Concat(Definitions(typeof(StaticCardsLogEvents)))
             .ToArray();
         var actual = definitions.ToDictionary(x => x.EventId, Describe, StringComparer.Ordinal);
         var expected = new Dictionary<string, string>(StringComparer.Ordinal)
         {
+            ["static_cards.catalog.unsupported_templates"] =
+                "accepted_count:High:None|unsupported_count:High:None",
             ["supporters.catalog.degraded"] =
                 "source:Low:None|reason_code:Low:None|cache_path:High:None",
             ["supporters.catalog.recovered"] = "source:Low:None|entry_count:High:None",

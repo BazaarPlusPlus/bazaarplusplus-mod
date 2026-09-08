@@ -172,7 +172,6 @@ internal sealed class BppComposition : IDisposable
         _settingsDockRegistry.Register(FixedSupporterListSettingsDockEntry.Create());
         VoiceSubtitlesSettingsDockEntry.RegisterAll(_settingsDockRegistry);
         _settingsDockRegistry.Register(ChineseLocaleModeSettingsDockEntry.Create(_eventBus));
-        _settingsDockRegistry.Register(CombatStatusBarSettingsDockEntry.Create());
         _settingsDockRegistry.Register(BilingualItemNamesSettingsDockEntry.Create());
         _settingsDockRegistry.Register(new EndOfRunScreenshotSettingsDockEntry());
         _settingsDockRegistry.Register(new HistoryPanelSettingsDockEntry());

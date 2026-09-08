@@ -6,6 +6,20 @@ namespace Architecture.Tests;
 public sealed class NativeAssetLoadingArchitectureTests
 {
     [Fact]
+    public void Combat_controls_load_persistent_art_through_the_global_asset_seam()
+    {
+        var root = Path.Combine(MainSourceRoot(RepoRoot()), "Game", "CombatStatusBar");
+        var skin = File.ReadAllText(Path.Combine(root, "CombatStatusBarNativeSkin.cs"));
+        Assert.Contains("NativeGlobalAssetLoader.LoadByAddressAsync", skin);
+        foreach (var file in Directory.EnumerateFiles(root, "*.cs"))
+        {
+            var source = File.ReadAllText(file);
+            Assert.DoesNotContain("Addressables.LoadAssetAsync", source);
+            Assert.DoesNotContain("UnityEngine.AddressableAssets", source);
+        }
+    }
+
+    [Fact]
     public void Cross_build_argument_adaptation_has_one_shared_owner()
     {
         var sourceRoot = MainSourceRoot(RepoRoot());
