@@ -21,49 +21,60 @@ var pluginPath = Path.Combine(AppContext.BaseDirectory, "BazaarPlusPlus.dll");
 Assert(File.Exists(pluginPath), $"Expected plugin assembly at {pluginPath}.");
 
 var assembly = Assembly.LoadFrom(pluginPath);
-var patchType = assembly.GetType(
-    "BazaarPlusPlus.Patches.Lobby.RandomHeroPoolRefreshButtonsPatch",
-    throwOnError: true
-)!;
-var postfix = patchType.GetMethod("Postfix", BindingFlags.NonPublic | BindingFlags.Static);
-Assert(postfix != null, "Random hero pool RefreshButtons postfix was not found.");
+foreach (
+    var (patch, target, method) in new[]
+    {
+        ("RandomHeroPoolProjectPatch", "TheBazaar.UI.Menu.HeroOptionController", "UpdateSelected"),
+        ("RandomHeroPoolClickPatch", "TheBazaar.UI.Menu.HeroOptionController", "HeroClicked"),
+        ("RandomHeroPoolSelectPatch", "TheBazaar.HeroManager", "SetRandomHero"),
+        (
+            "RandomHeroPoolKeepPopupPatch",
+            "TheBazaar.UI.Menu.HeroSelectPopupController",
+            "OnHeroChanged"
+        ),
+        (
+            "RandomHeroSkinPoolCategoryAccessPatch",
+            "TheBazaar.CosmeticsPanelController",
+            "HandleButtonDimming"
+        ),
+        (
+            "RandomHeroSkinPoolCategorySelectionPatch",
+            "TheBazaar.CosmeticsPanelController",
+            "OnCosmeticPressed"
+        ),
+        (
+            "RandomHeroSkinPoolKeepSubpanelPatch",
+            "TheBazaar.LoadoutPopupController",
+            "OnRandomizeToggled"
+        ),
+    }
+)
+{
+    AssertPatchMethod(assembly, "BazaarPlusPlus.Patches.Lobby." + patch, "Prefix");
+    var patchType = assembly.GetType("BazaarPlusPlus.Patches.Lobby." + patch, true)!;
+    var nativeAssembly = Assembly.Load("TheBazaarRuntime");
+    var nativeType = nativeAssembly.GetType(target, true)!;
+    Assert(
+        nativeType.GetMethod(
+            method,
+            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance
+        ) != null,
+        $"Current game must expose {target}.{method}."
+    );
+    var attributes = patchType
+        .GetCustomAttributesData()
+        .Where(attribute => attribute.AttributeType.FullName == "HarmonyLib.HarmonyPatch")
+        .ToArray();
+    Assert(
+        attributes.Any(attribute =>
+            attribute.ConstructorArguments.Any(argument =>
+                argument.Value is Type type && type.FullName == target
+            ) && attribute.ConstructorArguments.Any(argument => Equals(argument.Value, method))
+        ),
+        $"{patch} must patch the current popup path {target}.{method}."
+    );
+}
 
-var parameters = postfix!.GetParameters();
-Assert(
-    parameters.All(parameter => parameter.Name != "__result"),
-    "RefreshButtons postfix must not request __result; current game RefreshButtons returns void."
-);
-
-AssertPatchMethod(
-    assembly,
-    "BazaarPlusPlus.Patches.Lobby.RandomHeroPoolHeroItemStartPatch",
-    "Postfix"
-);
-AssertPatchMethod(
-    assembly,
-    "BazaarPlusPlus.Patches.Lobby.RandomHeroPoolHeroItemUpdateViewPatch",
-    "Prefix"
-);
-AssertPatchMethod(
-    assembly,
-    "BazaarPlusPlus.Patches.Lobby.RandomHeroPoolHeroItemSelectedPatch",
-    "Prefix"
-);
-AssertPatchMethod(
-    assembly,
-    "BazaarPlusPlus.Patches.Lobby.RandomHeroPoolOnHeroPurchasedPatch",
-    "Prefix"
-);
-AssertPatchMethod(
-    assembly,
-    "BazaarPlusPlus.Patches.Lobby.RandomHeroPoolOnHeroPurchasedPatch",
-    "Finalizer"
-);
-AssertPatchMethod(
-    assembly,
-    "BazaarPlusPlus.Patches.Lobby.RandomHeroPoolSelectRandomHeroImmediatePatch",
-    "Prefix"
-);
 AssertPatchMethod(assembly, "BazaarPlusPlus.Patches.Lobby.RandomHeroSkinPoolFetchPatch", "Prefix");
 AssertPatchMethod(
     assembly,
@@ -90,19 +101,6 @@ AssertPatchMethod(
     "BazaarPlusPlus.Patches.Lobby.RandomHeroSkinPoolTogglePatch",
     "Postfix"
 );
-
-var programmaticScopeType = assembly.GetType(
-    "BazaarPlusPlus.Game.Lobby.RandomHeroPool.HeroProgrammaticSelectionScope",
-    throwOnError: true
-)!;
-foreach (var methodName in new[] { "Enter", "Restore", "IsActive" })
-{
-    Assert(
-        programmaticScopeType.GetMethod(methodName, BindingFlags.NonPublic | BindingFlags.Static)
-            != null,
-        $"Hero programmatic-selection scope must expose {methodName}."
-    );
-}
 
 Assert(
     assembly.GetType("BazaarPlusPlus.Game.Lobby.RandomHeroPool.RandomHeroPoolPanelController")

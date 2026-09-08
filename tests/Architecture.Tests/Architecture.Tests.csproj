@@ -47,6 +47,10 @@
       Link="NativeGameFontsLogEvents.cs"
     />
     <Compile
+      Include="../../src/BazaarPlusPlus/GameInterop/StaticCards/StaticCardsLogEvents.cs"
+      Link="StaticCardsLogEvents.cs"
+    />
+    <Compile
       Include="../../src/BazaarPlusPlus/PluginTeardownAccumulator.cs"
       Link="PluginTeardownAccumulator.cs"
     />

@@ -22,13 +22,11 @@ public sealed class CombatStatusBarStateTests : IDisposable
     }
 
     [Fact]
-    public void GetDisplayedTimeText_ReturnsStandbyPlaceholderOutsideCombat()
+    public void GetDisplayedTimeText_ReturnsZeroTimeOutsideCombat()
     {
-        Assert.Equal("LastCombat", CombatStatusBar.GetDisplayedTimeLabel());
-
         var result = CombatStatusBar.GetDisplayedTimeText();
 
-        Assert.Equal("-:--:--", result);
+        Assert.Equal("0:00.00", result);
     }
 
     [Fact]
@@ -38,11 +36,9 @@ public sealed class CombatStatusBarStateTests : IDisposable
         for (var i = 0; i < 25; i++)
             CombatStatusBar.AdvanceCombatFrame();
 
-        Assert.Equal("Time", CombatStatusBar.GetDisplayedTimeLabel());
-
         var result = CombatStatusBar.GetDisplayedTimeText();
 
-        Assert.Equal("0:01:20", result);
+        Assert.Equal("0:01.20", result);
     }
 
     [Fact]
@@ -54,8 +50,7 @@ public sealed class CombatStatusBarStateTests : IDisposable
 
         CombatStatusBar.EndCombatPlayback();
 
-        Assert.Equal("LastCombat", CombatStatusBar.GetDisplayedTimeLabel());
-        Assert.Equal("0:01:20", CombatStatusBar.GetDisplayedTimeText());
+        Assert.Equal("0:01.20", CombatStatusBar.GetDisplayedTimeText());
     }
 
     [Fact]
@@ -75,84 +70,19 @@ public sealed class CombatStatusBarStateTests : IDisposable
         CombatStatusBar.BeginCombatPlayback();
 
         CombatStatusBar.AdvanceCombatFrame();
-        Assert.Equal("0:00:00", CombatStatusBar.GetDisplayedTimeText());
+        Assert.Equal("0:00.00", CombatStatusBar.GetDisplayedTimeText());
 
         CombatStatusBar.AdvanceCombatFrame();
-        Assert.Equal("0:00:05", CombatStatusBar.GetDisplayedTimeText());
+        Assert.Equal("0:00.05", CombatStatusBar.GetDisplayedTimeText());
     }
 
     [Fact]
-    public void ButtonVisuals_KeepPauseBrightWhenDisabled()
+    public void CombatSpeed_PlaqueCyclesThroughEverySupportedStepAndWraps()
     {
-        var palette = new CombatStatusBarButtonPalette(
-            Normal: new CombatStatusBarRgba(0.7f, 0.6f, 0.2f, 1f),
-            Pressed: new CombatStatusBarRgba(0.9f, 0.7f, 0.3f, 1f),
-            Unavailable: new CombatStatusBarRgba(0.2f, 0.2f, 0.2f, 0.45f),
-            Text: new CombatStatusBarRgba(1f, 0.95f, 0.85f, 1f)
-        );
-
-        var result = CombatStatusBar.ResolveButtonVisuals(
-            CombatStatusBarButtonKind.Pause,
-            interactable: false,
-            palette
-        );
-
-        Assert.False(result.Interactable);
-        Assert.Equal(palette.Normal, result.Disabled);
-        Assert.Equal(palette.Normal, result.Background);
-        Assert.Equal(palette.Text, result.Text);
-    }
-
-    [Fact]
-    public void ButtonVisuals_DimSpeedWhenUnavailable()
-    {
-        var palette = new CombatStatusBarButtonPalette(
-            Normal: new CombatStatusBarRgba(0.7f, 0.6f, 0.2f, 1f),
-            Pressed: new CombatStatusBarRgba(0.9f, 0.7f, 0.3f, 1f),
-            Unavailable: new CombatStatusBarRgba(0.35f, 0.28f, 0.16f, 0.55f),
-            Text: new CombatStatusBarRgba(1f, 0.95f, 0.85f, 1f)
-        );
-
-        var result = CombatStatusBar.ResolveButtonVisuals(
-            CombatStatusBarButtonKind.Speed,
-            interactable: false,
-            palette
-        );
-
-        Assert.False(result.Interactable);
-        Assert.Equal(palette.Unavailable, result.Disabled);
-        Assert.Equal(palette.Unavailable, result.Background);
-        Assert.Equal(new CombatStatusBarRgba(1f, 0.95f, 0.85f, 0.45f), result.Text);
-    }
-
-    [Fact]
-    public void RoundedSpriteAlpha_UsesSoftCornerEdge()
-    {
-        var outsideCorner = CombatStatusBar.ResolveRoundedRectAlpha(
-            pixelCenterX: 0.5f,
-            pixelCenterY: 0.5f,
-            size: 32,
-            radius: 12f,
-            edgeSoftness: 1.5f
-        );
-        var softEdge = CombatStatusBar.ResolveRoundedRectAlpha(
-            pixelCenterX: 3.5f,
-            pixelCenterY: 3.5f,
-            size: 32,
-            radius: 12f,
-            edgeSoftness: 1.5f
-        );
-        var insideCenter = CombatStatusBar.ResolveRoundedRectAlpha(
-            pixelCenterX: 16f,
-            pixelCenterY: 16f,
-            size: 32,
-            radius: 12f,
-            edgeSoftness: 1.5f
-        );
-
-        Assert.Equal(0f, outsideCorner, precision: 3);
-        Assert.InRange(softEdge, 0.05f, 0.95f);
-        Assert.Equal(1f, insideCenter, precision: 3);
+        Assert.Equal(0.5f, CombatStatusBar.CycleCombatSpeed(), 3);
+        Assert.Equal(0.67f, CombatStatusBar.CycleCombatSpeed(), 3);
+        Assert.Equal(1f, CombatStatusBar.CycleCombatSpeed(), 3);
+        Assert.Equal(0.5f, CombatStatusBar.CycleCombatSpeed(), 3);
     }
 
     [Fact]
@@ -164,23 +94,14 @@ public sealed class CombatStatusBarStateTests : IDisposable
 
         CombatStatusBar.SetCombatSpeed(0.67f);
         Assert.Equal(0.67f, CombatStatusBar.CombatSpeedMultiplier, 3);
-
-        CombatStatusBar.StepCombatSpeed(-1);
-        Assert.Equal(0.5f, CombatStatusBar.CombatSpeedMultiplier, 3);
-
-        CombatStatusBar.StepCombatSpeed(1);
-        CombatStatusBar.StepCombatSpeed(1);
-        Assert.Equal(1f, CombatStatusBar.CombatSpeedMultiplier, 3);
     }
 
     [Fact]
-    public void CombatSpeed_CanStepWithinBounds_AndOnlyOverridesDuringPlayback()
+    public void CombatSpeed_OnlyOverridesDuringPlayback()
     {
         Assert.False(CombatStatusBar.ShouldOverrideCombatSpeed(1f));
 
         CombatStatusBar.SetCombatSpeed(0.5f);
-        Assert.False(CombatStatusBar.CanStepCombatSpeed(-1));
-        Assert.True(CombatStatusBar.CanStepCombatSpeed(1));
 
         CombatStatusBar.BeginCombatPlayback();
 
@@ -188,19 +109,16 @@ public sealed class CombatStatusBarStateTests : IDisposable
         Assert.False(CombatStatusBar.ShouldOverrideCombatSpeed(1.2f));
 
         CombatStatusBar.SetCombatSpeed(1f);
-        Assert.True(CombatStatusBar.CanStepCombatSpeed(-1));
-        Assert.False(CombatStatusBar.CanStepCombatSpeed(1));
     }
 
     [Fact]
-    public void ShouldRenderForState_RequiresFeatureEnabledAndInGameRun()
+    public void ShouldRenderForState_RequiresInGameRun()
     {
         BazaarPlusPlus.Core.Runtime.TestServices.Instance.RunContext.IsInGameRun = false;
-        Assert.False(CombatStatusBar.ShouldRenderForState(enabled: true));
+        Assert.False(CombatStatusBar.ShouldRenderForState());
 
         BazaarPlusPlus.Core.Runtime.TestServices.Instance.RunContext.IsInGameRun = true;
-        Assert.True(CombatStatusBar.ShouldRenderForState(enabled: true));
-        Assert.False(CombatStatusBar.ShouldRenderForState(enabled: false));
+        Assert.True(CombatStatusBar.ShouldRenderForState());
     }
 
     [Fact]
@@ -214,10 +132,7 @@ public sealed class CombatStatusBarStateTests : IDisposable
         // ...but the live probe reports ReplayState as in-game-run.
         services.GameStateProbe.Result = true;
 
-        Assert.True(CombatStatusBar.ShouldRenderForState(enabled: true));
-
-        // The user's enable toggle is still the master switch.
-        Assert.False(CombatStatusBar.ShouldRenderForState(enabled: false));
+        Assert.True(CombatStatusBar.ShouldRenderForState());
     }
 
     [Fact]
@@ -244,22 +159,6 @@ public sealed class CombatStatusBarStateTests : IDisposable
         Assert.Equal(1, activationCount);
         Assert.True(definition.IsActive());
         Assert.True(definition.CollapseAfterActivate);
-    }
-
-    [Theory]
-    [InlineData("zh-Hans", "战斗状态")]
-    [InlineData("zh-CN", "战斗状态")]
-    [InlineData("en", "Combat Status Bar")]
-    [InlineData("", "Combat Status Bar")]
-    public void SettingsMenuLabel_UsesChineseOnlyForSimplifiedChinese(
-        string languageCode,
-        string expected
-    )
-    {
-        LocalizationTestHost.Install(languageCode);
-        var result = CombatStatusBarSettingsMenuLabel.Resolve(languageCode);
-
-        Assert.Equal(expected, result);
     }
 
     [Theory]

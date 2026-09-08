@@ -88,7 +88,6 @@ internal enum SettingsRowId
     ItemEnchantPreview,
     EventPreview,
     QuestPreview,
-    CombatStatusBar,
     VoiceSubtitles,
 }
 

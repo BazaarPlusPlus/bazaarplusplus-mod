@@ -86,7 +86,6 @@ internal static class Sizes
     public const float BattleRankPillMinWidth = 68f;
     public const float BattleRankPillWidth = 80f;
     public const float DayBubbleSize = 40f;
-    public const float CombatStatusBarHeight = 60f;
 
     public const int FontTiny = 10;
     public const int FontCorner = 11;

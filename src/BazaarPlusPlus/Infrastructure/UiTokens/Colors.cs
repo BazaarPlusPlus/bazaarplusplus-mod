@@ -230,9 +230,6 @@ internal static class Colors
     public static Color HeroDefaultBackground => FromRgb(57, 73, 97);
     public static Color HeroDarkText => Rgba(0.10f, 0.12f, 0.15f, 1f);
 
-    public static Color CombatBarBackground => Rgba(0.06f, 0.07f, 0.09f, 0.90f);
-    public static Color CombatBarGlow => Rgba(0.28f, 0.22f, 0.12f, 0.10f);
-
     public static Color ButtonBorderFor(Color background) =>
         Rgba(
             Mathf.Clamp01(background.r + 0.08f),

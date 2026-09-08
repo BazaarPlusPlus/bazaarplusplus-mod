@@ -128,7 +128,8 @@ AssertSequence(orderedCandidates, "Vanessa", "Mak");
 var picked = selector.SelectHero(candidateHeroIds: new[] { "Vanessa", "Mak" }, randomIndex: 1);
 AssertEqual("Mak", picked);
 
-Console.WriteLine("RandomHeroPoolState checks passed.");
+PopupInteractionTests.Run();
+Console.WriteLine("RandomHeroPoolState and native popup interaction checks passed.");
 
 static void AssertSet(IEnumerable<string> actual, params string[] expected)
 {
