@@ -110,6 +110,29 @@ public sealed class EndOfRunCaptureArchitectureTests
         Assert.True(workflow >= 0 && workflow < features && features < driver);
     }
 
+    [Fact]
+    public void Screenshot_persistence_cannot_resample_live_game_state()
+    {
+        var root = Path.Combine(MainSourceRoot(RepoRoot()), "Game", "Screenshots");
+        var persistence = File.ReadAllText(Path.Combine(root, "EndOfRunArtifactPersistence.cs"));
+        var mapper = File.ReadAllText(Path.Combine(root, "RunScreenshotRecordMapper.cs"));
+        Assert.DoesNotContain("RunSnapshot", persistence);
+        Assert.DoesNotContain("Data.Run", persistence);
+        Assert.DoesNotContain("private readonly IBppServices", persistence);
+        Assert.DoesNotContain("RunBasicsSnapshot", mapper);
+        Assert.DoesNotContain("RankSnapshot", mapper);
+        var capture = File.ReadAllText(Path.Combine(root, "ScreenshotService.cs"));
+        var snapshot = capture.IndexOf(
+            "ScreenshotCaptureMetadata.Capture(",
+            StringComparison.Ordinal
+        );
+        var acquire = capture.IndexOf("var captureAndWrite =", StringComparison.Ordinal);
+        Assert.True(
+            snapshot >= 0 && acquire > snapshot,
+            "Metadata must be frozen before frame acquisition can release Continue."
+        );
+    }
+
     private static string RepoRoot()
     {
         var current = new DirectoryInfo(AppContext.BaseDirectory);
