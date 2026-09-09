@@ -162,8 +162,10 @@ static void VerifyVisualStabilityTracker()
 static void VerifyArtifactMapping()
 {
     var capturedAtLocal = new DateTimeOffset(2026, 7, 11, 20, 30, 0, TimeSpan.FromHours(8));
+    var probe = new ScreenshotMetadataProbe();
     var capture = new ScreenshotCaptureResult
     {
+        Metadata = ScreenshotCaptureMetadata.Capture(probe),
         ScreenshotId = "shot-42",
         RunId = "run-42",
         HeroName = null,
@@ -173,18 +175,15 @@ static void VerifyArtifactMapping()
         CapturedAtLocal = capturedAtLocal,
         CapturedAtUtc = capturedAtLocal.ToUniversalTime(),
     };
-    var basics = new RunBasicsSnapshot
-    {
-        Day = 12,
-        Victories = 10,
-        Hero = "Vanessa",
-    };
-    var rank = new RankSnapshot { Rank = "Legend", Rating = 2750 };
+    // Simulate live DTO mutation and then run teardown during background PNG encoding.
+    probe.Basics.Victories = 0;
+    probe.Basics.Day = 1;
+    probe.Basics.Hero = "Pygmalien";
+    probe.Ranking.Rank = "Bronze";
+    probe.Ranking.Rating = 0;
+    probe.Available = false;
     var record = RunScreenshotRecordMapper.CreateRecord(
         capture,
-        basics,
-        rank,
-        position: 37,
         isPrimary: true,
         buildChannel: "Online"
     );
@@ -202,6 +201,22 @@ static void VerifyArtifactMapping()
             && record.VictoriesAtCapture == 10
             && record.BuildChannel == "Online",
         "Screenshot metadata mapping should preserve capture and run identity."
+    );
+
+    var unavailable = new ScreenshotCaptureResult
+    {
+        Metadata = ScreenshotCaptureMetadata.Capture(probe),
+    };
+    probe.Available = true;
+    var missing = RunScreenshotRecordMapper.CreateRecord(unavailable, true, "Online");
+    Assert(
+        missing.VictoriesAtCapture == null && missing.Day == null && missing.PlayerRank == null,
+        "Unavailable capture metadata must remain unknown even if a new run becomes available."
+    );
+    var zero = new ScreenshotCaptureResult { Metadata = ScreenshotCaptureMetadata.Capture(probe) };
+    Assert(
+        RunScreenshotRecordMapper.CreateRecord(zero, true, "Online").VictoriesAtCapture == 0,
+        "A genuine zero-win capture must remain zero."
     );
 
     var relativePath = ScreenshotPathBuilder.BuildRelativePath(
@@ -329,4 +344,38 @@ namespace TheBazaar.UI.EndOfRun
 
         public void SetFaceUp(bool faceUp) => _faceUp = faceUp;
     }
+}
+
+file sealed class ScreenshotMetadataProbe : IRunSnapshotProbe
+{
+    internal bool Available { get; set; } = true;
+    internal RunBasicsSnapshot Basics { get; } =
+        new()
+        {
+            Day = 12,
+            Victories = 10,
+            Hero = "Vanessa",
+        };
+    internal RankSnapshot Ranking { get; } = new() { Rank = "Legend", Rating = 2750 };
+
+    public bool TryGetRunBasics(out RunBasicsSnapshot basics)
+    {
+        basics = Basics;
+        return Available;
+    }
+
+    public bool TryGetRankSnapshot(out RankSnapshot rank)
+    {
+        rank = Ranking;
+        return Available;
+    }
+
+    public bool TryGetLeaderboardPosition(out int? position)
+    {
+        position = 37;
+        return Available;
+    }
+
+    public bool TryGetPlayerStats(out PlayerStatsSnapshot stats) =>
+        throw new NotSupportedException();
 }

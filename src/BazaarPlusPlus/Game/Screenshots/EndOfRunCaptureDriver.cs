@@ -58,7 +58,8 @@ internal sealed class EndOfRunCaptureDriver
         _workflow = workflow ?? throw new ArgumentNullException(nameof(workflow));
         _services = services ?? throw new ArgumentNullException(nameof(services));
         _screenshotService = new ScreenshotService(
-            PathConstants.Screenshots(services.Paths.RequireDataRoot())
+            PathConstants.Screenshots(services.Paths.RequireDataRoot()),
+            services.RunSnapshot
         );
 
         _workflow.AttachDriver(this);
