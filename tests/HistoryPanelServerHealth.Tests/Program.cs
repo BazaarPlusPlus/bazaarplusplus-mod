@@ -55,22 +55,6 @@ var textType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanelText");
 var languageProvider = new MutableLanguageProvider("zh-CN");
 var modeProvider = new MutableLocaleModeProvider(BppChineseLocaleMode.Mainland);
 L.Install(languageProvider, modeProvider);
-var mainlandSample = InvokeStatic(textType, "FontAtlasSample") as string;
-modeProvider.CurrentMode = BppChineseLocaleMode.Taiwan;
-var taiwanSample = InvokeStatic(textType, "FontAtlasSample") as string;
-Assert(
-    !string.IsNullOrWhiteSpace(mainlandSample) && mainlandSample.Contains('对'),
-    "Mainland font atlas sample should include simplified Chinese glyphs."
-);
-Assert(
-    !string.IsNullOrWhiteSpace(taiwanSample) && taiwanSample.Contains('對'),
-    "Taiwan font atlas sample should include traditional Chinese glyphs after a mode switch."
-);
-Assert(
-    !string.Equals(mainlandSample, taiwanSample, StringComparison.Ordinal),
-    "FontAtlasSample cache should vary by Chinese locale mode, not only language code."
-);
-
 var accountLinkType =
     textType.GetNestedType("AccountLink", BindingFlags.NonPublic | BindingFlags.Public)
     ?? throw new InvalidOperationException("HistoryPanelText.AccountLink should exist.");

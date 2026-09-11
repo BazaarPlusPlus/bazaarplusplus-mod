@@ -38,13 +38,17 @@ Facts that take more than one file to derive, and that ARCHITECTURE does not sta
 
 ## Patterns
 
-Reach for these before writing a new one.
+Reuse these patterns.
 
 - Reuse the game's native UI components (`CardPreviewBase.SetUp` and the like) and existing prior art instead of hand-rolling a render or upload chain.
 - Mod-appended tooltip text goes through `BppTooltipSections`, which clones the tooltip's own passive-text block at 0.75 font scale, keyed per controller and purpose. [`src/BazaarPlusPlus/Patches/Tooltips/BppTooltipSections.cs`]
 - Keep Unity-adjacent logic free of Unity types and Compile-Include it into a test project — no InternalsVisibleTo needed. `OverlayLifecycleCore`, `HotkeyBindingPathCore`, `AsyncLoadCache`, `CollectionCardFitMath`, and `SavedReplayLifecycle` reach zero-ManagedPath. `CollectionViewState` does not: it uses `BazaarGameShared` types, so its test project still references the game assemblies. [ADR-0005]
 
 ## Gotchas
+
+- Main-menu scene identity is `SceneID.HeroSelectScene`, but the loaded Unity scene is named `MainMenuScene` in current builds. Use `SceneLoader.ActiveScene` and `IsSceneLoaded` for replay return gates; comparing the scene name to `HeroSelectSceneName` silently prevents reopening history. [`src/BazaarPlusPlus/Game/HistoryPanel/HistoryPanel.cs`]
+
+- Owned `MonsterBoardTooltip` clones must inherit the host canvas sorting: the donor has `overrideSorting=true` at order 0, hiding its opaque, correctly loaded cards behind history at order 26. Before destroying a clone, detach its registered cards/skills before `HandlePooling`; native pooling does not reparent them. Fit the carpet from its own four corners: recursive bounds include card/gem overhang and shift opposing boards differently. [`src/BazaarPlusPlus/GameInterop/MonsterBoardPreview/OwnedMonsterBoardPreview.cs`]
 
 Each of these failed silently, or reported something misleading, at least once.
 

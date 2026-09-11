@@ -35,6 +35,7 @@ TestRunHeroPresentationTreatsAliasesAsSelectedAndDisplaysCanonicalName();
 TestCoordinatorCanonicalizesAliasFilterState();
 TestStateSelectedRunUsesFilteredRunList();
 TestCoordinatorRunSelectionUsesFilteredSpace();
+TestReplayReturnPreservesSelectionAndFilters();
 TestGhostDayFilterRequiresDayTenOrLaterAndKeepsOutcomeFilter();
 
 Console.WriteLine("HistoryPanelFiltering checks passed.");
@@ -232,6 +233,97 @@ void TestCoordinatorRunSelectionUsesFilteredSpace()
         GetString(selected, "RunId") == "raw-3",
         "SelectRun should interpret indexes in filtered run space, not raw run space."
     );
+}
+
+void TestReplayReturnPreservesSelectionAndFilters()
+{
+    var state = Activator.CreateInstance(stateType)!;
+    var firstRun = CreateRun("run-1", "Vanessa");
+    var selectedRun = CreateRun("run-2", "Vanessa");
+    var selectedBattle = CreateBattle("battle-2", 12, "Lost");
+    GetList(state, "Runs").Add(firstRun);
+    GetList(state, "Runs").Add(selectedRun);
+    GetList(state, "Battles").Add(CreateBattle("battle-1", 11, "Won"));
+    GetList(state, "Battles").Add(selectedBattle);
+    stateType.GetProperty("SelectedRunIndex")!.SetValue(state, 1);
+    stateType.GetProperty("SelectedBattleIndex")!.SetValue(state, 1);
+    stateType.GetProperty("SelectedGhostBattleIndex")!.SetValue(state, 2);
+    stateType.GetProperty("SelectedRunHero")!.SetValue(state, "Vanessa");
+    stateType.GetProperty("GhostDayMin10")!.SetValue(state, true);
+    stateType
+        .GetProperty("GhostBattleFilter")!
+        .SetValue(state, Enum.Parse(ghostFilterType, "ILost"));
+    var dataService = Construct(dataServiceType, null, null);
+    var dependencies = Construct(dependenciesType, null, dataService, null, null, null, null, null);
+    var previewRequests = 0;
+    using var coordinator = (IDisposable)
+        Activator.CreateInstance(
+            coordinatorType,
+            state,
+            dependencies,
+            (Action)(() => { }),
+            (Action)(() => previewRequests++),
+            (Action<bool>)(_ => { })
+        )!;
+
+    // This capsule has no Unity PlayerPrefs; exercise the panel as a signed-out client.
+    var bridge = RequireType("BazaarPlusPlus.GameInterop.BppClientCacheBridge");
+    var cacheType = bridge.GetField(
+        "_clientCacheType",
+        BindingFlags.NonPublic | BindingFlags.Static
+    )!;
+    var resolved = bridge.GetField(
+        "_clientCacheTypeResolved",
+        BindingFlags.NonPublic | BindingFlags.Static
+    )!;
+    var previousType = cacheType.GetValue(null);
+    var previousResolved = resolved.GetValue(null);
+    cacheType.SetValue(null, null);
+    resolved.SetValue(null, true);
+    try
+    {
+        Invoke(coordinatorType, coordinator, "OnPanelHidden");
+        previewRequests = 0;
+        Invoke(coordinatorType, coordinator, "OnPanelShown", true);
+
+        Assert(
+            GetList(state, "Runs").Count == 2
+                && ReferenceEquals(GetList(state, "Runs")[1], selectedRun),
+            "Returning from replay must retain the loaded run list."
+        );
+        Assert(
+            ReferenceEquals(Invoke(stateType, state, "GetSelectedBattle"), selectedBattle),
+            "Returning from replay must retain the selected battle, not the latest battle."
+        );
+        Assert(
+            (int)stateType.GetProperty("SelectedRunIndex")!.GetValue(state)! == 1,
+            "Returning from replay must retain the selected run index."
+        );
+        Assert(
+            GetNullableString(state, "SelectedRunHero") == "Vanessa"
+                && (bool)stateType.GetProperty("GhostDayMin10")!.GetValue(state)!
+                && stateType.GetProperty("GhostBattleFilter")!.GetValue(state)!.ToString()
+                    == "ILost"
+                && (int)stateType.GetProperty("SelectedGhostBattleIndex")!.GetValue(state)! == 2,
+            "Returning from replay must retain both run and ghost filters and selection."
+        );
+        Assert(
+            previewRequests == 1,
+            "Returning from replay must refresh the selected preview once."
+        );
+
+        Invoke(coordinatorType, coordinator, "OnPanelHidden");
+        Invoke(coordinatorType, coordinator, "OnPanelShown", false);
+        Assert(
+            GetList(state, "Runs").Count == 0,
+            "A normal panel open must reload from storage instead of reusing replay-origin state."
+        );
+    }
+    finally
+    {
+        cacheType.SetValue(null, previousType);
+        resolved.SetValue(null, previousResolved);
+    }
 }
 
 void TestGhostDayFilterRequiresDayTenOrLaterAndKeepsOutcomeFilter()

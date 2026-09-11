@@ -10,6 +10,38 @@ namespace Architecture.Tests;
 /// </summary>
 public sealed class CoreLayeringTests
 {
+    [Fact]
+    public void History_view_cannot_own_native_history_workflows_or_leak_into_services()
+    {
+        var sourceRoot = MainSourceRoot();
+        var viewRoot = Path.Combine(sourceRoot, "Game", "HistoryPanel", "Ui");
+        foreach (var file in SourceFiles(viewRoot))
+        {
+            var source = File.ReadAllText(file);
+            foreach (
+                var controller in new[]
+                {
+                    "MatchHistoryScreenController",
+                    "MatchHistoryRunDetailsController",
+                    "RunHistoryListEntry",
+                }
+            )
+                Assert.DoesNotContain(controller, source);
+        }
+        var allowedBridge = Path.Combine(sourceRoot, "Game", "HistoryPanel", "HistoryPanel.Ui.cs");
+        foreach (
+            var file in SourceFiles(sourceRoot)
+                .Where(file =>
+                    !file.StartsWith(
+                        viewRoot + Path.DirectorySeparatorChar,
+                        StringComparison.Ordinal
+                    )
+                    && file != allowedBridge
+                )
+        )
+            Assert.DoesNotContain("HistoryPanelView", File.ReadAllText(file));
+    }
+
     private static readonly HashSet<string> AllowedCoreGameInteropImports = new(
         StringComparer.Ordinal
     )
