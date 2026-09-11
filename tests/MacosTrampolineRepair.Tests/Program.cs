@@ -75,7 +75,8 @@ try
     File.WriteAllText(exe, "UNITY current executable");
     File.WriteAllText(orig, "UNITY stale backup");
     File.WriteAllText(script, "#!/bin/sh\n");
-    File.WriteAllText(marker, "trampoline");
+    // Current installers remove the obsolete launch-mode marker.
+    File.WriteAllText(Path.Combine(gameRoot, "libdoorstop.dylib"), "DOORSTOP");
     File.WriteAllText(stub, "TRAMPOLINE STUB");
     Directory.CreateDirectory(fakeBin);
 
@@ -144,6 +145,7 @@ try
     );
 
     AssertEqual(0, result.ExitCode, result.Output);
+    AssertFalse(File.Exists(marker), "Repair must not recreate the obsolete launch-mode marker.");
     AssertEqual(
         "TRAMPOLINE STUB",
         File.ReadAllText(exe),
@@ -190,6 +192,25 @@ try
         Directory.GetDirectories(backups, "*.app").Single(),
         "Repeated builds must reuse the backup and preserve the signed root layout."
     );
+
+    File.Delete(Path.Combine(gameRoot, "libdoorstop.dylib"));
+    File.Delete(dotnetRecord);
+    result = RunProcess(
+        "/bin/bash",
+        new[] { Path.Combine(projectRoot, "run.sh"), "build" },
+        new Dictionary<string, string?>
+        {
+            ["BPP_GAME_ROOT"] = gameRoot,
+            ["BPP_TRAMPOLINE_STUB"] = stub,
+            ["PATH"] = fakeBin + Path.PathSeparator + Environment.GetEnvironmentVariable("PATH"),
+        }
+    );
+    AssertTrue(result.ExitCode != 0, "Missing bootstrap must fail the build.");
+    AssertTrue(
+        result.Output.Contains("libdoorstop.dylib is missing"),
+        "Missing bootstrap must report an actionable error."
+    );
+    AssertFalse(File.Exists(dotnetRecord), "Build must stop when bootstrap repair cannot run.");
 }
 finally
 {

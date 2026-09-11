@@ -181,7 +181,7 @@ class BundleRootTests(unittest.TestCase):
         self.backups.mkdir()
         (self.backups / ".DS_Store").write_bytes(b"Legacy Finder metadata")
         self.duplicate()
-        (self.game / ".bpp-launch-mode").write_text("trampoline")
+        (self.game / "libdoorstop.dylib").write_text("DOORSTOP")
         stub = self.game / "stub"
         source.write_text("int main(void) { return 0; }")
         subprocess.run(["clang", "-isysroot", sdk, "-arch", "arm64", str(source), "-o", str(stub)], check=True, capture_output=True)
