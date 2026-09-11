@@ -4,7 +4,9 @@ using BazaarGameShared.Domain.Cards.Item;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Effect.AuraActions;
 using BazaarGameShared.Domain.Players;
+using BazaarGameShared.Domain.Prerequisites.Conditionals;
 using BazaarGameShared.Domain.Values;
+using BazaarGameShared.Domain.Values.ReferenceValues;
 using BazaarGameShared.Infra.Serialization;
 using BazaarPlusPlus.GameInterop.StaticCards;
 using Newtonsoft.Json;
@@ -64,7 +66,25 @@ internal static class PantryCompatibilityTests
                 values.Length == 5,
                 "All base and enchanted Pantry references must be exercised."
             );
-            foreach (var value in values)
+            Check(
+                values.All(value =>
+                    (value.GetType().Assembly == typeof(ITValue).Assembly)
+                    == nativeAlreadySupportsPantry
+                ),
+                "Use native counts when available and compatibility counts only when missing."
+            );
+            foreach (
+                var value in values.SelectMany(value =>
+                    new[]
+                    {
+                        value,
+                        ReadFallback(
+                            serializer,
+                            JObject.FromObject(value, serializer).ToString(Formatting.None)
+                        ),
+                    }
+                )
+            )
             {
                 Check(
                     value.GetRawValue(context) == 2,
@@ -125,9 +145,90 @@ internal static class PantryCompatibilityTests
             NativeSupports(json) == nativeAlreadySupportsPantry,
             "A card serializer adapter must not mutate the global native type registry."
         );
+        VerifyNativeTargetAndRecordBehavior(serializer);
         Console.WriteLine(
             "PASS: Pantry is retained; all five references preserve unique food counting, tiers, empty stash, and round trips."
         );
+    }
+
+    private static TReferenceValueWithTargetCard ReadFallback(
+        JsonSerializer serializer,
+        string json
+    )
+    {
+        var converter = new CompatibleCardValueConverter(new MissingUniqueCountConverter());
+        using var reader = new JsonTextReader(new StringReader(json));
+        return (TReferenceValueWithTargetCard)
+            converter.ReadJson(reader, typeof(TReferenceValueWithTargetCard), null, serializer)!;
+    }
+
+    private static void VerifyNativeTargetAndRecordBehavior(JsonSerializer serializer)
+    {
+        var value = ReadFallback(
+            serializer,
+            "{\"$type\":\"TReferenceValueUniqueCardCount\",\"DefaultValue\":7}"
+        );
+        var context = new ValueContext(null!);
+        Check(
+            value.GetRawValue(context) == 7 && value.GetValue(context) == 7,
+            "A missing target must preserve the configured native default."
+        );
+        var clone = value with { DefaultValue = 9 };
+        Check(
+            clone.GetType() == value.GetType()
+                && value.DefaultValue == 7
+                && clone.DefaultValue == 9,
+            "Native record cloning must preserve the compatibility type and isolate changes."
+        );
+        Check(
+            value.Equals(value with { }) && !value.Equals(clone),
+            "Native record equality must preserve inherited properties."
+        );
+        Check(
+            !value.Equals(new TReferenceValueCardCount { DefaultValue = 7 }),
+            "Compatibility records must remain distinct from native count records."
+        );
+
+        var card = NativeProxy.Create<ICard>(
+            (method, _) =>
+                method switch
+                {
+                    "get_TemplateId" => Guid.Empty,
+                    "GetAttributeValue" => 1,
+                    _ => throw new NotSupportedException(method),
+                }
+        );
+        var conditional = new TCardConditionalAttribute
+        {
+            ComparisonOperator = EComparisonOperator.Equal,
+            ComparisonValue = value,
+        };
+        Check(
+            conditional.IsSatisfiedBy(card, new CardConditionalContext(null!, [card], null, null)),
+            "Native null-target conditionals must count the explicit card instead of using DefaultValue."
+        );
+    }
+
+    private sealed class MissingUniqueCountConverter : JsonConverter
+    {
+        public override bool CanConvert(Type objectType) => true;
+
+        public override object? ReadJson(
+            JsonReader reader,
+            Type objectType,
+            object? existingValue,
+            JsonSerializer serializer
+        ) =>
+            throw new JsonSerializationException(
+                "Unknown type or missing type information: "
+                    + CompatibleCardValueConverter.UniqueCardCountType
+            );
+
+        public override void WriteJson(
+            JsonWriter writer,
+            object? value,
+            JsonSerializer serializer
+        ) => throw new NotSupportedException();
     }
 
     private static ICard Card(int identity, bool food) =>

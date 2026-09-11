@@ -1,5 +1,6 @@
 #nullable enable
 using BazaarGameShared.Domain.Values;
+using BazaarGameShared.Domain.Values.ReferenceValues;
 using BazaarGameShared.Infra.Serialization;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -45,11 +46,11 @@ internal sealed class CompatibleCardValueConverter : JsonConverter
             when ((string?)data["$type"] == UniqueCardCountType
                 && error.Message
                     == "Unknown type or missing type information: " + UniqueCardCountType
-                && objectType.IsAssignableFrom(typeof(CompatibleUniqueCardCount))
+                && objectType.IsAssignableFrom(CompatibleUniqueCardCount.RuntimeType)
             )
         {
             data.Remove("$type");
-            var value = new CompatibleUniqueCardCount();
+            var value = CompatibleUniqueCardCount.Create();
             using var compatibilityReader = data.CreateReader();
             serializer.Populate(compatibilityReader, value);
             return value;
@@ -58,7 +59,10 @@ internal sealed class CompatibleCardValueConverter : JsonConverter
 
     public override void WriteJson(JsonWriter writer, object? value, JsonSerializer serializer)
     {
-        if (value is not CompatibleUniqueCardCount count)
+        if (
+            value is not TReferenceValueWithTargetCard count
+            || !CompatibleUniqueCardCount.IsInstance(count)
+        )
         {
             _native.WriteJson(writer, value, serializer);
             return;

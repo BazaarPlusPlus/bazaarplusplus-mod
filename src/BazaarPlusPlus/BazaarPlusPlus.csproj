@@ -162,12 +162,6 @@
   <PropertyGroup>
     <PublicizeAll>true</PublicizeAll>
   </PropertyGroup>
-  <ItemGroup>
-    <!-- Preserve record inheritance and protected override signatures for the value adapter. -->
-    <DoNotPublicize Include="BazaarGameShared:BazaarGameShared.Domain.Values.ReferenceValues.TReferenceValueBase" />
-    <DoNotPublicize Include="BazaarGameShared:BazaarGameShared.Domain.Values.ReferenceValues.TReferenceValueWithTargetCard" />
-  </ItemGroup>
-
   <!-- Debug build -->
   <Target
     Name="CopyToBepInExPlugins"
