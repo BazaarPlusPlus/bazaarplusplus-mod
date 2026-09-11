@@ -8,14 +8,11 @@ fi
 GAME_ROOT="${BPP_GAME_ROOT:-$HOME/Library/Application Support/Steam/steamapps/common/The Bazaar}"
 TRAMPOLINE_STUB="${BPP_TRAMPOLINE_STUB:-}"
 
-MARKER="$GAME_ROOT/.bpp-launch-mode"
-if [[ ! -f "$MARKER" ]]; then
-    exit 0
-fi
-
-MODE="$(tr -d '[:space:]' < "$MARKER")"
-if [[ "$MODE" != "trampoline" ]]; then
-    exit 0
+# Current installers remove .bpp-launch-mode. Check the installed bootstrap
+# payload instead, then inspect the executable to decide whether repair is needed.
+if [[ ! -f "$GAME_ROOT/libdoorstop.dylib" ]]; then
+    echo "[BPP] Cannot repair macOS trampoline: libdoorstop.dylib is missing under $GAME_ROOT. Install BepInEx with the BPP installer and retry." >&2
+    exit 1
 fi
 
 APP_PATH="$GAME_ROOT/TheBazaar.app"
