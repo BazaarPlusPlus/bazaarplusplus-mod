@@ -54,7 +54,10 @@ internal sealed partial class CombatStatusBar : MonoBehaviour
             IsCombatPlaybackActive,
             Time.unscaledDeltaTime
         );
+    }
 
+    private void LateUpdate()
+    {
         EnsureUi();
         RefreshUi();
     }
