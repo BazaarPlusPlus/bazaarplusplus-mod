@@ -68,6 +68,12 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
     public bool IsReplayStartInProgress => _savedReplay.IsReplayStartInProgress;
 
+    internal bool HasSavedReplaySession =>
+        _activePlaybackOperation != null
+        || _pendingMenuReturnOperation != null
+        || IsReplayStartInProgress
+        || IsSavedReplayPlaybackActive;
+
     public bool HasPendingPersistence => _persistence?.HasPendingPersistence == true;
 
     private void Awake()

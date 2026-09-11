@@ -212,31 +212,6 @@ internal static class HistoryPanelLogEvents
         ],
         new BppLogStormPolicy([CardPreviewDegradedOperation, CardPreviewDegradedReasonCode])
     );
-    internal static readonly BppLogFieldDefinition ItemBoardPreviewDegradedOperation = PublicLow(
-        0,
-        "operation"
-    );
-    internal static readonly BppLogFieldDefinition ItemBoardPreviewDegradedReasonCode = PublicLow(
-        1,
-        "reason_code"
-    );
-    internal static readonly BppLogFieldDefinition ItemBoardPreviewDegradedTemplateId = PublicHigh(
-        2,
-        "template_id"
-    );
-    internal static readonly BppLogEventDefinition ItemBoardPreviewDegraded = new(
-        BppLogFeatureScope.HistoryPanel,
-        "history_panel.item_board_preview.degraded",
-        [
-            ItemBoardPreviewDegradedOperation,
-            ItemBoardPreviewDegradedReasonCode,
-            ItemBoardPreviewDegradedTemplateId,
-        ],
-        new BppLogStormPolicy([
-            ItemBoardPreviewDegradedOperation,
-            ItemBoardPreviewDegradedReasonCode,
-        ])
-    );
 
     private static BppLogFieldDefinition PublicLow(int order, string name) =>
         new(order, name, BppLogCorrelationPolicy.None, BppLogCardinality.Low);

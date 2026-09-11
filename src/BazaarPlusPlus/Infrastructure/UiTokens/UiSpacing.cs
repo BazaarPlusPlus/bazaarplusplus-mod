@@ -14,5 +14,4 @@ internal static class UiSpacing
     public const float Xxl = 14f;
     public const float ColumnGap = 18f;
     public const float PanelPadding = 24f;
-    public const float RowVerticalPadding = 9f;
 }

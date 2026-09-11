@@ -2,7 +2,6 @@
 using System.Globalization;
 using BazaarPlusPlus.Game.HistoryPanel.Data;
 using BazaarPlusPlus.Localization;
-using UnityEngine;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;
 
@@ -101,38 +100,9 @@ internal static class HistoryPanelFormatter
             );
     }
 
-    public static string? FormatOpponentHero(string? rawHero)
-    {
-        if (string.IsNullOrWhiteSpace(rawHero))
-            return null;
-
-        return rawHero;
-    }
-
     public static string FormatDayOnly(int? day)
     {
         return HistoryPanelText.DayBadge(day);
-    }
-
-    public static string? FormatRunDuration(HistoryRunRecord run)
-    {
-        if (!string.Equals(run.RawStatus, "completed", StringComparison.OrdinalIgnoreCase))
-            return null;
-
-        if (!run.EndedAtUtc.HasValue)
-            return null;
-
-        var duration = run.EndedAtUtc.Value - run.StartedAtUtc;
-        if (duration <= TimeSpan.Zero)
-            return null;
-
-        if (duration.TotalHours >= 1d)
-            return $"{(int)duration.TotalHours}h {duration.Minutes}m";
-
-        if (duration.TotalMinutes >= 1d)
-            return $"{Mathf.Max(1, Mathf.RoundToInt((float)duration.TotalMinutes))}m";
-
-        return $"{Mathf.Max(1, duration.Seconds)}s";
     }
 
     public static string FormatTimestamp(DateTimeOffset value)
@@ -165,41 +135,5 @@ internal static class HistoryPanelFormatter
             culture = CultureInfo.CurrentCulture;
             return false;
         }
-    }
-
-    public static string FormatSnapshotSummary(
-        HistoryBattleSnapshotCounts counts,
-        HistoryBattleSource source
-    )
-    {
-        if (!counts.Known)
-            return HistoryPanelText.SnapshotCountsUnknown();
-
-        if (!counts.HasAnyRecordedCard)
-            return string.Empty;
-
-        return source == HistoryBattleSource.Ghost
-            ? HistoryPanelText.GhostSnapshotSummary(
-                counts.PlayerHandItemCount,
-                counts.PlayerSkillCount,
-                counts.OpponentHandItemCount,
-                counts.OpponentSkillCount
-            )
-            : HistoryPanelText.SnapshotSummary(
-                counts.PlayerHandItemCount,
-                counts.PlayerSkillCount,
-                counts.OpponentHandItemCount,
-                counts.OpponentSkillCount
-            );
-    }
-
-    public static string? NormalizeRank(string? rawRank)
-    {
-        if (string.IsNullOrWhiteSpace(rawRank))
-            return null;
-
-        var trimmed = rawRank.Trim();
-        var firstSpace = trimmed.IndexOf(' ');
-        return firstSpace > 0 ? trimmed[..firstSpace] : trimmed;
     }
 }

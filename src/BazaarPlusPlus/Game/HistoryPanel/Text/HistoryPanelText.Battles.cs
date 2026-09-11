@@ -12,21 +12,15 @@ internal static partial class HistoryPanelText
     );
 
     private static readonly LocalizedTextSet SelectBattleForFooterText = new(
-        "Select one battle to inspect it, then use Replay when you want to jump back into it.",
-        "选择一场战斗进行查看，想重新进入时再使用回放。",
-        "選擇一場戰鬥進行檢視，想重新進入時再使用重播。"
+        "Select a battle to view both boards.",
+        "选择一场战斗，查看双方阵容。",
+        "選擇一場戰鬥，查看雙方陣容。"
     );
 
     private static readonly LocalizedTextSet SelectedBattleText = new(
         "Selected",
         "当前战斗",
         "當前戰鬥"
-    );
-
-    private static readonly LocalizedTextSet SnapshotCountsUnknownText = new(
-        "Items and skills: unknown until replay is downloaded",
-        "物品与技能数量：下载回放后可见",
-        "物品與技能數量：下載重播後可見"
     );
 
     private static readonly LocalizedTextSet WinText = new("Win", "胜利", "勝利");
@@ -51,8 +45,6 @@ internal static partial class HistoryPanelText
 
     internal static string SelectedBattle() => Resolve(SelectedBattleText);
 
-    internal static string SnapshotCountsUnknown() => Resolve(SnapshotCountsUnknownText);
-
     internal static string Win() => Resolve(WinText);
 
     internal static string Loss() => Resolve(LossText);
@@ -73,44 +65,6 @@ internal static partial class HistoryPanelText
 
     internal static string GhostChallengedYou(string name) =>
         FormatSimple($"{name} challenged you", $"{name} 挑战了你", $"{name} 挑戰了你");
-
-    internal static string SnapshotSummary(
-        int playerItems,
-        int playerSkills,
-        int opponentItems,
-        int opponentSkills
-    )
-    {
-        var languageCode = L.CurrentLanguageCode;
-        if (LanguageCodeMatcher.IsChinese(languageCode))
-        {
-            return ResolveChinese(
-                $"我方 {playerItems} 件物品 · {playerSkills} 个技能  |  对手 {opponentItems} 件物品 · {opponentSkills} 个技能",
-                $"我方 {playerItems} 件物品 · {playerSkills} 個技能  |  對手 {opponentItems} 件物品 · {opponentSkills} 個技能"
-            );
-        }
-
-        return $"YOU {playerItems} {Pluralize(playerItems, "item", "items")} · {playerSkills} {Pluralize(playerSkills, "skill", "skills")}  |  OPP {opponentItems} {Pluralize(opponentItems, "item", "items")} · {opponentSkills} {Pluralize(opponentSkills, "skill", "skills")}";
-    }
-
-    internal static string GhostSnapshotSummary(
-        int defenderItems,
-        int defenderSkills,
-        int challengerItems,
-        int challengerSkills
-    )
-    {
-        var languageCode = L.CurrentLanguageCode;
-        if (LanguageCodeMatcher.IsChinese(languageCode))
-        {
-            return ResolveChinese(
-                $"你 {defenderItems} 件物品 · {defenderSkills} 个技能  |  挑战者 {challengerItems} 件物品 · {challengerSkills} 个技能",
-                $"你 {defenderItems} 件物品 · {defenderSkills} 個技能  |  挑戰者 {challengerItems} 件物品 · {challengerSkills} 個技能"
-            );
-        }
-
-        return $"YOU {defenderItems} {Pluralize(defenderItems, "item", "items")} · {defenderSkills} {Pluralize(defenderSkills, "skill", "skills")}  |  CHA {challengerItems} {Pluralize(challengerItems, "item", "items")} · {challengerSkills} {Pluralize(challengerSkills, "skill", "skills")}";
-    }
 
     internal static string LoadedGhostBattles(int count)
     {

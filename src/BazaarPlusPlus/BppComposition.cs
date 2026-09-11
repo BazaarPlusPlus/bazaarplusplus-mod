@@ -257,8 +257,7 @@ internal sealed class BppComposition : IDisposable
                 combatReplayRuntime: () => _combatReplayModule.Runtime,
                 modApiSession: () => _modApiSessionRef,
                 accountLinkClient: () => _accountLinkClientRef,
-                overlayHost: () => overlayPanelHostMount.Host,
-                nativeCardPreviewHost: _nativeCardPreviewHost
+                overlayHost: () => overlayPanelHostMount.Host
             )
         );
         _mountables.Register(

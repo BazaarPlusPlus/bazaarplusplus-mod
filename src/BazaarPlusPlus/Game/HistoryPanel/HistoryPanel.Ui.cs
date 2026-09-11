@@ -1,6 +1,5 @@
 #nullable enable
 using BazaarPlusPlus.Game.HistoryPanel.Data;
-using BazaarPlusPlus.Game.HistoryPanel.Ui;
 using BazaarPlusPlus.Game.Supporters;
 using UnityEngine;
 
@@ -8,16 +7,15 @@ namespace BazaarPlusPlus.Game.HistoryPanel;
 
 internal sealed partial class HistoryPanel
 {
-    private HistoryPanelUiToolkitView? _uiView;
+    private Ui.HistoryPanelView? _uiView;
     private Rect _previewContainerBounds;
     private bool _hasPreviewContainerBounds;
-    private bool _previewContainerBoundsChanged;
 
     private void EnsureUi()
     {
         if (_uiView == null)
         {
-            _uiView = new HistoryPanelUiToolkitView(
+            _uiView = new Ui.HistoryPanelView(
                 transform,
                 () => SetHistoryVisible(false),
                 () => TryReplaySelectedBattle(false),
@@ -34,10 +32,18 @@ internal sealed partial class HistoryPanel
                 SetRunHero,
                 ToggleGhostDayMin10
             );
-            _uiView.PreviewContainerBoundsChanged += OnPreviewContainerBoundsChanged;
 
-            // First panel open: load the macOS native plugin on the UI thread, or warm the
-            // Warm the native recorder before per-refresh gating.
+            _uiView.PreviewContainerBoundsChanged += OnPreviewContainerBoundsChanged;
+            _uiView.OpponentBoundsChanged += bounds =>
+            {
+                _opponentBounds = bounds;
+                if (_nativeOpponentBoard != null)
+                    _nativeOpponentBoard.SetBounds(bounds);
+                else
+                    RefreshNativeHistoryBoards();
+            };
+
+            // Warm the native recorder on the UI thread before per-refresh gating.
             _coordinator?.PrewarmRecordingAvailability();
         }
         _uiView.EnsureCreated();
@@ -45,16 +51,12 @@ internal sealed partial class HistoryPanel
 
     private void OnPreviewContainerBoundsChanged(Rect bounds)
     {
-        _previewContainerBoundsChanged =
-            !_hasPreviewContainerBounds || !RectApproximately(_previewContainerBounds, bounds);
         _previewContainerBounds = bounds;
         _hasPreviewContainerBounds = true;
-
-        if (_battleBoardPreview == null)
-            return;
-
-        if (ApplyPreviewContainerBounds(bounds) && IsVisible)
-            RefreshSelectedBattlePreview();
+        if (_nativePlayerBoard != null)
+            _nativePlayerBoard.SetBounds(bounds);
+        else
+            RefreshNativeHistoryBoards();
     }
 
     private void DisposeUi()
@@ -83,13 +85,7 @@ internal sealed partial class HistoryPanel
         _uiView?.SetPreviewStatus(message, visible);
     }
 
-    private static bool RectApproximately(Rect left, Rect right) =>
-        Mathf.Approximately(left.x, right.x)
-        && Mathf.Approximately(left.y, right.y)
-        && Mathf.Approximately(left.width, right.width)
-        && Mathf.Approximately(left.height, right.height);
-
-    private HistoryPanelUiToolkitModel BuildUiModel()
+    private HistoryPanelViewModel BuildUiModel()
     {
         var canReplaySelectedBattle = CanReplaySelectedBattle(out var replayUnavailableReason);
         var canRecordSelectedBattle = CanRecordSelectedBattle(out _);
@@ -124,10 +120,6 @@ internal sealed partial class HistoryPanel
         var detailResultText = hasSelectedBattle
             ? HistoryPanelFormatter.FormatBattleResult(selectedBattle!)
             : string.Empty;
-        var detailResultSeverity = ResolveBattleResultSeverity(selectedBattle);
-        var detailDayText = hasSelectedBattle
-            ? HistoryPanelFormatter.FormatDayOnly(selectedBattle!.Day)
-            : string.Empty;
         var detailOpponentName = hasSelectedBattle
             ? selectedBattle!.Source == HistoryBattleSource.Ghost
                 ? HistoryPanelText.GhostChallengedYou(
@@ -137,12 +129,6 @@ internal sealed partial class HistoryPanel
             : string.Empty;
         var detailMetaText = hasSelectedBattle
             ? HistoryPanelFormatter.FormatTimestamp(selectedBattle!.RecordedAtUtc)
-            : string.Empty;
-        var detailSnapshotText = hasSelectedBattle
-            ? HistoryPanelFormatter.FormatSnapshotSummary(
-                selectedBattle!.SnapshotCounts,
-                selectedBattle.Source
-            )
             : string.Empty;
         var detailPlaceholderText = hasSelectedBattle
             ? string.Empty
@@ -162,10 +148,9 @@ internal sealed partial class HistoryPanel
 
         var statusSeverity = _state.StatusSeverity;
 
-        return new HistoryPanelUiToolkitModel
+        return new HistoryPanelViewModel
         {
             Title = HistoryPanelText.Title(),
-            Subtitle = HistoryPanelText.Subtitle(),
             Supporters = _supporters,
             CountChipText =
                 _state.SectionMode == HistorySectionMode.Ghost
@@ -180,7 +165,6 @@ internal sealed partial class HistoryPanel
             ServerHealthButtonText = serverHealthDisplay.ButtonText,
             ServerHealthButtonEnabled = serverHealthDisplay.ButtonEnabled,
             AccountCardVisible = _dependencies?.IsBazaarDbAccountLinkAvailable?.Invoke() ?? false,
-            IsBazaarDbLinked = isBazaarDbLinked,
             AccountTitleText = HistoryPanelText.AccountLink.Title(),
             AccountWhyText = HistoryPanelText.AccountLink.Why(),
             AccountHintText = HistoryPanelText.AccountLink.Hint(),
@@ -218,52 +202,24 @@ internal sealed partial class HistoryPanel
                 _state.SectionMode == HistorySectionMode.Ghost
                     ? _state.SelectedGhostBattleIndex
                     : _state.SelectedBattleIndex,
-            RunsBattleSubtitle =
-                selectedRun == null
-                    ? HistoryPanelText.SelectRunSubtitle()
-                    : $"{HistoryPanelHeroPresentation.DisplayName(selectedRun.Hero)} | {HistoryPanelFormatter.FormatDayOnly(selectedRun.FinalDay)}",
             ReplayButtonText = buttons.ReplayButtonText,
             ReplayButtonEnabled = buttons.ReplayButtonEnabled,
             RecordAndReplayButtonText = buttons.RecordAndReplayButtonText,
             RecordAndReplayButtonEnabled = buttons.RecordAndReplayButtonEnabled,
             DeleteButtonText = buttons.DeleteButtonText,
             DeleteButtonEnabled = buttons.DeleteButtonEnabled,
-            HasSelectedBattle = hasSelectedBattle,
             DetailResultText = detailResultText,
-            DetailResultSeverity = detailResultSeverity,
-            DetailDayText = detailDayText,
             DetailOpponentName = detailOpponentName,
             DetailMetaText = detailMetaText,
-            DetailSnapshotText = detailSnapshotText,
             DetailPlaceholderText = detailPlaceholderText,
             GhostOpponentEliminatedNoticeText = ghostOpponentEliminatedNoticeText,
         };
     }
-
-    private static StatusSeverity ResolveBattleResultSeverity(HistoryBattleRecord? battle)
-    {
-        if (battle == null)
-            return StatusSeverity.Neutral;
-
-        // eliminated first (it also counts as a win)
-        if (HistoryPanelFormatter.IsGhostOpponentEliminated(battle))
-            return StatusSeverity.Confirm; // -> Eliminated accent pill
-
-        if (HistoryPanelFormatter.IsBattleWin(battle))
-            return StatusSeverity.Success;
-
-        if (HistoryPanelFormatter.IsBattleLoss(battle))
-            return StatusSeverity.Failure;
-
-        return StatusSeverity.Neutral;
-    }
 }
 
-internal sealed class HistoryPanelUiToolkitModel
+internal sealed class HistoryPanelViewModel
 {
     public string Title { get; set; } = string.Empty;
-
-    public string Subtitle { get; set; } = string.Empty;
 
     public IReadOnlyList<BPPSupporterSample> Supporters { get; set; } =
         new List<BPPSupporterSample>();
@@ -279,8 +235,6 @@ internal sealed class HistoryPanelUiToolkitModel
     public bool ServerHealthButtonEnabled { get; set; }
 
     public bool AccountCardVisible { get; set; }
-
-    public bool IsBazaarDbLinked { get; set; }
 
     public string AccountTitleText { get; set; } = string.Empty;
 
@@ -334,8 +288,6 @@ internal sealed class HistoryPanelUiToolkitModel
 
     public int SelectedBattleIndex { get; set; }
 
-    public string RunsBattleSubtitle { get; set; } = string.Empty;
-
     public string ReplayButtonText { get; set; } = string.Empty;
 
     public bool ReplayButtonEnabled { get; set; }
@@ -348,19 +300,11 @@ internal sealed class HistoryPanelUiToolkitModel
 
     public bool DeleteButtonEnabled { get; set; }
 
-    public bool HasSelectedBattle { get; set; }
-
     public string DetailResultText { get; set; } = string.Empty;
-
-    public StatusSeverity DetailResultSeverity { get; set; }
-
-    public string DetailDayText { get; set; } = string.Empty;
 
     public string DetailOpponentName { get; set; } = string.Empty;
 
     public string DetailMetaText { get; set; } = string.Empty;
-
-    public string DetailSnapshotText { get; set; } = string.Empty;
 
     public string DetailPlaceholderText { get; set; } = string.Empty;
 

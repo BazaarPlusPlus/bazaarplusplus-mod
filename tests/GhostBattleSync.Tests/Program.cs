@@ -422,12 +422,6 @@ static void UnknownProjectionAndCountsStayUnknown()
         !local.SnapshotCounts.Known,
         "Hand and skill counts must be unknown before replay download."
     );
-    Assert(
-        HistoryPanelFormatter
-            .FormatSnapshotSummary(local.SnapshotCounts, local.Source)
-            .Contains("unknown", StringComparison.OrdinalIgnoreCase),
-        "Unknown counts must not render as zero."
-    );
 }
 
 static GhostBattleImportRecord CreateImport(

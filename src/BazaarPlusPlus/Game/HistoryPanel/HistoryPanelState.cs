@@ -3,12 +3,6 @@ using BazaarPlusPlus.Game.HistoryPanel.Data;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;
 
-internal enum PreviewSelectionMode
-{
-    Run,
-    Battle,
-}
-
 internal enum HistorySectionMode
 {
     Runs,
@@ -53,8 +47,6 @@ internal sealed class HistoryPanelState
     public DeleteConfirmation DeleteRunConfirmation { get; set; }
 
     public bool DeleteRunConfirmationStatusActive { get; set; }
-
-    public PreviewSelectionMode PreviewSelectionMode { get; set; } = PreviewSelectionMode.Run;
 
     public HistorySectionMode SectionMode { get; set; } = HistorySectionMode.Runs;
 

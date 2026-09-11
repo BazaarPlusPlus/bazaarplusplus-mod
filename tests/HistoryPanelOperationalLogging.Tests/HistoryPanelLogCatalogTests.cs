@@ -40,8 +40,6 @@ public sealed class HistoryPanelLogCatalogTests
             ["history_panel.open.skipped"] = "reason_code:Low:None",
             ["history_panel.card_preview.degraded"] =
                 "operation:Low:None|reason_code:Low:None|template_id:High:None",
-            ["history_panel.item_board_preview.degraded"] =
-                "operation:Low:None|reason_code:Low:None|template_id:High:None",
         };
 
         Assert.Equal(expected.Count, actual.Count);
@@ -63,7 +61,6 @@ public sealed class HistoryPanelLogCatalogTests
             new[]
             {
                 "history_panel.card_preview.degraded",
-                "history_panel.item_board_preview.degraded",
                 "history_panel.preview.payload_degraded",
                 "history_panel.preview.socket_effect_degraded",
                 "history_panel.preview.static_data_degraded",

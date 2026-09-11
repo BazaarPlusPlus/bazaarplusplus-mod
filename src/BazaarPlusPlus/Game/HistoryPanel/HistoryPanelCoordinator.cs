@@ -53,7 +53,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         _session.Dispose();
     }
 
-    public void OnPanelShown()
+    public void OnPanelShown(bool resumeSelection = false)
     {
         _session.Begin();
         _state.AccountLinkExpanded = false;
@@ -63,7 +63,13 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         _state.AccountLinkInProgress = false;
         RefreshAccountLinkIdentityFromGame();
         _state.ReplayActionInProgress = false;
-        RefreshSectionOnEntry();
+        if (resumeSelection)
+        {
+            ClearTransientStatus();
+            _requestPreviewRefresh();
+        }
+        else
+            RefreshSectionOnEntry();
     }
 
     public void OnPanelHidden()
@@ -135,7 +141,6 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         InvalidateFilteredRuns();
         _state.SelectedRunIndex = ClampIndex(_state.SelectedRunIndex, GetFilteredRuns().Count);
         LoadBattlesForSelectedRun();
-        _state.PreviewSelectionMode = PreviewSelectionMode.Run;
         SetStatusMessage(statusMessage);
 
         _requestUiRefresh();
@@ -179,7 +184,6 @@ internal sealed class HistoryPanelCoordinator : IDisposable
             _state.SelectedGhostBattleIndex,
             GetFilteredGhostBattles().Count
         );
-        _state.PreviewSelectionMode = PreviewSelectionMode.Battle;
         SetStatusMessage(statusMessage);
 
         _requestUiRefresh();
@@ -192,10 +196,6 @@ internal sealed class HistoryPanelCoordinator : IDisposable
             return;
 
         _state.SectionMode = mode;
-        _state.PreviewSelectionMode =
-            mode == HistorySectionMode.Ghost
-                ? PreviewSelectionMode.Battle
-                : PreviewSelectionMode.Run;
         RefreshSectionOnEntry();
     }
 
@@ -210,7 +210,6 @@ internal sealed class HistoryPanelCoordinator : IDisposable
             _state.SelectedGhostBattleIndex,
             GetFilteredGhostBattles().Count
         );
-        _state.PreviewSelectionMode = PreviewSelectionMode.Battle;
         _requestUiRefresh();
         _requestPreviewRefresh();
     }
@@ -227,7 +226,6 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         _state.SelectedRunIndex = 0;
         ClearDeleteRunConfirmation();
         LoadBattlesForSelectedRun();
-        _state.PreviewSelectionMode = PreviewSelectionMode.Run;
         _requestUiRefresh();
         _requestPreviewRefresh();
     }
@@ -248,7 +246,6 @@ internal sealed class HistoryPanelCoordinator : IDisposable
             _state.SelectedGhostBattleIndex,
             GetFilteredGhostBattles().Count
         );
-        _state.PreviewSelectionMode = PreviewSelectionMode.Battle;
         _requestUiRefresh();
         _requestPreviewRefresh();
     }
@@ -264,7 +261,6 @@ internal sealed class HistoryPanelCoordinator : IDisposable
 
         _state.SelectedRunIndex = index;
         LoadBattlesForSelectedRun();
-        _state.PreviewSelectionMode = PreviewSelectionMode.Run;
         _requestUiRefresh();
         _requestPreviewRefresh();
     }
@@ -282,7 +278,6 @@ internal sealed class HistoryPanelCoordinator : IDisposable
             _state.SelectedGhostBattleIndex = index;
         else
             _state.SelectedBattleIndex = index;
-        _state.PreviewSelectionMode = PreviewSelectionMode.Battle;
         _requestUiRefresh();
         _requestPreviewRefresh();
     }
