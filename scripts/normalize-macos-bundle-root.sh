@@ -84,6 +84,9 @@ tombstones=()
 for entry in "$BACKUPS"/*; do
     name="${entry##*/}"
     case "$name" in
+        .DS_Store)
+            [[ -f "$entry" && ! -L "$entry" ]] || fail "Invalid Finder metadata: $entry"
+            ;;
         current|current.tmp)
             [[ -f "$entry" && ! -L "$entry" ]] || fail "Invalid backup record: $entry"
             ;;

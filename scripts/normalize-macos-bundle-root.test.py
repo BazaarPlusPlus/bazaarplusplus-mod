@@ -92,13 +92,45 @@ class BundleRootTests(unittest.TestCase):
         self.assertTrue((self.app / DUPLICATE).exists())
 
     def test_legacy_stash_stays_outside_application(self):
+        (self.app / ".DS_Store").write_bytes(b"Finder metadata")
         self.backups.mkdir()
         shutil.copytree(self.app, self.backups / DUPLICATE)
+        original = digest(self.backups / DUPLICATE)
+        (self.backups / ".DS_Store").write_bytes(b"Legacy Finder metadata")
         self.normalize()
+        self.normalize()
+        self.duplicate()
         self.normalize()
         self.assertFalse((self.app / DUPLICATE).exists())
         self.assertFalse((self.backups / DUPLICATE).exists())
         self.assertEqual(len(list(self.backups.glob("*.app"))), 1)
+        self.assertEqual(digest(self.backups / f"{original}.app"), original)
+        self.assertEqual((self.app / ".DS_Store").read_bytes(), b"Finder metadata")
+        self.assertEqual((self.backups / ".DS_Store").read_bytes(), b"Legacy Finder metadata")
+
+    def test_backup_metadata_rejects_directories_links_and_unknown_files(self):
+        self.backups.mkdir()
+        self.duplicate()
+        outside = self.game / "outside"
+        outside.write_bytes(b"keep")
+        for kind in ("directory", "symbolic-link", "unknown-file"):
+            with self.subTest(kind=kind):
+                entry = self.backups / ("user-file" if kind == "unknown-file" else ".DS_Store")
+                if kind == "directory":
+                    entry.mkdir()
+                elif kind == "symbolic-link":
+                    entry.symlink_to(outside)
+                else:
+                    entry.write_bytes(b"keep")
+                self.normalize(success=False)
+                self.assertTrue((self.app / DUPLICATE).is_dir())
+                self.assertFalse((self.backups / "current").exists())
+                self.assertEqual(outside.read_bytes(), b"keep")
+                if kind == "directory":
+                    entry.rmdir()
+                else:
+                    self.assertEqual(entry.read_bytes(), b"keep")
+                    entry.unlink()
 
     def test_symbolic_link_is_rejected_without_moving_source(self):
         self.duplicate()
@@ -145,6 +177,9 @@ class BundleRootTests(unittest.TestCase):
         subprocess.run(["clang", "-isysroot", sdk, "-arch", "arm64", str(source), str(engine),
                         "-Wl,-rpath,@executable_path/../Frameworks", "-o",
                         str(self.app / "Contents/MacOS/The Bazaar")], check=True, capture_output=True)
+        (self.app / ".DS_Store").write_bytes(b"Finder metadata")
+        self.backups.mkdir()
+        (self.backups / ".DS_Store").write_bytes(b"Legacy Finder metadata")
         self.duplicate()
         (self.game / ".bpp-launch-mode").write_text("trampoline")
         stub = self.game / "stub"
@@ -157,6 +192,8 @@ class BundleRootTests(unittest.TestCase):
             verify = subprocess.run(["codesign", "--verify", "--deep", "--strict", str(self.app)], text=True, capture_output=True)
             self.assertEqual(verify.returncode, 0, verify.stdout + verify.stderr)
             self.assertFalse((self.app / DUPLICATE).exists())
+            self.assertEqual((self.app / ".DS_Store").read_bytes(), b"Finder metadata")
+            self.assertEqual((self.backups / ".DS_Store").read_bytes(), b"Legacy Finder metadata")
 
 
 if __name__ == "__main__":
