@@ -40,12 +40,36 @@ try
         <dict>
             <key>CFBundleExecutable</key>
             <string>The Bazaar</string>
+            <key>CFBundleIdentifier</key>
+            <string>com.TempoStorm.TheBazaar</string>
+            <key>CFBundleShortVersionString</key>
+            <string>test</string>
         </dict>
         </plist>
         """
     );
     var nestedApp = Path.Combine(gameRoot, "TheBazaar.app", "TheBazaar_ARM64.app");
     Directory.CreateDirectory(Path.Combine(nestedApp, "Contents", "MacOS"));
+    File.Copy(
+        Path.Combine(gameRoot, "TheBazaar.app", "Contents", "Info.plist"),
+        Path.Combine(nestedApp, "Contents", "Info.plist")
+    );
+    foreach (var bundle in new[] { Path.Combine(gameRoot, "TheBazaar.app"), nestedApp })
+    {
+        foreach (
+            var relative in new[]
+            {
+                "Contents/Frameworks/UnityPlayer.dylib",
+                "Contents/Frameworks/libmonobdwgc-2.0.dylib",
+                "Contents/Resources/Data/boot.config",
+            }
+        )
+        {
+            var path = Path.Combine(bundle, relative);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllText(path, "matching game contents");
+        }
+    }
     File.WriteAllText(Path.Combine(nestedApp, "Contents", "MacOS", "The Bazaar"), "UNITY arm64");
 
     File.WriteAllText(exe, "UNITY current executable");
@@ -139,14 +163,32 @@ try
         File.Exists(dotnetRecord),
         "run.sh build should still invoke dotnet build after repair."
     );
+    AssertFalse(
+        Directory.Exists(nestedApp),
+        "Repair must leave the duplicate outside the signed application."
+    );
+    var backups = Path.Combine(gameRoot, ".bpp-bundle-root-stash");
+    var backup = Directory.GetDirectories(backups, "*.app").Single();
     AssertEqual(
         "UNITY arm64",
-        File.ReadAllText(Path.Combine(nestedApp, "Contents", "MacOS", "The Bazaar")),
-        "Repair must put the bundle-root entries it stashed for codesign back in place."
+        File.ReadAllText(Path.Combine(backup, "Contents", "MacOS", "The Bazaar")),
+        "Repair must preserve the duplicate contents in its external backup."
     );
-    AssertFalse(
-        Directory.Exists(Path.Combine(gameRoot, ".bpp-bundle-root-stash")),
-        "Repair should not leave a bundle-root stash behind."
+    result = RunProcess(
+        "/bin/bash",
+        new[] { Path.Combine(projectRoot, "run.sh"), "build" },
+        new Dictionary<string, string?>
+        {
+            ["BPP_GAME_ROOT"] = gameRoot,
+            ["BPP_TRAMPOLINE_STUB"] = stub,
+            ["PATH"] = fakeBin + Path.PathSeparator + Environment.GetEnvironmentVariable("PATH"),
+        }
+    );
+    AssertEqual(0, result.ExitCode, result.Output);
+    AssertEqual(
+        backup,
+        Directory.GetDirectories(backups, "*.app").Single(),
+        "Repeated builds must reuse the backup and preserve the signed root layout."
     );
 }
 finally
