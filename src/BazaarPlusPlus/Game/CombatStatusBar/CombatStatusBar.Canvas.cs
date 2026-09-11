@@ -1,6 +1,7 @@
 #nullable enable
 using System.Globalization;
 using BazaarPlusPlus.GameInterop.Fonts;
+using BazaarPlusPlus.GameInterop.HeroPortraits;
 using BazaarPlusPlus.Infrastructure;
 using TMPro;
 using UnityEngine;
@@ -19,6 +20,8 @@ internal sealed partial class CombatStatusBar
     private float _nativeSkinRetryAt;
     private bool _nativeSkinFailureReported;
     private GameObject? _canvasObject;
+    private RectTransform? _barRoot;
+    private readonly NativePlayerPortraitBounds _portraitBounds = new();
     private TextMeshProUGUI? _timeValue;
     private TextMeshProUGUI? _speedValue;
     private Button? _pauseButton;
@@ -63,27 +66,30 @@ internal sealed partial class CombatStatusBar
         scaler.matchWidthOrHeight = 0.55f;
 
         var barRoot = CreateRect("CombatControls", _canvasObject.transform, 0f, 0f, 220f, 46f);
-        barRoot.anchorMin = barRoot.anchorMax = new Vector2(0.5f, 0f);
+        barRoot.anchorMin = barRoot.anchorMax = Vector2.zero;
         barRoot.pivot = new Vector2(0.5f, 0f);
-        barRoot.anchoredPosition = new Vector2(0f, 8f);
+        barRoot.anchoredPosition = Vector2.zero;
+        _barRoot = barRoot;
         CreatePlaque(barRoot);
     }
 
     private void CreatePlaque(RectTransform root)
     {
         _nativeSkin!.ApplyPlaque(root);
-        CreateDivider(root, -54f);
-        CreateDivider(root, 54f);
+        CreateDivider(root, 0.24f);
+        CreateDivider(root, 0.76f);
         _timeValue = CreateText("Elapsed", root, 0f, 0f, 104f, 36f, 22, counter: true);
-        _pauseButton = CreateControlButton("Pause", root, 80f);
+        StretchRegion(_timeValue.rectTransform, 0.24f, 0.76f);
+        _pauseButton = CreateControlButton("Pause", root, 0.76f, 1f);
         _pauseIcon = CreateRect("PauseIcon", _pauseButton.transform, 0f, 0f, 12f, 14f)
             .gameObject.AddComponent<CombatPlaybackIcon>();
         _pauseIcon.raycastTarget = false;
         _pauseIcon.color = Ink;
         _pauseButton.onClick.AddListener(() => ToggleCombatPause());
 
-        var speedButton = CreateControlButton("CycleSpeed", root, -80f);
+        var speedButton = CreateControlButton("CycleSpeed", root, 0f, 0.24f);
         _speedValue = CreateText("Multiplier", speedButton.transform, 0f, 0f, 42f, 28f, 14);
+        StretchRegion(_speedValue.rectTransform, 0f, 1f);
         speedButton.onClick.AddListener(() => CycleCombatSpeed());
         BppLog.InfoEvent(CombatStatusBarLogEvents.NativeSkinReady);
     }
@@ -126,15 +132,23 @@ internal sealed partial class CombatStatusBar
 
     private static void CreateDivider(Transform parent, float x)
     {
-        var image = CreateRect("Divider", parent, x, 0f, 0.5f, 20f)
-            .gameObject.AddComponent<Image>();
+        var rect = CreateRect("Divider", parent, 0f, 0f, 0.5f, 0f);
+        rect.anchorMin = new Vector2(x, 0.28f);
+        rect.anchorMax = new Vector2(x, 0.72f);
+        var image = rect.gameObject.AddComponent<Image>();
         image.color = new Color(0.69f, 0.52f, 0.255f, 0.32f);
         image.raycastTarget = false;
     }
 
-    private static Button CreateControlButton(string name, Transform parent, float x)
+    private static Button CreateControlButton(
+        string name,
+        Transform parent,
+        float left,
+        float right
+    )
     {
-        var rect = CreateRect(name, parent, x, 0f, 44f, 36f);
+        var rect = CreateRect(name, parent, 0f, 0f, 0f, 0f);
+        StretchRegion(rect, left, right);
         var feedback = rect.gameObject.AddComponent<Image>();
         feedback.raycastTarget = true;
         var button = rect.gameObject.AddComponent<Button>();
@@ -154,11 +168,19 @@ internal sealed partial class CombatStatusBar
         return button;
     }
 
+    private static void StretchRegion(RectTransform rect, float left, float right)
+    {
+        rect.anchorMin = new Vector2(left, 0f);
+        rect.anchorMax = new Vector2(right, 1f);
+        rect.offsetMin = new Vector2(2f, 2f);
+        rect.offsetMax = new Vector2(-2f, -2f);
+    }
+
     private void RefreshUi()
     {
         if (_canvasObject == null)
             return;
-        var visible = ShouldDraw();
+        var visible = ShouldDraw() && RefreshLayout();
         SetUiVisible(visible);
         if (!visible)
             return;
@@ -196,10 +218,58 @@ internal sealed partial class CombatStatusBar
         }
     }
 
+    private bool RefreshLayout()
+    {
+        if (
+            _canvasObject == null
+            || _barRoot == null
+            || !_portraitBounds.TryRead(out var frame, out var bottom, out var viewport)
+        )
+            return false;
+        var canvas = _canvasObject.GetComponent<Canvas>();
+        var scale = canvas.scaleFactor;
+        if (
+            !CombatStatusBarLayout.TryPlace(
+                frame.xMin,
+                frame.xMax,
+                bottom,
+                viewport.xMin,
+                viewport.xMax,
+                viewport.yMin,
+                viewport.yMax,
+                scale,
+                out var height
+            )
+        )
+            return false;
+
+        var canvasRect = (RectTransform)_canvasObject.transform;
+        RectTransformUtility.ScreenPointToLocalPointInRectangle(
+            canvasRect,
+            new Vector2(frame.center.x, viewport.yMin),
+            null,
+            out var position
+        );
+        _barRoot.anchoredPosition = position - canvasRect.rect.min;
+        _barRoot.sizeDelta = new Vector2(frame.width / scale, height / scale);
+        var contentScale = Mathf.Min(
+            1f,
+            Mathf.Min(_barRoot.rect.width / 220f, _barRoot.rect.height / 46f)
+        );
+        if (_timeValue != null)
+            _timeValue.fontSize = 22f * contentScale;
+        if (_speedValue != null)
+            _speedValue.fontSize = 14f * contentScale;
+        if (_pauseIcon != null)
+            _pauseIcon.rectTransform.sizeDelta = new Vector2(12f, 14f) * contentScale;
+        return true;
+    }
+
     private void SetUiVisible(bool visible)
     {
-        if (_canvasObject != null && _canvasObject.activeSelf != visible)
-            _canvasObject.SetActive(visible);
+        // Keep the CanvasScaler active while hidden so resize/re-entry uses the current scale.
+        if (_barRoot != null && _barRoot.gameObject.activeSelf != visible)
+            _barRoot.gameObject.SetActive(visible);
     }
 
     private void DisposeUi()
@@ -210,6 +280,7 @@ internal sealed partial class CombatStatusBar
             Destroy(_canvasObject);
         }
         _canvasObject = null;
+        _barRoot = null;
         _uiTypography = null;
         _counterTypography = null;
         _timeValue = null;

@@ -25,6 +25,10 @@
 
   <ItemGroup>
     <Compile
+      Include="../../src/BazaarPlusPlus/Game/CombatStatusBar/CombatStatusBarLayout.cs"
+      Link="CombatStatusBarLayout.cs"
+    />
+    <Compile
       Include="..\..\src\BazaarPlusPlus\Infrastructure\UiSuppressionScope.cs"
       Link="UiSuppressionScope.cs"
     />

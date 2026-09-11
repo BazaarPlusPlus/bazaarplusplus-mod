@@ -53,24 +53,24 @@ internal sealed class CombatStatusBarNativeSkin
 
     internal void ApplyPlaque(RectTransform rect)
     {
-        var scale = rect.rect.height / Frame.rect.height;
-        var backingSize = rect.rect.size - (Frame.rect.size - Backing.rect.size) * scale;
-        AddLayer("Backing", rect, Backing, backingSize);
-        AddLayer("Frame", rect, Frame, rect.rect.size);
+        AddLayer("Backing", rect, Backing, new Vector2(2f, 2f));
+        AddLayer("Frame", rect, Frame, Vector2.zero);
     }
 
-    private static void AddLayer(string name, RectTransform parent, Sprite sprite, Vector2 size)
+    private static void AddLayer(string name, RectTransform parent, Sprite sprite, Vector2 inset)
     {
         var rect = new GameObject(name, typeof(RectTransform)).GetComponent<RectTransform>();
         rect.SetParent(parent, false);
-        rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(0.5f, 0.5f);
-        rect.sizeDelta = size;
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.offsetMin = inset;
+        rect.offsetMax = -inset;
         var image = rect.gameObject.AddComponent<Image>();
         image.sprite = sprite;
         image.color = Color.white;
         image.type = Image.Type.Sliced;
-        // Preserve the original bevel proportions; stretch only the nine-slice center.
-        image.pixelsPerUnitMultiplier = sprite.rect.height / size.y * 100f / sprite.pixelsPerUnit;
+        // Keep the bevel thin at every dock size; stretch only the nine-slice center.
+        image.pixelsPerUnitMultiplier = sprite.rect.height / 38f * 100f / sprite.pixelsPerUnit;
         image.raycastTarget = false;
     }
 }
