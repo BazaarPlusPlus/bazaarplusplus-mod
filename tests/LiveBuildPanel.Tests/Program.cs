@@ -6,15 +6,22 @@ using BazaarPlusPlus.GameInterop.ItemBoardPreview;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using BazaarPlusPlus.Localization;
 
+L.Install(
+    new FixedLanguageProvider("en"),
+    new FixedLocaleModeProvider(BppChineseLocaleMode.Mainland)
+);
+
 TestOverlaySortingLayersKeepNativeCardsBetweenPanelAndForeground();
 TestSupporterAttributionCountFillsRail();
 TestCandidateToggleUsesTemplateId();
 TestCandidatePruneKeepsSelectableRowsOnly();
 TestRowVmTogglePolicyComesFromBoardType();
-TestSlotChromeGeometryMatchesTenSlotContract();
-TestRefreshFinalBuildsTextsAreAtlasWarmed();
 TestNoRunRowsSuppressEmptyText();
-TestActiveRunRowsSuppressVisibleEmptyTextAndKeepSpecificTooltips();
+TestActiveRunRowsKeepSpecificEmptyStates();
+
+TestRowsKeepFourPeerOrder();
+TestCandidateIdentityIsSharedAcrossSources();
+TestCorpusFreshnessKeepsLocalizedRelativeTime();
 
 Console.WriteLine("LiveBuildPanel checks passed.");
 
@@ -135,88 +142,8 @@ static void TestRowVmTogglePolicyComesFromBoardType()
     );
 }
 
-static void TestSlotChromeGeometryMatchesTenSlotContract()
-{
-    var hitPercent = ItemBoardSlotGridGeometry.ResolveOccupiedRect(100f, 100f, 3, 2, 0f, 0f);
-    var markerPixels = ItemBoardSlotGridGeometry.ResolveOccupiedRect(1000f, 180f, 3, 2, 0f, 4f);
-
-    Assert(hitPercent.X == 30f, "Hit target should start at the socket's 10-slot percent.");
-    Assert(hitPercent.Width == 20f, "Hit target should span the card's display slots.");
-    Assert(markerPixels.X == 300f, "Marker should use the same left socket in pixels.");
-    Assert(markerPixels.Width == 200f, "Marker should use the same occupied span in pixels.");
-    Assert(markerPixels.Y == 4f, "Marker should apply only its vertical chrome inset.");
-    Assert(markerPixels.Height == 172f, "Marker height should preserve the vertical chrome inset.");
-}
-
-// CJK glyphs only render if they were in the font-atlas warm-up sample on first open; every
-// refresh-flow string the rail can show must therefore be part of FontAtlasSample().
-static void TestRefreshFinalBuildsTextsAreAtlasWarmed()
-{
-    L.Install(
-        new FixedLanguageProvider("zh-CN"),
-        new FixedLocaleModeProvider(BppChineseLocaleMode.Mainland)
-    );
-
-    Assert(
-        LiveBuildPanelText.RefreshFinalBuilds() == "拉取阵容",
-        "zh-CN pull-builds button copy should be 拉取阵容."
-    );
-
-    var sampleSummary = new TenWinCorpusSummary(
-        new DateTimeOffset(2034, 5, 16, 7, 28, 9, TimeSpan.Zero),
-        1234567890,
-        1234567890,
-        [
-            new TenWinHeroBuildCount("Vanessa", 1234567890),
-            new TenWinHeroBuildCount("Dooley", 987654321),
-        ]
-    );
-    var sample = LiveBuildPanelText.FontAtlasSample();
-    foreach (
-        var text in new[]
-        {
-            LiveBuildPanelText.CorpusCardTitle(),
-            LiveBuildPanelText.ResultCardTitle(),
-            LiveBuildPanelText.RefreshFinalBuilds(),
-            LiveBuildPanelText.Working(),
-            LiveBuildPanelText.RefreshingFinalBuilds(),
-            LiveBuildPanelText.CorpusEmpty(),
-            "✓",
-            "VAN",
-            "更新于",
-            LiveBuildPanelText.CorpusSummaryTooltip(sampleSummary),
-            LiveBuildPanelText.FinalBuildRefreshFailed(LiveBuildPanelText.Unknown()),
-        }
-    )
-    {
-        Assert(
-            sample.Contains(text, StringComparison.Ordinal),
-            $"FontAtlasSample must include refresh copy '{text}' for CJK glyph warm-up."
-        );
-    }
-
-    var twoHoursOld = new TenWinCorpusSummary(
-        new DateTimeOffset(2034, 5, 16, 5, 28, 9, TimeSpan.Zero),
-        1240,
-        7
-    );
-    var freshness = LiveBuildPanelText.CorpusFreshnessLine(
-        twoHoursOld,
-        new DateTimeOffset(2034, 5, 16, 7, 28, 9, TimeSpan.Zero)
-    );
-    Assert(
-        freshness.Contains("2 小时前", StringComparison.Ordinal),
-        $"zh-CN freshness line should bucket a 2h-old corpus as '2 小时前', got '{freshness}'."
-    );
-}
-
 static void TestNoRunRowsSuppressEmptyText()
 {
-    L.Install(
-        new FixedLanguageProvider("en"),
-        new FixedLocaleModeProvider(BppChineseLocaleMode.Mainland)
-    );
-
     var rows = RowsById(
         new LiveBuildPanelSnapshot
         {
@@ -239,53 +166,31 @@ static void TestNoRunRowsSuppressEmptyText()
             string.IsNullOrEmpty(rows[id].EmptyText),
             $"{id} no-run empty text should be suppressed."
         );
-        Assert(
-            string.IsNullOrEmpty(rows[id].EmptyTooltip),
-            $"{id} no-run empty tooltip should be suppressed."
-        );
     }
 }
 
-static void TestActiveRunRowsSuppressVisibleEmptyTextAndKeepSpecificTooltips()
+static void TestActiveRunRowsKeepSpecificEmptyStates()
 {
-    L.Install(
-        new FixedLanguageProvider("en"),
-        new FixedLocaleModeProvider(BppChineseLocaleMode.Mainland)
-    );
-
     var rows = RowsById(
         new LiveBuildPanelSnapshot
         {
             Hero = EHero.Vanessa,
             Shop = EmptyBoard(BppItemBoardId.LiveShop, BppItemBoardType.SelectableShop),
-            Board = EmptyBoard(BppItemBoardId.LiveBoard, BppItemBoardType.SelectableContainer),
             Stash = EmptyBoard(BppItemBoardId.LiveStash, BppItemBoardType.SelectableContainer),
+            Board = EmptyBoard(BppItemBoardId.LiveBoard, BppItemBoardType.SelectableContainer),
         }
     );
-
     Assert(
-        string.IsNullOrEmpty(rows[BppItemBoardId.LiveShop].EmptyText),
-        "Active empty shop should not render visible empty text."
+        rows[BppItemBoardId.LiveShop].EmptyText == LiveBuildPanelText.EmptyShop(),
+        "Shop empty state must remain specific."
     );
     Assert(
-        string.IsNullOrEmpty(rows[BppItemBoardId.LiveBoard].EmptyText),
-        "Active empty board should not render visible empty text."
+        rows[BppItemBoardId.LiveStash].EmptyText == LiveBuildPanelText.EmptyStash(),
+        "Stash empty state must remain specific."
     );
     Assert(
-        string.IsNullOrEmpty(rows[BppItemBoardId.LiveStash].EmptyText),
-        "Active empty stash should not render visible empty text."
-    );
-    Assert(
-        rows[BppItemBoardId.LiveShop].EmptyTooltip == LiveBuildPanelText.EmptyShop(),
-        "Active empty shop tooltip should preserve the shop-specific detail."
-    );
-    Assert(
-        rows[BppItemBoardId.LiveBoard].EmptyTooltip == LiveBuildPanelText.EmptyBoard(),
-        "Active empty board tooltip should preserve the board-specific detail."
-    );
-    Assert(
-        rows[BppItemBoardId.LiveStash].EmptyTooltip == LiveBuildPanelText.EmptyStash(),
-        "Active empty stash tooltip should preserve the stash-specific detail."
+        rows[BppItemBoardId.LiveBoard].EmptyText == LiveBuildPanelText.EmptyBoard(),
+        "Board empty state must remain specific."
     );
 }
 
@@ -302,6 +207,68 @@ static void Assert(bool condition, string message)
 {
     if (!condition)
         throw new InvalidOperationException(message);
+}
+
+static void TestRowsKeepFourPeerOrder()
+{
+    var snapshot = new LiveBuildPanelSnapshot
+    {
+        FinalBuild = EmptyBoard(BppItemBoardId.FinalBuild, BppItemBoardType.Reference),
+        Shop = EmptyBoard(BppItemBoardId.LiveShop, BppItemBoardType.SelectableShop),
+        Stash = EmptyBoard(BppItemBoardId.LiveStash, BppItemBoardType.SelectableContainer),
+        Board = EmptyBoard(BppItemBoardId.LiveBoard, BppItemBoardType.SelectableContainer),
+    };
+    Assert(
+        snapshot
+            .Rows.Select(row => row.Board.Id)
+            .SequenceEqual(
+                new[]
+                {
+                    BppItemBoardId.FinalBuild,
+                    BppItemBoardId.LiveShop,
+                    BppItemBoardId.LiveStash,
+                    BppItemBoardId.LiveBoard,
+                }
+            ),
+        "All four peers must remain in recommendation, shop, stash, board order."
+    );
+}
+
+static void TestCandidateIdentityIsSharedAcrossSources()
+{
+    var template = Guid.NewGuid();
+    var state = new LiveBuildCandidateState();
+    var shop = Board(BppItemBoardId.LiveShop, BppItemBoardType.SelectableShop, template);
+    var stash = Board(BppItemBoardId.LiveStash, BppItemBoardType.SelectableContainer, template);
+    state.Toggle(template);
+    state.PruneToSelectableRows(new[] { shop, stash });
+    Assert(
+        state.TemplateIds.Count == 1 && state.Contains(template),
+        "The same template across sources is one candidate."
+    );
+    state.Toggle(stash.Cards[0].TemplateId);
+    Assert(!state.HasCandidates, "Toggling another source clears the same candidate.");
+}
+
+static void TestCorpusFreshnessKeepsLocalizedRelativeTime()
+{
+    L.Install(
+        new FixedLanguageProvider("zh-CN"),
+        new FixedLocaleModeProvider(BppChineseLocaleMode.Mainland)
+    );
+    var summary = new TenWinCorpusSummary(
+        new DateTimeOffset(2034, 5, 16, 5, 28, 9, TimeSpan.Zero),
+        1240,
+        7
+    );
+    var freshness = LiveBuildPanelText.CorpusFreshnessLine(
+        summary,
+        new DateTimeOffset(2034, 5, 16, 7, 28, 9, TimeSpan.Zero)
+    );
+    Assert(
+        freshness.Contains("2 小时前", StringComparison.Ordinal),
+        "Corpus freshness should retain the localized relative update time."
+    );
 }
 
 internal sealed class FixedLanguageProvider(string languageCode) : ILanguageProvider

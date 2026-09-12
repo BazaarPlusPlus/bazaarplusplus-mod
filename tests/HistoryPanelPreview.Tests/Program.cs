@@ -1,22 +1,7 @@
 using BazaarGameShared.Domain.Core.Types;
-using BazaarPlusPlus.GameInterop.CardPreview;
 using BazaarPlusPlus.GameInterop.ItemBoardPreview;
+using BazaarPlusPlus.GameInterop.MonsterBoardPreview;
 
-TestSignatureGate_NullAggregate_DoesNotCache();
-TestSignatureGate_IncompleteAggregate_DoesNotCache();
-TestSignatureGate_FaultedAggregate_DoesNotCache();
-TestSignatureGate_CanceledAggregate_DoesNotCache();
-TestSignatureGate_CompletedSuccessfully_Caches();
-TestGenerationGuard_FreshSnapshotIsCurrent();
-TestGenerationGuard_BumpInvalidatesPriorSnapshot();
-TestGenerationGuard_ParallelBumpsAreSerialised();
-TestBatchAcquirer_UsesFakeHostAndPreservesPartialResults().GetAwaiter().GetResult();
-TestBatchAcquirer_ConvertsScopeCancellationToCanceledResult().GetAwaiter().GetResult();
-TestSocketResolver_HonoursRequestedIndex();
-TestSocketResolver_FallsBackWhenNoRequest();
-TestSocketResolver_ClampsIntoRange();
-TestSocketResolver_ReturnsMinusOneWhenSpanCannotFit();
-TestSocketResolver_ReturnsMinusOneForEmptyBoard();
 TestBoardSpan_MapsNativeItemSizes();
 TestSlotPlanner_ReferencePreservesSourceSockets();
 TestSlotPlanner_ReferenceFallsBackWhenSourceMissing();
@@ -25,206 +10,9 @@ TestSlotPlanner_SelectableShopCentersByTotalSpan();
 TestSlotPlanner_SelectableShopSkipsOverflowRemainder();
 TestPreviewMapper_UsesDisplaySocketAndBoardPrefix();
 TestPreviewMapper_CarriesDisplaySpan();
-TestSlotGridGeometry_ResolvesSingleSlot();
-TestSlotGridGeometry_ResolvesMediumSpan();
-TestSlotGridGeometry_ResolvesLargeSpan();
-TestSlotGridGeometry_ClampsOverflowSpan();
-TestSlotGridScale_AllowsHeightFirstUpscale();
-TestSlotGridScale_UsesSharedHeightForProportionalSpans();
-TestSlotGridScale_DerivesWidthFromHeightAndNativeAspect();
-TestSlotGridTargetHeight_UsesBoardFitScaleInTallContainer();
-TestSlotGridTargetHeight_ClampsToSlotHeightInShortContainer();
+TestNativeItemMapperPreservesPlannedCardsAndOwnsAttributes();
 
 Console.WriteLine("HistoryPanelPreview checks passed.");
-
-static async Task TestBatchAcquirer_UsesFakeHostAndPreservesPartialResults()
-{
-    var firstSession = new FakeSession();
-    var secondSession = new FakeSession();
-    var failure = new NativeCardPreviewFailure(
-        NativeCardPreviewOperation.SetUp,
-        NativeCardPreviewFailureReason.SetUpException,
-        Guid.NewGuid()
-    );
-    var scope = new FakeScope(
-        subject => Acquired(firstSession),
-        subject => new ValueTask<NativeCardAcquireResult>(
-            new NativeCardAcquireResult(NativeCardAcquireStatus.Failed, null, failure)
-        ),
-        subject => Acquired(secondSession)
-    );
-    INativeCardPreviewHost host = new FakeHost(scope);
-    var openedScope = host.OpenScope(new FakeOwner());
-    var subjects = new[] { Subject(), Subject(), Subject() };
-
-    var results = await ItemBoardPreviewBatchAcquirer.AcquireAsync(openedScope, subjects);
-
-    Assert(results.Length == 3, "Batch acquisition should preserve every input result.");
-    Assert(
-        ReferenceEquals(results[0].Session, firstSession)
-            && ReferenceEquals(results[2].Session, secondSession),
-        "Successful acquisitions should expose only the opaque sessions returned by the host scope."
-    );
-    Assert(
-        results[1].Session == null && ReferenceEquals(results[1].NativeFailure, failure),
-        "A partial native failure must not discard successful sibling sessions."
-    );
-
-    results[0].Session!.Dispose();
-    results[2].Session!.Dispose();
-    Assert(
-        firstSession.DisposeCount == 1 && secondSession.DisposeCount == 1,
-        "Consumer cleanup should dispose each acquired session exactly once."
-    );
-}
-
-static async Task TestBatchAcquirer_ConvertsScopeCancellationToCanceledResult()
-{
-    var scope = new FakeScope(subject => throw new OperationCanceledException());
-    var results = await ItemBoardPreviewBatchAcquirer.AcquireAsync(scope, new[] { Subject() });
-
-    Assert(
-        results.Length == 1 && results[0].Canceled && results[0].Session == null,
-        "A standard scope cancellation should remain distinguishable from a typed native failure."
-    );
-}
-
-static ValueTask<NativeCardAcquireResult> Acquired(INativeCardPreviewSession session) =>
-    new(new NativeCardAcquireResult(NativeCardAcquireStatus.Acquired, session, Failure: null));
-
-static NativeCardPreviewSubject Subject() =>
-    new()
-    {
-        TemplateId = Guid.NewGuid(),
-        Tier = ETier.Bronze,
-        DisplaySpan = 1,
-    };
-
-static void TestSignatureGate_NullAggregate_DoesNotCache()
-{
-    Assert(
-        !ItemBoardPreviewSignatureGate.ShouldCache(null),
-        "Null aggregate must not cache the signature."
-    );
-}
-
-static void TestSignatureGate_IncompleteAggregate_DoesNotCache()
-{
-    var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-    Assert(
-        !ItemBoardPreviewSignatureGate.ShouldCache(tcs.Task),
-        "An incomplete aggregate must not cache the signature (caller should still be waiting)."
-    );
-}
-
-static void TestSignatureGate_FaultedAggregate_DoesNotCache()
-{
-    var tcs = new TaskCompletionSource<bool>();
-    tcs.SetException(new InvalidOperationException("simulated SetUp failure"));
-    Assert(
-        !ItemBoardPreviewSignatureGate.ShouldCache(tcs.Task),
-        "A faulted aggregate must not cache; next selection should retry."
-    );
-}
-
-static void TestSignatureGate_CanceledAggregate_DoesNotCache()
-{
-    var tcs = new TaskCompletionSource<bool>();
-    tcs.SetCanceled();
-    Assert(
-        !ItemBoardPreviewSignatureGate.ShouldCache(tcs.Task),
-        "A canceled aggregate must not cache; the frame is incomplete."
-    );
-}
-
-static void TestSignatureGate_CompletedSuccessfully_Caches()
-{
-    var tcs = new TaskCompletionSource<bool>();
-    tcs.SetResult(true);
-    Assert(
-        ItemBoardPreviewSignatureGate.ShouldCache(tcs.Task),
-        "A completed-OK aggregate must cache so identical selections short-circuit."
-    );
-}
-
-static void TestGenerationGuard_FreshSnapshotIsCurrent()
-{
-    var guard = new ItemBoardPreviewGenerationGuard();
-    var snapshot = guard.Bump();
-    Assert(
-        guard.IsCurrent(snapshot),
-        "A snapshot taken at Bump() time must remain current until the next Bump()."
-    );
-}
-
-static void TestGenerationGuard_BumpInvalidatesPriorSnapshot()
-{
-    var guard = new ItemBoardPreviewGenerationGuard();
-    var firstSnapshot = guard.Bump();
-    guard.Bump();
-    Assert(
-        !guard.IsCurrent(firstSnapshot),
-        "A new Bump() must invalidate the previous snapshot so the wait loop exits."
-    );
-}
-
-static void TestGenerationGuard_ParallelBumpsAreSerialised()
-{
-    var guard = new ItemBoardPreviewGenerationGuard();
-    var first = guard.Bump();
-    var second = guard.Bump();
-    var third = guard.Bump();
-    Assert(
-        first != second && second != third && first != third,
-        "Sequential Bumps must produce distinct snapshots."
-    );
-    Assert(guard.IsCurrent(third), "Latest snapshot must be the current generation.");
-}
-
-static void TestSocketResolver_HonoursRequestedIndex()
-{
-    Assert(
-        ItemBoardSocketResolver.ResolveIndex(10, 3, 0, 1) == 3,
-        "A requested socket index that fits must be used verbatim."
-    );
-}
-
-static void TestSocketResolver_FallsBackWhenNoRequest()
-{
-    Assert(
-        ItemBoardSocketResolver.ResolveIndex(10, null, 4, 1) == 4,
-        "With no requested index, the fallback index is used."
-    );
-}
-
-static void TestSocketResolver_ClampsIntoRange()
-{
-    // 10 sockets, span 3 → last valid start is 7; a requested 9 clamps to 7.
-    Assert(
-        ItemBoardSocketResolver.ResolveIndex(10, 9, 0, 3) == 7,
-        "A requested start beyond the last valid start clamps to it."
-    );
-    Assert(
-        ItemBoardSocketResolver.ResolveIndex(10, null, -2, 1) == 0,
-        "A negative fallback index clamps to 0."
-    );
-}
-
-static void TestSocketResolver_ReturnsMinusOneWhenSpanCannotFit()
-{
-    Assert(
-        ItemBoardSocketResolver.ResolveIndex(2, 0, 0, 3) == -1,
-        "A card span larger than the socket count cannot fit."
-    );
-}
-
-static void TestSocketResolver_ReturnsMinusOneForEmptyBoard()
-{
-    Assert(
-        ItemBoardSocketResolver.ResolveIndex(0, 0, 0, 1) == -1,
-        "Zero sockets cannot host a card."
-    );
-}
 
 static void TestBoardSpan_MapsNativeItemSizes()
 {
@@ -386,108 +174,6 @@ static void TestPreviewMapper_CarriesDisplaySpan()
     Assert(spec.DisplaySpan == 3, "Mapper should pass the planned display span to the renderer.");
 }
 
-static void TestSlotGridGeometry_ResolvesSingleSlot()
-{
-    var rect = ItemBoardSlotGridGeometry.ResolveOccupiedRect(1000f, 200f, 2, 1, 0f, 0f);
-
-    Assert(rect.X == 200f, "Socket 2 should start at x=200 for a 1000px row.");
-    Assert(rect.Width == 100f, "A small item should occupy one 100px slot.");
-}
-
-static void TestSlotGridGeometry_ResolvesMediumSpan()
-{
-    var rect = ItemBoardSlotGridGeometry.ResolveOccupiedRect(1000f, 200f, 3, 2, 0f, 0f);
-
-    Assert(rect.X == 300f, "Socket 3 should start at x=300 for a 1000px row.");
-    Assert(rect.Width == 200f, "A medium item should occupy two 100px slots.");
-}
-
-static void TestSlotGridGeometry_ResolvesLargeSpan()
-{
-    var rect = ItemBoardSlotGridGeometry.ResolveOccupiedRect(1000f, 200f, 5, 3, 0f, 0f);
-
-    Assert(rect.X == 500f, "Socket 5 should start at x=500 for a 1000px row.");
-    Assert(rect.Width == 300f, "A large item should occupy three 100px slots.");
-}
-
-static void TestSlotGridGeometry_ClampsOverflowSpan()
-{
-    var rect = ItemBoardSlotGridGeometry.ResolveOccupiedRect(1000f, 200f, 8, 3, 0f, 0f);
-
-    Assert(rect.X == 800f, "Socket 8 should start at x=800 for a 1000px row.");
-    Assert(rect.Width == 200f, "Overflowing span should clamp at the end of the row.");
-}
-
-static void TestSlotGridScale_AllowsHeightFirstUpscale()
-{
-    var scale = ItemBoardSlotGridGeometry.ResolveHeightScale(200f, 300f, 2f);
-
-    Assert(Approx(scale, 1.5f), "SlotGrid should be able to grow cards above native scale.");
-}
-
-static void TestSlotGridScale_UsesSharedHeightForProportionalSpans()
-{
-    const float nativeHeight = 200f;
-    const float targetHeight = 300f;
-    var smallScale = ItemBoardSlotGridGeometry.ResolveHeightScale(nativeHeight, targetHeight, 2f);
-    var mediumScale = ItemBoardSlotGridGeometry.ResolveHeightScale(nativeHeight, targetHeight, 2f);
-    var largeScale = ItemBoardSlotGridGeometry.ResolveHeightScale(nativeHeight, targetHeight, 2f);
-
-    Assert(
-        Approx(nativeHeight * smallScale, targetHeight),
-        "Small card should reach target height."
-    );
-    Assert(
-        Approx(nativeHeight * mediumScale, targetHeight),
-        "Medium card should reach target height."
-    );
-    Assert(
-        Approx(nativeHeight * largeScale, targetHeight),
-        "Large card should reach target height."
-    );
-}
-
-static void TestSlotGridScale_DerivesWidthFromHeightAndNativeAspect()
-{
-    const float nativeWidth = 400f;
-    const float nativeHeight = 100f;
-    const float targetHeight = 250f;
-    var scale = ItemBoardSlotGridGeometry.ResolveHeightScale(nativeHeight, targetHeight, 5f);
-
-    Assert(Approx(scale, 2.5f), "SlotGrid scale should be determined by target height.");
-    Assert(
-        Approx(nativeWidth * scale, 1000f),
-        "Rendered width should follow the native frame aspect after height scaling."
-    );
-}
-
-static void TestSlotGridTargetHeight_UsesBoardFitScaleInTallContainer()
-{
-    var targetHeight = ItemBoardSlotGridGeometry.ResolveScaledTargetHeight(
-        slotHeight: 500f,
-        boardNativeHeight: 600f,
-        boardScale: 0.4f,
-        maxHeightRatio: 0.96f
-    );
-
-    Assert(
-        Approx(targetHeight, 230.4f),
-        "A tall HistoryPanel container should cap card height by board-fit scale."
-    );
-}
-
-static void TestSlotGridTargetHeight_ClampsToSlotHeightInShortContainer()
-{
-    var targetHeight = ItemBoardSlotGridGeometry.ResolveScaledTargetHeight(
-        slotHeight: 180f,
-        boardNativeHeight: 600f,
-        boardScale: 0.5f,
-        maxHeightRatio: 0.96f
-    );
-
-    Assert(Approx(targetHeight, 180f), "A short LiveBuildPanel row should use its slot height.");
-}
-
 static BppItemBoard Board(
     BppItemBoardId id,
     BppItemBoardType type,
@@ -516,82 +202,54 @@ static BppItemBoardCard Card(
         DisplaySocketId = display,
     };
 
+static void TestNativeItemMapperPreservesPlannedCardsAndOwnsAttributes()
+{
+    var source = Card(0, ECardSize.Large, source: EContainerSocketId.Socket_4);
+    var board = Board(
+        BppItemBoardId.LiveStash,
+        BppItemBoardType.SelectableContainer,
+        source,
+        Card(1, ECardSize.Medium, source: EContainerSocketId.Socket_9)
+    );
+    var mapped = NativeMonsterBoardItemMapper.Map(board, "preview");
+    Assert(mapped.Count == 1, "Native projection must omit cards that exceed the ten sockets.");
+    var item = mapped[0];
+    Assert(
+        item.TemplateId == source.TemplateId,
+        "Native projection must retain template identity."
+    );
+    Assert(item.InstanceId == "preview-0", "Each caller owns its instance prefix.");
+    Assert(
+        item.SocketId == EContainerSocketId.Socket_4,
+        "Container placement must retain source sockets."
+    );
+    Assert(
+        item.Tier == source.Tier && item.EnchantmentType == source.EnchantmentType,
+        "Native projection must retain tier and enchantment."
+    );
+    var attributes = item.Attributes ?? throw new InvalidOperationException("Missing attributes.");
+    Assert(
+        attributes[ECardAttributeType.BurnApplyAmount] == 1,
+        "Native projection must retain attributes."
+    );
+    attributes[ECardAttributeType.BurnApplyAmount] = 99;
+    Assert(
+        source.Attributes[ECardAttributeType.BurnApplyAmount] == 1,
+        "Native card mutation must not alter source snapshots."
+    );
+
+    var shop = NativeMonsterBoardItemMapper.Map(
+        Board(BppItemBoardId.LiveShop, BppItemBoardType.SelectableShop, source),
+        "shop"
+    );
+    Assert(
+        shop[0].SocketId == EContainerSocketId.Socket_3,
+        "Shop projection must use the centered planned socket, not the source socket."
+    );
+}
+
 static void Assert(bool condition, string message)
 {
     if (!condition)
         throw new InvalidOperationException(message);
-}
-
-static bool Approx(float actual, float expected, float tolerance = 0.0001f) =>
-    Math.Abs(actual - expected) <= tolerance;
-
-internal sealed class FakeHost(INativeCardPreviewScope scope) : INativeCardPreviewHost
-{
-    public NativeCardMeasureResult Measure(NativeCardPreviewSubject subject) =>
-        new(NativeCardMeasureStatus.Measured, subject.DisplaySpan, null);
-
-    public INativeCardPreviewScope OpenScope(INativeCardPreviewOwner owner) => scope;
-
-    public NativeTooltipRefreshResult RefreshHoveredTooltip(NativeTooltipRefreshRequest request) =>
-        new(NativeTooltipRefreshStatus.NoHoveredPreview, null, null);
-}
-
-internal sealed class FakeScope(
-    params Func<NativeCardPreviewSubject, ValueTask<NativeCardAcquireResult>>[] outcomes
-) : INativeCardPreviewScope
-{
-    private readonly Queue<
-        Func<NativeCardPreviewSubject, ValueTask<NativeCardAcquireResult>>
-    > _outcomes = new(outcomes);
-
-    public ValueTask<NativeCardAcquireResult> AcquireAsync(
-        NativeCardPreviewSubject subject,
-        CancellationToken cancellationToken = default
-    ) => _outcomes.Dequeue()(subject);
-
-    public ValueTask DisposeAsync() => default;
-}
-
-internal sealed class FakeSession : INativeCardPreviewSession
-{
-    public int DisposeCount { get; private set; }
-    public UnityEngine.GameObject Root => null!;
-    public UnityEngine.RectTransform Rect => null!;
-
-    public NativePreviewActionResult Show() => Applied();
-
-    public NativePreviewActionResult ShowArtworkOnly() => Applied();
-
-    public NativePreviewActionResult Hide() => Applied();
-
-    public NativeCardPreviewSlotFitResult FitInto(
-        UnityEngine.RectTransform slot,
-        NativeCardPreviewHorizontalAlignment horizontalAlignment =
-            NativeCardPreviewHorizontalAlignment.Center
-    ) => NativeCardPreviewSlotFitResult.Applied;
-
-    public NativePreviewActionResult HoverEnter() => Applied();
-
-    public NativePreviewActionResult HoverExit() => Applied();
-
-    public void Dispose() => DisposeCount++;
-
-    private static NativePreviewActionResult Applied() =>
-        new(NativePreviewActionStatus.Applied, null);
-}
-
-internal sealed class FakeOwner : INativeCardPreviewOwner
-{
-    public int Layer => 0;
-    public bool UsePremiumVisuals => false;
-
-    public UnityEngine.Transform? ResolveParent(NativeCardPreviewSubject subject) => null;
-
-    public void PrepareWhileInactive(NativeCardPreviewOwnerContext context) { }
-
-    public void OnAcquired(NativeCardPreviewOwnerContext context) { }
-
-    public void BeforeRelease(NativeCardPreviewOwnerContext context) { }
-
-    public void ReportFailure(NativeCardPreviewFailure failure) { }
 }

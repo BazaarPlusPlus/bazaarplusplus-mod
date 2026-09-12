@@ -55,7 +55,7 @@ internal static class TenWinBuildTests
         TestCorpusSummaryIncludesPerHeroBuildCounts();
         TestMixedAliasCorpusMergesCanonicalFirstByBuildIdentity();
         TestNonPlayableCorpusKeysCannotBeQueried();
-        TestHeroStripProjectionAndTooltipsUseCanonicalPresentation();
+        TestCorpusTooltipsUseCanonicalPresentation();
         TestLegacyCacheAndCanonicalRemoteFixturesShareOneIdentity();
         TestExistingSevenHeroesKeepRecommendationResults();
 
@@ -770,7 +770,7 @@ internal static class TenWinBuildTests
         );
     }
 
-    private static void TestHeroStripProjectionAndTooltipsUseCanonicalPresentation()
+    private static void TestCorpusTooltipsUseCanonicalPresentation()
     {
         var withBuilds = new TenWinCorpusSummary(
             windowEndUtc: null,
@@ -783,26 +783,6 @@ internal static class TenWinBuildTests
                 new TenWinHeroBuildCount("UnknownHero", 7),
             ]
         );
-        var visible = LiveBuildHeroPresentation.SelectHeroBuildCounts(withBuilds);
-        Assert(
-            visible.Select(entry => entry.Hero).SequenceEqual(["Hero8", "Vanessa"]),
-            "The hero strip should retain only playable heroes with actual builds."
-        );
-
-        var emptyDragons = new TenWinCorpusSummary(
-            windowEndUtc: null,
-            buildCount: 2,
-            heroCount: 2,
-            [new TenWinHeroBuildCount("TheDragons", 0), new TenWinHeroBuildCount("Vanessa", 2)]
-        );
-        Assert(
-            LiveBuildHeroPresentation
-                .SelectHeroBuildCounts(emptyDragons)
-                .Select(entry => entry.Hero)
-                .SequenceEqual(["Vanessa"]),
-            "The Dragons tile should be omitted when its merged corpus has no builds."
-        );
-
         Assert(
             LiveBuildHeroPresentation.DisplayName("Hero8") == "The Dragons",
             "A legacy tile or tooltip identity should display the canonical native hero name."

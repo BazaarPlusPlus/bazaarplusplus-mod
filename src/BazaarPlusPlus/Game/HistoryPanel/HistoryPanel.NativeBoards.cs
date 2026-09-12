@@ -1,11 +1,9 @@
 #nullable enable
-using BazaarGameShared.Domain.Cards.Item;
 using BazaarGameShared.Domain.Cards.Skill;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.HistoryPanel.Data;
 using BazaarPlusPlus.Game.PvpBattles;
 using BazaarPlusPlus.GameInterop.CardPreview;
-using BazaarPlusPlus.GameInterop.ItemBoardPreview;
 using BazaarPlusPlus.GameInterop.MonsterBoardPreview;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
@@ -37,7 +35,7 @@ internal sealed partial class HistoryPanel
         var playerSkills = snapshots?.PlayerSkills.Items;
         _nativePlayerBoard.Render(
             $"{player.Signature}:{player.Board.Cards.Count}:{playerSkills?.Count}",
-            NativeHistoryItems(player.Board),
+            NativeMonsterBoardItemMapper.Map(player.Board, "history-item"),
             NativeHistorySkills(playerSkills)
         );
         if (_uiView.ShowsBothBoards)
@@ -52,7 +50,7 @@ internal sealed partial class HistoryPanel
             var skills = snapshots?.OpponentSkills.Items;
             _nativeOpponentBoard.Render(
                 $"{opponent.Signature}:{opponent.Board.Cards.Count}:{skills?.Count}",
-                NativeHistoryItems(opponent.Board),
+                NativeMonsterBoardItemMapper.Map(opponent.Board, "history-item"),
                 NativeHistorySkills(skills)
             );
         }
@@ -92,32 +90,6 @@ internal sealed partial class HistoryPanel
                     );
             }
         );
-
-    private static List<TCardInstanceItem> NativeHistoryItems(BppItemBoard board)
-    {
-        var planned = BppItemBoardSlotPlanner.Plan(board);
-        return BppItemBoardPreviewMapper
-            .Map(planned)
-            .Where(card =>
-                card.SocketId.HasValue
-                && (int)card.SocketId.Value >= 0
-                && (int)card.SocketId.Value + card.DisplaySpan <= 10
-            )
-            .Select(
-                (card, index) =>
-                    new TCardInstanceItem
-                    {
-                        TemplateId = card.TemplateId,
-                        TemplateVersion = string.Empty,
-                        InstanceId = $"history-item-{index}",
-                        Tier = card.Tier,
-                        SocketId = card.SocketId,
-                        EnchantmentType = card.EnchantmentType,
-                        Attributes = card.Attributes == null ? new() : new(card.Attributes),
-                    }
-            )
-            .ToList();
-    }
 
     private static List<TCardInstanceSkill> NativeHistorySkills(
         IList<PvpBattleCardSnapshot>? snapshots

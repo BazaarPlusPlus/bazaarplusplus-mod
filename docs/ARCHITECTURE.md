@@ -59,9 +59,9 @@ Each of these is consumed by two or more features. Reaching around one to re-imp
 |---|---|---|
 | Overlay panel lifecycle | `Game/OverlayPanels/OverlayPanelHost.cs` | Collection, History, LiveBuild |
 | Native asset loading compatibility | `GameInterop/AssetLoading/` | Card preview, portraits, replay warmers |
-| Native card preview | `GameInterop/CardPreview/` | Collection, item boards |
+| Native card preview | `GameInterop/CardPreview/` | Collection, combat recap |
 | Native tooltip suppression | `GameInterop/Tooltips/NativeTooltipSuppression` | replay recording, end-of-run capture |
-| Item board rendering | `GameInterop/ItemBoardPreview/` | History, LiveBuild |
+| Item board planning / native boards | `GameInterop/ItemBoardPreview/`, `GameInterop/MonsterBoardPreview/` | History, LiveBuild |
 | Day tier resolution | `GameInterop/DayTiers/` | Collection's Day gate, Encounter Preview |
 | Hero portraits | `GameInterop/HeroPortraits/` | History, LiveBuild, ghost rows |
 | Text rendering | `GameInterop/Fonts/NativeGameTypography` | every BPP surface |

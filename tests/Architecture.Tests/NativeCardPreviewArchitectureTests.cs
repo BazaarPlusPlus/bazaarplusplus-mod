@@ -55,27 +55,12 @@ public sealed class NativeCardPreviewArchitectureTests
                 "CollectionGridVirtualizer.cs"
             )
         );
-        var itemBoard = File.ReadAllText(
-            Path.Combine(
-                sourceRoot,
-                "GameInterop",
-                "ItemBoardPreview",
-                "ItemBoardPreviewSurface.cs"
-            )
-        );
 
         Assert.Contains("INativeCardPreviewScope", collection);
         Assert.Contains("INativeCardPreviewSession", collection);
         Assert.DoesNotContain("SetUpTask", collection);
         Assert.DoesNotContain("NativeCardPreviewKind", collection);
         Assert.DoesNotContain("Component Card", collection);
-
-        Assert.Contains("INativeCardPreviewHost", itemBoard);
-        Assert.Contains("INativeCardPreviewScope", itemBoard);
-        Assert.Contains("INativeCardPreviewSession", itemBoard);
-        Assert.DoesNotContain("NativeCardPreviewPool", itemBoard);
-        Assert.DoesNotContain("NativeCardPreviewFactory", itemBoard);
-        Assert.DoesNotContain("NativeCardPreviewReflection", itemBoard);
     }
 
     [Fact]
@@ -147,14 +132,6 @@ public sealed class NativeCardPreviewArchitectureTests
                 "CollectionNativeCardPreviewOwner.cs"
             )
         );
-        var itemBoardSurface = File.ReadAllText(
-            Path.Combine(
-                sourceRoot,
-                "GameInterop",
-                "ItemBoardPreview",
-                "ItemBoardPreviewSurface.cs"
-            )
-        );
         var postCombatPreview = File.ReadAllText(
             Path.Combine(
                 sourceRoot,
@@ -171,7 +148,6 @@ public sealed class NativeCardPreviewArchitectureTests
         );
 
         Assert.Contains("public bool UsePremiumVisuals => true;", collectionOwner);
-        Assert.Contains("public bool UsePremiumVisuals => false;", itemBoardSurface);
         Assert.Contains("public bool UsePremiumVisuals => false;", postCombatPreview);
         Assert.Contains("owner.UsePremiumVisuals", factory);
         Assert.Contains("usePremiumVisuals", runtime);

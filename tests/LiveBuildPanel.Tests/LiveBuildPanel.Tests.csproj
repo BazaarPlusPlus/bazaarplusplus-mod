@@ -49,10 +49,6 @@
       Link="Text/LiveBuildPanelText.Evidence.cs"
     />
     <Compile
-      Include="../../src/BazaarPlusPlus/Game/LiveBuildPanel/Text/LiveBuildPanelText.FontSample.cs"
-      Link="Text/LiveBuildPanelText.FontSample.cs"
-    />
-    <Compile
       Include="../../src/BazaarPlusPlus/Game/LiveBuildPanel/Text/LiveBuildPanelText.Refresh.cs"
       Link="Text/LiveBuildPanelText.Refresh.cs"
     />
@@ -116,10 +112,6 @@
     <Compile
       Include="../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/BppItemBoardType.cs"
       Link="BppItemBoardType.cs"
-    />
-    <Compile
-      Include="../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/ItemBoardSlotGridGeometry.cs"
-      Link="ItemBoardSlotGridGeometry.cs"
     />
     <Compile
       Include="../../src/BazaarPlusPlus/Infrastructure/UiTokens/BppOverlaySorting.cs"

@@ -13,12 +13,16 @@ internal readonly record struct NativeMonsterBoardLayout(
         float boardWidth,
         float boardHeight,
         float skillsWidth,
-        float skillsHeight
+        float skillsHeight,
+        bool itemsOnly = false,
+        float itemFooterHeight = 0,
+        float itemTopInset = 0
     )
     {
         var boardScale = Math.Min(
             width / Math.Max(1, boardWidth),
-            height * .74f / Math.Max(1, boardHeight)
+            (itemsOnly ? Math.Max(1, height - itemFooterHeight - itemTopInset) : height * .74f)
+                / Math.Max(1, boardHeight)
         );
         var skillScale = height * .20f / Math.Max(1, skillsHeight);
         return new(boardScale, skillScale, Math.Max(width, skillsWidth * skillScale));
