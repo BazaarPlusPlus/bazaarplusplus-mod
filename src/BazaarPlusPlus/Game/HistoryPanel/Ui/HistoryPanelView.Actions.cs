@@ -1,6 +1,5 @@
 #nullable enable
 using BazaarPlusPlus.Game.HistoryPanel.Data;
-using BazaarPlusPlus.Game.Supporters;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using TMPro;
 using UnityEngine;
@@ -120,30 +119,6 @@ internal sealed partial class HistoryPanelView
         status.textWrappingMode = TextWrappingModes.Normal;
         if (m.AccountCardVisible)
             BuildAccountLink(dialog);
-
-        var names = string.Join(" · ", m.Supporters.Where(s => s.HasValue).Select(s => s.Name));
-        var language = PlayerPreferences.Data.LanguageCode ?? string.Empty;
-        var attribution = Text(
-            dialog,
-            BPPSupporterAttributionText.FormatSupportedBy(names, language),
-            .05f,
-            .86f,
-            .70f,
-            .075f,
-            14,
-            Muted
-        );
-        attribution.textWrappingMode = TextWrappingModes.Normal;
-        Button(
-            dialog,
-            BPPSupporterAttributionText.FormatSponsorAction(language),
-            .79f,
-            .87f,
-            .16f,
-            .06f,
-            () => Application.OpenURL(BPPSupporterLinks.ResolveSponsorUrl(language)),
-            size: 14
-        );
     }
 
     private void BuildAccountLink(RectTransform dialog)

@@ -292,6 +292,7 @@ internal sealed partial class HistoryPanelView : IDisposable
         Panel(_layout, 0.014f, 0.018f, .972f, .962f);
         Text(_layout, _model.Title, .04f, .032f, .37f, .055f, 34);
         Button(_layout, HistoryPanelText.Close(), .87f, .04f, .09f, .045f, _close);
+        BuildSupporterHeader();
         Filters();
         BuildArchive();
         var status = Text(
