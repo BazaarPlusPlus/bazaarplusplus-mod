@@ -142,7 +142,8 @@ internal sealed class CollectionPanelDockButtonController
 
         // The hero-ready background intercepts clicks below the settings bar.
         // Give only our button a sorting boundary above its native canvas content.
-        var canvas = _dockButtonRect!.GetComponent<Canvas>()
+        var canvas =
+            _dockButtonRect!.GetComponent<Canvas>()
             ?? _dockButtonRect.gameObject.AddComponent<Canvas>();
         canvas.overrideSorting = true;
         canvas.sortingLayerID = anchorCanvas.sortingLayerID;
