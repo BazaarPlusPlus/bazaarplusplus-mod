@@ -33,8 +33,6 @@ public sealed class LiveBuildPanelLogEventCatalogTests
                 "section:Low:None|reason_code:Low:None|template_id:High:None|socket_id:High:None|item_size:Low:None",
             ["live_build_panel.card_preview.degraded"] =
                 "operation:Low:None|reason_code:Low:None|template_id:High:None",
-            ["live_build_panel.item_board_preview.degraded"] =
-                "operation:Low:None|reason_code:Low:None|template_id:High:None",
         };
 
         Assert.Equal(expected, actual);
@@ -68,13 +66,6 @@ public sealed class LiveBuildPanelLogEventCatalogTests
                 LiveBuildPanelLogEvents.CardPreviewDegradedReasonCode,
             ],
             LiveBuildPanelLogEvents.CardPreviewDegraded.StormPolicy!.KeyFields
-        );
-        Assert.Equal(
-            [
-                LiveBuildPanelLogEvents.ItemBoardPreviewDegradedOperation,
-                LiveBuildPanelLogEvents.ItemBoardPreviewDegradedReasonCode,
-            ],
-            LiveBuildPanelLogEvents.ItemBoardPreviewDegraded.StormPolicy!.KeyFields
         );
         var validation = BppLogEventCatalog.FromDefinitions(Definitions().ToArray()).Validate();
         Assert.True(

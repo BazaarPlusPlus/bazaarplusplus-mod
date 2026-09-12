@@ -263,8 +263,7 @@ internal sealed class BppComposition : IDisposable
         _mountables.Register(
             new LiveBuildPanelMount(
                 () => overlayPanelHostMount.Host,
-                _buildRecommendationRepository,
-                _nativeCardPreviewHost
+                _buildRecommendationRepository
             )
         );
         _mountables.Register(new ComponentMount<VoiceLineDisplayDispatcher>());

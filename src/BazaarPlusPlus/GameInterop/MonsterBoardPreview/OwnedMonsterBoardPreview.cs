@@ -20,7 +20,7 @@ internal enum NativeMonsterBoardStatus
 }
 
 // Owns a clone of the native monster board, never the active tooltip's view.
-internal sealed class OwnedMonsterBoardPreview : IDisposable
+internal sealed partial class OwnedMonsterBoardPreview : IDisposable
 {
     private const string TooltipAddress = "Assets/Prefabs/UIPrefabs/Tooltips/Tooltip_P.prefab";
     private readonly GameObject _root;
@@ -33,21 +33,26 @@ internal sealed class OwnedMonsterBoardPreview : IDisposable
     private RectTransform? _ownedSkillParent;
     private readonly Vector3[] _carpetCorners = new Vector3[4];
     private readonly Action<NativeMonsterBoardStatus, Exception?> _report;
+    private readonly bool _itemsOnly;
     private MonsterBoardTooltip? _view;
     private Task _pending = Task.CompletedTask;
     private int _generation;
     private string? _signature;
     private bool _disposed;
     private bool _ready;
+    private float _itemFooterHeight;
+    private float _itemTopInset;
 
     internal OwnedMonsterBoardPreview(
         Transform parent,
         int sortingOrder,
         bool skillsBelow,
-        Action<NativeMonsterBoardStatus, Exception?> report
+        Action<NativeMonsterBoardStatus, Exception?> report,
+        bool itemsOnly = false
     )
     {
         _report = report;
+        _itemsOnly = itemsOnly;
         _root = new GameObject(
             "OwnedMonsterBoardPreview",
             typeof(RectTransform),
@@ -66,8 +71,10 @@ internal sealed class OwnedMonsterBoardPreview : IDisposable
         _region.SetParent(_root.transform, false);
         _region.anchorMin = _region.anchorMax = Vector2.zero;
         _region.pivot = Vector2.zero;
+        _region.sizeDelta = Vector2.zero;
         _gate = _region.GetComponent<CanvasGroup>();
         _gate.alpha = 0;
+        _gate.blocksRaycasts = false;
         _boardRegion = Region("Cards", _region);
         _skillViewport = Region("SkillsViewport", _region);
         _boardRegion.anchorMin = new Vector2(0, skillsBelow ? .26f : 0);
@@ -101,6 +108,12 @@ internal sealed class OwnedMonsterBoardPreview : IDisposable
         scrollbar.direction = Scrollbar.Direction.LeftToRight;
         _skillScroll.horizontalScrollbar = scrollbar;
         _skillScroll.horizontalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
+        if (itemsOnly)
+        {
+            _boardRegion.anchorMin = Vector2.zero;
+            _boardRegion.anchorMax = Vector2.one;
+            _skillViewport.gameObject.SetActive(false);
+        }
     }
 
     private static RectTransform Region(string name, Transform parent)
@@ -113,11 +126,20 @@ internal sealed class OwnedMonsterBoardPreview : IDisposable
         return rect;
     }
 
-    internal void SetBounds(Rect bounds)
+    internal void SetBounds(Rect bounds, float itemFooterHeight = 0, float itemTopInset = 0)
     {
         _region.anchoredPosition = bounds.position;
         _region.sizeDelta = bounds.size;
+        _itemFooterHeight = itemFooterHeight;
+        _itemTopInset = itemTopInset;
+        if (_itemsOnly)
+        {
+            _boardRegion.offsetMin = new Vector2(0, itemFooterHeight);
+            _boardRegion.offsetMax = new Vector2(0, -itemTopInset);
+        }
         Fit();
+        if (_ready)
+            _gate.alpha = 1;
     }
 
     internal void Render(
@@ -129,6 +151,7 @@ internal sealed class OwnedMonsterBoardPreview : IDisposable
         if (_disposed || signature == _signature)
             return;
         _signature = signature;
+        EndPointer();
         _generation++;
         _ready = false;
         _gate.alpha = 0;
@@ -213,6 +236,7 @@ internal sealed class OwnedMonsterBoardPreview : IDisposable
                     throw new InvalidOperationException(
                         "Native board did not load every requested card."
                     );
+                RegisterTooltips();
                 _view.Show(0f);
                 _view._visibilitySequence?.Complete();
                 // Keep native skill visuals and pooling, but own their layout independently.
@@ -223,7 +247,7 @@ internal sealed class OwnedMonsterBoardPreview : IDisposable
                 _skillScroll.horizontalNormalizedPosition = 0;
                 _ready = true;
                 Fit();
-                _gate.alpha = 1;
+                _gate.alpha = _region.rect.width > 1 && _region.rect.height > 1 ? 1 : 0;
                 _gate.blocksRaycasts = true;
                 _report(
                     items.Count + skills.Count == 0
@@ -274,11 +298,14 @@ internal sealed class OwnedMonsterBoardPreview : IDisposable
             boardBounds.size.x,
             boardBounds.size.y,
             skillBounds.size.x,
-            skillBounds.size.y
+            skillBounds.size.y,
+            _itemsOnly,
+            _itemFooterHeight,
+            _itemTopInset
         );
         rect.localScale = Vector3.one * layout.BoardScale;
         rect.anchoredPosition = -(Vector2)boardBounds.center * layout.BoardScale;
-        _skillViewport.gameObject.SetActive(_view._activeSkills.Count > 0);
+        _skillViewport.gameObject.SetActive(!_itemsOnly && _view._activeSkills.Count > 0);
         _skillContent.sizeDelta = new Vector2(layout.SkillContentWidth, 0);
         if (_ownedSkillParent != null)
         {
@@ -322,8 +349,12 @@ internal sealed class OwnedMonsterBoardPreview : IDisposable
             return;
         _disposed = true;
         _generation++;
+        EndPointer();
         _gate.alpha = 0;
         _gate.blocksRaycasts = false;
+        // The owner may destroy its UI this frame. Keep native loading alive until
+        // all rented cards are registered and can safely be detached and pooled.
+        _root.transform.SetParent(null, false);
         _ = DisposeAfterLoad();
     }
 
