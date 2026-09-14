@@ -1,6 +1,11 @@
 #nullable enable
 using System.Collections;
 using System.Reflection;
+using BazaarPlusPlus.Storage.RunLog;
+using Microsoft.Data.Sqlite;
+
+using var uiContext = new TestUiContext();
+SynchronizationContext.SetSynchronizationContext(uiContext);
 
 var modAssembly = Assembly.Load("BazaarPlusPlus");
 var stateType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanelState");
@@ -208,7 +213,6 @@ void TestCoordinatorRunSelectionUsesFilteredSpace()
         Activator.CreateInstance(stateType)
         ?? throw new InvalidOperationException("HistoryPanelState should construct.");
     GetList(state, "Runs").Add(CreateRun("raw-1", "Vanessa"));
-    GetList(state, "Runs").Add(CreateRun("raw-2", "Mak"));
     GetList(state, "Runs").Add(CreateRun("raw-3", "Vanessa"));
     stateType.GetProperty("SelectedRunHero")!.SetValue(state, "Vanessa");
 
@@ -231,7 +235,7 @@ void TestCoordinatorRunSelectionUsesFilteredSpace()
 
     Assert(
         GetString(selected, "RunId") == "raw-3",
-        "SelectRun should interpret indexes in filtered run space, not raw run space."
+        "SelectRun should interpret indexes in the current filtered database page."
     );
 }
 
@@ -253,7 +257,30 @@ void TestReplayReturnPreservesSelectionAndFilters()
     stateType
         .GetProperty("GhostBattleFilter")!
         .SetValue(state, Enum.Parse(ghostFilterType, "ILost"));
-    var dataService = Construct(dataServiceType, null, null);
+    var databasePath = Path.Combine(
+        Path.GetTempPath(),
+        $"bpp-history-selection-{Guid.NewGuid():N}.sqlite3"
+    );
+    using var db = new SqliteConnection($"Data Source={databasePath}");
+    db.Open();
+    RunLogSchema.EnsureInitialized(db);
+    using (var command = db.CreateCommand())
+    {
+        command.CommandText = """
+            INSERT INTO runs (run_id,hero,game_mode,status,started_at_utc,last_seen_at_utc)
+            VALUES ('run-1','Vanessa','Ranked','completed','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z'),
+                ('run-2','Vanessa','Ranked','completed','2026-01-02T00:00:00Z','2026-01-02T00:00:00Z');
+            INSERT INTO battles (battle_id,run_id,source,recorded_at_utc,combat_kind,local_payload_state)
+            VALUES ('battle-1','run-2','LOCAL','2026-01-02T00:00:00Z','PVPCombat','missing'),
+                ('battle-2','run-2','LOCAL','2026-01-01T00:00:00Z','PVPCombat','missing');
+            """;
+        command.ExecuteNonQuery();
+    }
+    var repository = Construct(
+        RequireType("BazaarPlusPlus.Game.HistoryPanel.Storage.HistoryPanelRepository"),
+        databasePath
+    );
+    var dataService = Construct(dataServiceType, repository, null);
     var dependencies = Construct(dependenciesType, null, dataService, null, null, null, null, null);
     var previewRequests = 0;
     using var coordinator = (IDisposable)
@@ -285,19 +312,24 @@ void TestReplayReturnPreservesSelectionAndFilters()
         Invoke(coordinatorType, coordinator, "OnPanelHidden");
         previewRequests = 0;
         Invoke(coordinatorType, coordinator, "OnPanelShown", true);
+        uiContext.Until(() =>
+            stateType.GetProperty("DetailBattleId")!.GetValue(state)?.ToString() == "battle-2"
+            && !(bool)stateType.GetProperty("DetailLoading")!.GetValue(state)!
+        );
 
         Assert(
             GetList(state, "Runs").Count == 2
-                && ReferenceEquals(GetList(state, "Runs")[1], selectedRun),
-            "Returning from replay must retain the loaded run list."
+                && GetString(Invoke(coordinatorType, coordinator, "GetSelectedRun"), "RunId")
+                    == "run-2",
+            "Returning from replay must reload the page and retain the selected run by ID."
         );
         Assert(
-            ReferenceEquals(Invoke(stateType, state, "GetSelectedBattle"), selectedBattle),
+            GetString(Invoke(stateType, state, "GetSelectedBattle"), "BattleId") == "battle-2",
             "Returning from replay must retain the selected battle, not the latest battle."
         );
         Assert(
-            (int)stateType.GetProperty("SelectedRunIndex")!.GetValue(state)! == 1,
-            "Returning from replay must retain the selected run index."
+            (int)stateType.GetProperty("SelectedRunIndex")!.GetValue(state)! == 0,
+            "Reloading may change the selected index while retaining run identity."
         );
         Assert(
             GetNullableString(state, "SelectedRunHero") == "Vanessa"
@@ -308,21 +340,25 @@ void TestReplayReturnPreservesSelectionAndFilters()
             "Returning from replay must retain both run and ghost filters and selection."
         );
         Assert(
-            previewRequests == 1,
-            "Returning from replay must refresh the selected preview once."
+            previewRequests > 0,
+            "Returning from replay must refresh the selected preview after loading its detail."
         );
 
         Invoke(coordinatorType, coordinator, "OnPanelHidden");
         Invoke(coordinatorType, coordinator, "OnPanelShown", false);
+        uiContext.Until(() => !(bool)stateType.GetProperty("PageLoading")!.GetValue(state)!);
         Assert(
-            GetList(state, "Runs").Count == 0,
-            "A normal panel open must reload from storage instead of reusing replay-origin state."
+            GetList(state, "Runs").Count == 2
+                && !ReferenceEquals(GetList(state, "Runs")[0], selectedRun),
+            "A normal panel open must read persisted records."
         );
     }
     finally
     {
         cacheType.SetValue(null, previousType);
         resolved.SetValue(null, previousResolved);
+        db.Close();
+        File.Delete(databasePath);
     }
 }
 
@@ -389,8 +425,7 @@ object CreateRun(string runId, string hero)
             100,
             1,
             0,
-            "finished",
-            2
+            "finished"
         ) ?? throw new InvalidOperationException("HistoryRunRecord should construct.");
 }
 

@@ -31,12 +31,24 @@ internal static class HistoryPanelGhostBattleFilter
         return !dayMin10 || (battle.Day.HasValue && battle.Day.Value >= 10);
     }
 
-    private static HistoryPanelGhostBattleOutcome ResolveOutcome(HistoryBattleRecord battle)
+    internal static HistoryPanelGhostBattleOutcome ResolveOutcome(HistoryBattleRecord battle)
     {
-        if (string.Equals(battle.WinnerCombatantId, "Player", StringComparison.OrdinalIgnoreCase))
+        if (
+            string.Equals(
+                battle.WinnerCombatantId?.Trim(),
+                "Player",
+                StringComparison.OrdinalIgnoreCase
+            )
+        )
             return HistoryPanelGhostBattleOutcome.Won;
 
-        if (string.Equals(battle.WinnerCombatantId, "Opponent", StringComparison.OrdinalIgnoreCase))
+        if (
+            string.Equals(
+                battle.WinnerCombatantId?.Trim(),
+                "Opponent",
+                StringComparison.OrdinalIgnoreCase
+            )
+        )
             return HistoryPanelGhostBattleOutcome.Lost;
 
         var result = battle.Result?.Trim();

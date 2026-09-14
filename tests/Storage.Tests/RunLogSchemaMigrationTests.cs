@@ -86,7 +86,11 @@ internal static class RunLogSchemaMigrationTests
                     local_player_account_id TEXT NULL,
                     recorded_at_utc TEXT NOT NULL,
                     combat_kind TEXT NOT NULL,
-                    has_local_payload INTEGER NOT NULL DEFAULT 0
+                    has_local_payload INTEGER NOT NULL DEFAULT 0,
+                    deleted_at_utc TEXT NULL,
+                    day INTEGER NULL,
+                    result TEXT NULL,
+                    winner_combatant_id TEXT NULL
                 );
                 CREATE TABLE combat_replay_videos (
                     video_id TEXT PRIMARY KEY,
@@ -257,7 +261,11 @@ internal static class RunLogSchemaMigrationTests
                     source TEXT NOT NULL,
                     recorded_at_utc TEXT NOT NULL,
                     combat_kind TEXT NOT NULL,
-                    has_local_payload INTEGER NOT NULL DEFAULT 0
+                    has_local_payload INTEGER NOT NULL DEFAULT 0,
+                    deleted_at_utc TEXT NULL,
+                    day INTEGER NULL,
+                    result TEXT NULL,
+                    winner_combatant_id TEXT NULL
                 );
                 """
             );

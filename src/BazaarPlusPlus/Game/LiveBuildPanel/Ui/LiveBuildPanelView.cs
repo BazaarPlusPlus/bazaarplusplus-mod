@@ -7,7 +7,9 @@ using BazaarPlusPlus.GameInterop.Fonts;
 using BazaarPlusPlus.GameInterop.HeroPortraits;
 using BazaarPlusPlus.GameInterop.ItemBoardPreview;
 using BazaarPlusPlus.GameInterop.MonsterBoardPreview;
+using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Infrastructure.UiTokens;
+using BazaarPlusPlus.Localization;
 using TheBazaar.AppFramework;
 using TMPro;
 using UnityEngine;
@@ -54,6 +56,8 @@ internal sealed class LiveBuildPanelView : IDisposable
     private GameObject? _root;
     private RectTransform? _layout;
     private RectTransform? _markerRoot;
+    private Vector2 _screenSize;
+    private int _layoutFrames = 2;
     private RectTransform? _supporterHost;
     private RectTransform? _sidebar;
     private RectTransform? _corpusGroup;
@@ -377,21 +381,31 @@ internal sealed class LiveBuildPanelView : IDisposable
                 _ = _portraitLoad.Exception;
             _portraitLoad = null;
         }
-        Canvas.ForceUpdateCanvases();
-        UpdateLayout();
-        foreach (var pair in _rows)
+        var screen = new Vector2(Screen.width, Screen.height);
+        if (_screenSize != screen)
         {
-            pair.Value.Region.GetWorldCorners(_corners);
-            var bounds = UnityEngine.Rect.MinMaxRect(
-                _corners[0].x,
-                _corners[0].y,
-                _corners[2].x,
-                _corners[2].y
-            );
-            if (bounds.width > 1 && bounds.height > 1 && bounds != pair.Value.Bounds)
+            _screenSize = screen;
+            _layoutFrames = 2;
+        }
+        if (_layoutFrames > 0)
+        {
+            _layoutFrames--;
+            Canvas.ForceUpdateCanvases();
+            UpdateLayout();
+            foreach (var pair in _rows)
             {
-                pair.Value.Bounds = bounds;
-                RowBoundsChanged?.Invoke(pair.Key, bounds);
+                pair.Value.Region.GetWorldCorners(_corners);
+                var bounds = UnityEngine.Rect.MinMaxRect(
+                    _corners[0].x,
+                    _corners[0].y,
+                    _corners[2].x,
+                    _corners[2].y
+                );
+                if (bounds.width > 1 && bounds.height > 1 && bounds != pair.Value.Bounds)
+                {
+                    pair.Value.Bounds = bounds;
+                    RowBoundsChanged?.Invoke(pair.Key, bounds);
+                }
             }
         }
         _corpusDetail!.transform.parent.gameObject.SetActive(
@@ -403,7 +417,11 @@ internal sealed class LiveBuildPanelView : IDisposable
         );
     }
 
-    internal void SetBoardStatus(BppItemBoardId id, NativeMonsterBoardStatus status)
+    internal void SetBoardStatus(
+        BppItemBoardId id,
+        NativeMonsterBoardStatus status,
+        int unavailableCount = 0
+    )
     {
         if (!_rows.TryGetValue(id, out var row))
             return;
@@ -411,6 +429,12 @@ internal sealed class LiveBuildPanelView : IDisposable
         {
             NativeMonsterBoardStatus.Loading => LiveBuildPanelText.LoadingBoard(),
             NativeMonsterBoardStatus.Failed => LiveBuildPanelText.BoardFailed(),
+            NativeMonsterBoardStatus.Partial => LocalizedTextHelpers.Resolve(
+                new LocalizedTextSet(
+                    $"{unavailableCount} cards are unavailable in this game version.",
+                    $"{unavailableCount} 张卡牌在当前版本不可用。"
+                )
+            ),
             _ => string.Empty,
         };
         if (_snapshot != null)

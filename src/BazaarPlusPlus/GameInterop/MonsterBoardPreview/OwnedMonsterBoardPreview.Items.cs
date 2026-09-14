@@ -1,4 +1,5 @@
 #nullable enable
+using BazaarPlusPlus.GameInterop.CardPreview;
 using TheBazaar.UI;
 using UnityEngine;
 
@@ -10,18 +11,16 @@ internal sealed partial class OwnedMonsterBoardPreview
 {
     private readonly Vector3[] _itemCorners = new Vector3[4];
     private CardPreviewItem? _pointerItem;
-    private readonly List<NativeMonsterBoardTooltipGate.Lease> _tooltipLeases = new();
+    private readonly List<IDisposable> _tooltipLeases = new();
 
     private void RegisterTooltips()
     {
         foreach (var card in _view!._activeCards)
             if (card != null && card._tooltipData != null)
-                _tooltipLeases.Add(NativeMonsterBoardTooltipPatch.Gate.Register(card._tooltipData));
+                _tooltipLeases.Add(NativeCardPreviewHost.RegisterBorrowedHover(card));
         foreach (var skill in _view._activeSkills)
             if (skill != null && skill._tooltipData != null)
-                _tooltipLeases.Add(
-                    NativeMonsterBoardTooltipPatch.Gate.Register(skill._tooltipData)
-                );
+                _tooltipLeases.Add(NativeCardPreviewHost.RegisterBorrowedHover(skill));
     }
 
     internal void VisitItems(Action<NativeMonsterBoardItemBounds> visit)
@@ -84,7 +83,7 @@ internal sealed partial class OwnedMonsterBoardPreview
     private void EndPointer()
     {
         foreach (var lease in _tooltipLeases)
-            lease.Retire();
+            lease.Dispose();
         _tooltipLeases.Clear();
         var hovered = _pointerItem;
         _pointerItem = null;

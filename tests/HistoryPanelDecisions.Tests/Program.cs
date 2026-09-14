@@ -206,8 +206,7 @@ object CreateRun(string runId, string rawStatus)
             100,
             1,
             0,
-            rawStatus,
-            2
+            rawStatus
         ) ?? throw new InvalidOperationException("HistoryRunRecord should construct.");
 }
 

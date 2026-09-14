@@ -17,11 +17,28 @@ internal sealed partial class HistoryPanelView
     private readonly Action _markAccountLinked;
     private bool _moreVisible;
     private string _accountCode = string.Empty;
+    private string? _inputAccount;
     private TMP_InputField? _accountInput;
 
-    private void BuildActions()
+    private GameObject? _moreRoot;
+    private RectTransform _accountCard = null!,
+        _accountForm = null!;
+    private Button _deleteButton = null!,
+        _recordButton = null!,
+        _replayButton = null!,
+        _healthButton = null!,
+        _accountToggle = null!,
+        _accountSubmit = null!,
+        _accountLinked = null!;
+    private TextMeshProUGUI _databaseLabel = null!,
+        _moreStatus = null!,
+        _accountTitle = null!,
+        _accountStatus = null!,
+        _accountWhy = null!,
+        _accountBanner = null!;
+
+    private void CreateActions()
     {
-        var m = _model!;
         Button(
             _layout!,
             T("More", "更多"),
@@ -29,41 +46,11 @@ internal sealed partial class HistoryPanelView
             .04f,
             .09f,
             .045f,
-            () =>
-            {
-                _moreVisible = !_moreVisible;
-                Rebuild();
-            }
+            () => SetMoreVisible(!_moreVisible)
         );
-        if (m.SectionMode == HistorySectionMode.Runs)
-            Button(_layout!, m.DeleteButtonText, .04f, .90f, .16f, .044f, _delete).interactable =
-                m.DeleteButtonEnabled;
-        Button(
-            _layout!,
-            m.RecordAndReplayButtonText,
-            .58f,
-            .90f,
-            .13f,
-            .055f,
-            _record
-        ).interactable = m.RecordAndReplayButtonEnabled;
-        Button(
-            _layout!,
-            m.ReplayButtonText,
-            .72f,
-            .90f,
-            .23f,
-            .055f,
-            _replay,
-            true,
-            23
-        ).interactable = m.ReplayButtonEnabled;
-    }
-
-    private void BuildMoreDialog()
-    {
-        var m = _model!;
-        // This dialog must occlude both the panel and the separately owned native boards.
+        _deleteButton = Button(_layout!, "", .04f, .90f, .16f, .044f, _delete);
+        _recordButton = Button(_layout!, "", .58f, .90f, .13f, .055f, _record);
+        _replayButton = Button(_layout!, "", .72f, .90f, .23f, .055f, _replay, true, 23);
         var shade = CreateRect("HistoryMoreDialog", _layout!, 0, 0, 1, 1);
         var canvas = shade.gameObject.AddComponent<Canvas>();
         canvas.overrideSorting = true;
@@ -81,81 +68,34 @@ internal sealed partial class HistoryPanelView
             .045f,
             .14f,
             .06f,
-            () =>
-            {
-                _moreVisible = false;
-                Rebuild();
-            }
+            () => SetMoreVisible(false)
         );
-        Text(
-            dialog,
-            m.DatabaseChipText,
-            .05f,
-            .14f,
-            .53f,
-            .055f,
-            17,
-            StatusColor(m.DatabaseChipSeverity)
+        _databaseLabel = Text(dialog, "", .05f, .14f, .53f, .055f, 17);
+        _healthButton = Button(dialog, "", .65f, .14f, .30f, .055f, _checkHealth);
+        _moreStatus = Text(dialog, "", .05f, .21f, .90f, .075f, 14);
+        _moreStatus.textWrappingMode = TextWrappingModes.Normal;
+        _accountCard = CreateRect("AccountCard", dialog, .05f, .31f, .90f, .64f);
+        _accountTitle = Text(_accountCard, "", 0, 0, .7f, .094f, 21);
+        _accountStatus = Text(_accountCard, "", 0, .11f, .68f, .07f, 16, Muted);
+        _accountToggle = Button(
+            _accountCard,
+            "",
+            .76f,
+            .094f,
+            .24f,
+            .086f,
+            _toggleAccountLink,
+            size: 15
         );
-        Button(
-            dialog,
-            m.ServerHealthButtonText,
-            .65f,
-            .14f,
-            .30f,
-            .055f,
-            _checkHealth
-        ).interactable = m.ServerHealthButtonEnabled;
-        var status = Text(
-            dialog,
-            m.StatusMessage ?? string.Empty,
-            .05f,
-            .21f,
-            .90f,
-            .075f,
-            14,
-            StatusColor(m.StatusSeverity)
-        );
-        status.textWrappingMode = TextWrappingModes.Normal;
-        if (m.AccountCardVisible)
-            BuildAccountLink(dialog);
-    }
-
-    private void BuildAccountLink(RectTransform dialog)
-    {
-        var m = _model!;
-        Text(dialog, m.AccountTitleText, .05f, .31f, .66f, .06f, 21);
-        Text(dialog, m.AccountRowStatusText, .05f, .38f, .62f, .045f, 16, Muted);
-        if (m.AccountRowActionVisible)
-            Button(
-                dialog,
-                m.AccountLinkFormVisible ? m.AccountLinkCollapseText : m.AccountRowActionText,
-                .74f,
-                .37f,
-                .21f,
-                .055f,
-                _toggleAccountLink,
-                size: 15
-            );
-        if (!m.AccountLinkFormVisible)
-            return;
-        var why = Text(
-            dialog,
-            m.AccountWhyText + "\n" + m.AccountHintText,
-            .05f,
-            .45f,
-            .90f,
-            .10f,
-            14,
-            Muted
-        );
-        why.textWrappingMode = TextWrappingModes.Normal;
-        var inputRect = CreateRect("AccountLinkCode", dialog, .05f, .57f, .55f, .065f);
+        _accountForm = CreateRect("AccountForm", _accountCard, 0, .22f, 1, .76f);
+        _accountWhy = Text(_accountForm, "", 0, 0, 1, .2f, 14, Muted);
+        _accountWhy.textWrappingMode = TextWrappingModes.Normal;
+        var inputRect = CreateRect("AccountLinkCode", _accountForm, 0, .25f, .61f, .14f);
         var background = inputRect.gameObject.AddComponent<Image>();
         background.color = new Color(.20f, .15f, .09f);
         var viewport = CreateRect("TextViewport", inputRect, .035f, .03f, .93f, .94f);
         viewport.gameObject.AddComponent<RectMask2D>();
-        var inputText = Text(viewport, string.Empty, 0, 0, 1, 1, 20);
+        var inputText = Text(viewport, "", 0, 0, 1, 1, 20);
         var placeholder = Text(
             viewport,
             HistoryPanelText.AccountLink.EmptyCode(),
@@ -172,57 +112,106 @@ internal sealed partial class HistoryPanelView
         input.textComponent = inputText;
         input.placeholder = placeholder;
         input.lineType = TMP_InputField.LineType.SingleLine;
+        input.characterLimit = 10;
         input.onValidateInput = (_, _, character) =>
             char.IsWhiteSpace(character) ? '\0' : character;
-        input.SetTextWithoutNotify(_accountCode);
-        input.interactable = m.AccountLinkInputEnabled;
-        input.onValueChanged.AddListener(value =>
-        {
-            _accountCode = new string(
-                value.Where(character => !char.IsWhiteSpace(character)).Take(10).ToArray()
-            );
-            if (value != _accountCode)
-                input.SetTextWithoutNotify(_accountCode);
-        });
+        input.onValueChanged.AddListener(value => _accountCode = value);
+        input.onSelect.AddListener(_ => UpdateInputFocus());
+        input.onDeselect.AddListener(_ => ReleaseInputFocus());
         input.onSubmit.AddListener(_ =>
         {
             if (_model?.AccountLinkButtonEnabled == true)
                 _submitAccountCode(_accountCode);
         });
         _accountInput = input;
-        Button(
-            dialog,
-            m.AccountLinkButtonText,
-            .63f,
-            .57f,
-            .32f,
-            .065f,
+        _accountSubmit = Button(
+            _accountForm,
+            "",
+            .65f,
+            .25f,
+            .35f,
+            .14f,
             () => _submitAccountCode(_accountCode.Trim()),
             true,
             17
-        ).interactable = m.AccountLinkButtonEnabled;
-        var banner = Text(
-            dialog,
-            m.AccountLinkBannerText ?? string.Empty,
-            .05f,
-            .65f,
-            .90f,
-            .08f,
-            14,
-            StatusColor(m.AccountLinkBannerSeverity)
         );
-        banner.textWrappingMode = TextWrappingModes.Normal;
-        if (m.AccountAlreadyLinkedButtonVisible)
-            Button(
-                dialog,
-                m.AccountAlreadyLinkedButtonText,
-                .63f,
-                .75f,
-                .32f,
-                .05f,
-                _markAccountLinked,
-                size: 15
-            );
+        _accountBanner = Text(_accountForm, "", 0, .42f, 1, .18f, 14);
+        _accountBanner.textWrappingMode = TextWrappingModes.Normal;
+        _accountLinked = Button(
+            _accountForm,
+            "",
+            .65f,
+            .65f,
+            .35f,
+            .11f,
+            _markAccountLinked,
+            size: 15
+        );
+        _moreRoot = shade.gameObject;
+        _moreRoot.SetActive(false);
+    }
+
+    private void SetMoreVisible(bool visible)
+    {
+        _moreVisible = visible;
+        if (!visible)
+        {
+            _accountInput?.DeactivateInputField();
+            ReleaseInputFocus();
+        }
+        _moreRoot?.SetActive(visible);
+        UpdateFacts();
+    }
+
+    private void RefreshActions()
+    {
+        var m = _model!;
+        if (_inputAccount != m.AccountId)
+        {
+            _inputAccount = m.AccountId;
+            _accountCode = string.Empty;
+            _accountInput?.SetTextWithoutNotify(string.Empty);
+            _accountInput?.DeactivateInputField();
+            ReleaseInputFocus();
+        }
+        _deleteButton.gameObject.SetActive(ShowsBothBoards);
+        SetButton(
+            _deleteButton,
+            m.DeleteButtonText,
+            enabled: m.DeleteButtonEnabled && !m.PageLoading
+        );
+        SetButton(
+            _recordButton,
+            m.RecordAndReplayButtonText,
+            enabled: m.RecordAndReplayButtonEnabled && !m.PageLoading
+        );
+        SetButton(_replayButton, m.ReplayButtonText, true, m.ReplayButtonEnabled && !m.PageLoading);
+        _databaseLabel.text = m.DatabaseChipText;
+        _databaseLabel.color = StatusColor(m.DatabaseChipSeverity);
+        SetButton(_healthButton, m.ServerHealthButtonText, enabled: m.ServerHealthButtonEnabled);
+        _moreStatus.text = m.StatusMessage ?? "";
+        _moreStatus.color = StatusColor(m.StatusSeverity);
+        _accountCard.gameObject.SetActive(m.AccountCardVisible);
+        _accountTitle.text = m.AccountTitleText;
+        _accountStatus.text = m.AccountRowStatusText;
+        _accountToggle.gameObject.SetActive(m.AccountRowActionVisible);
+        SetButton(
+            _accountToggle,
+            m.AccountLinkFormVisible ? m.AccountLinkCollapseText : m.AccountRowActionText
+        );
+        if (!m.AccountLinkFormVisible)
+        {
+            _accountInput?.DeactivateInputField();
+            ReleaseInputFocus();
+        }
+        _accountForm.gameObject.SetActive(m.AccountLinkFormVisible);
+        _accountWhy.text = m.AccountWhyText + "\n" + m.AccountHintText;
+        _accountInput!.interactable = m.AccountLinkInputEnabled;
+        SetButton(_accountSubmit, m.AccountLinkButtonText, true, m.AccountLinkButtonEnabled);
+        _accountBanner.text = m.AccountLinkBannerText ?? "";
+        _accountBanner.color = StatusColor(m.AccountLinkBannerSeverity);
+        _accountLinked.gameObject.SetActive(m.AccountAlreadyLinkedButtonVisible);
+        SetButton(_accountLinked, m.AccountAlreadyLinkedButtonText);
     }
 
     private static Color StatusColor(StatusSeverity severity) =>

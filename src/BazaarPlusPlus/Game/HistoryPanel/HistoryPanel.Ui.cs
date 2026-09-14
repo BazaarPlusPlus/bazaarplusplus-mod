@@ -33,6 +33,10 @@ internal sealed partial class HistoryPanel
                 ToggleGhostDayMin10
             );
 
+            _uiView.SetPaginationActions(
+                direction => _coordinator?.PageArchive(direction),
+                direction => _coordinator?.PageBattles(direction)
+            );
             _uiView.PreviewContainerBoundsChanged += OnPreviewContainerBoundsChanged;
             _uiView.OpponentBoundsChanged += bounds =>
             {
@@ -129,6 +133,11 @@ internal sealed partial class HistoryPanel
             : string.Empty;
         var detailMetaText = hasSelectedBattle
             ? HistoryPanelFormatter.FormatTimestamp(selectedBattle!.RecordedAtUtc)
+                + " · "
+                + HistoryPanelText.RankLabel(
+                    selectedBattle.OpponentRank,
+                    selectedBattle.OpponentRating
+                )
             : string.Empty;
         var detailPlaceholderText = hasSelectedBattle
             ? string.Empty
@@ -150,6 +159,31 @@ internal sealed partial class HistoryPanel
 
         return new HistoryPanelViewModel
         {
+            PageLoading = _state.PageLoading,
+            HasNewer =
+                _state.SectionMode == HistorySectionMode.Ghost
+                    ? _state.GhostPage.HasNewer
+                    : _state.RunPage.HasNewer,
+            HasOlder =
+                _state.SectionMode == HistorySectionMode.Ghost
+                    ? _state.GhostPage.HasOlder
+                    : _state.RunPage.HasOlder,
+            BattleHasNewer = _state.BattlePage.HasNewer,
+            BattleHasOlder = _state.BattlePage.HasOlder,
+            PageRange = HistoryPanelFormatter.PageRange(
+                _state.SectionMode == HistorySectionMode.Ghost
+                    ? _state.GhostPage.First
+                    : _state.RunPage.First,
+                _state.SectionMode == HistorySectionMode.Ghost
+                    ? _state.GhostPage.Last
+                    : _state.RunPage.Last
+            ),
+            RunSummary =
+                _state.SectionMode == HistorySectionMode.Runs
+                    ? HistoryPanelFormatter.RunSummary(selectedRun)
+                    : string.Empty,
+            RunFacts = HistoryPanelFormatter.RunFacts(selectedRun),
+            AccountId = _state.CachedAccountId,
             Title = HistoryPanelText.Title(),
             Supporters = _supporters,
             CountChipText =
@@ -219,6 +253,16 @@ internal sealed partial class HistoryPanel
 
 internal sealed class HistoryPanelViewModel
 {
+    public string? AccountId { get; set; }
+
+    public bool PageLoading { get; set; }
+    public bool HasNewer { get; set; }
+    public bool HasOlder { get; set; }
+    public bool BattleHasNewer { get; set; }
+    public bool BattleHasOlder { get; set; }
+    public string PageRange { get; set; } = string.Empty;
+    public string RunSummary { get; set; } = string.Empty;
+    public string RunFacts { get; set; } = string.Empty;
     public string Title { get; set; } = string.Empty;
 
     public IReadOnlyList<BPPSupporterSample> Supporters { get; set; } =

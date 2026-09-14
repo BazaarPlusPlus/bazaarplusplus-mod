@@ -38,8 +38,8 @@ public sealed class NativeAssetLoadingArchitectureTests
         var cardPreviewLoaderPath = Path.Combine(
             sourceRoot,
             "GameInterop",
-            "CardPreview",
-            "NativeCardPreviewAssetLoader.cs"
+            "AssetLoading",
+            "NativeCardPrefabLoader.cs"
         );
         var obsoleteCardPreviewHelperPath = Path.Combine(
             sourceRoot,

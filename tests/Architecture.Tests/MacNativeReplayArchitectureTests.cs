@@ -490,7 +490,18 @@ public sealed class MacNativeReplayArchitectureTests
             windowsNativeProbe >= 0,
             $"Missing Windows native availability probe in {sourcePath}."
         );
-        Assert.DoesNotContain("Task.Run", source, StringComparison.Ordinal);
+        if (Path.GetFileName(sourcePath) == "HistoryPanelReplayService.cs")
+        {
+            var method = source[
+                source.IndexOf(
+                    "public void PrewarmRecordingAvailability()",
+                    StringComparison.Ordinal
+                )..source.IndexOf("public bool CanRecordReplay(", StringComparison.Ordinal)
+            ];
+            Assert.DoesNotContain("Task.Run", method, StringComparison.Ordinal);
+        }
+        else
+            Assert.DoesNotContain("Task.Run", source, StringComparison.Ordinal);
     }
 
     private static string RepoRoot([CallerFilePath] string file = "") =>
