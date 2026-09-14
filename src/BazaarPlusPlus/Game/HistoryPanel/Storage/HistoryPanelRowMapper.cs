@@ -37,15 +37,14 @@ internal static class HistoryPanelRowMapper
             GetNullableInt32(reader, "player_rating"),
             GetNullableInt32(reader, "victories"),
             GetNullableInt32(reader, "losses"),
-            rawStatus,
-            reader.GetInt32(reader.GetOrdinal("battle_count"))
+            rawStatus
         );
     }
 
     public static HistoryBattleRecord ReadLocalBattle(
         SqliteDataReader reader,
         string battleId,
-        PvpBattleSnapshots snapshots
+        PvpBattleSnapshots? snapshots
     )
     {
         return new HistoryBattleRecord(
@@ -73,12 +72,7 @@ internal static class HistoryPanelRowMapper
             GetNullableString(reader, "result"),
             GetNullableString(reader, "winner_combatant_id"),
             GetNullableString(reader, "loser_combatant_id"),
-            HistoryBattlePreviewProjection.CountSnapshots(
-                snapshots.PlayerHand,
-                snapshots.PlayerSkills,
-                snapshots.OpponentHand,
-                snapshots.OpponentSkills
-            ),
+            default,
             snapshots,
             isFinalBattle: false,
             source: HistoryBattleSource.Local,

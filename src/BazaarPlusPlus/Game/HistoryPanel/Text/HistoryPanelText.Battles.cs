@@ -89,9 +89,20 @@ internal static partial class HistoryPanelText
         return FormatSimple($"Couldn't sync ghost battles: {details}", $"幽灵同步失败：{details}");
     }
 
-    internal static string GhostSyncSucceeded(int count)
+    internal static string GhostSyncSucceeded(int count, bool discoveryLimitReached)
     {
-        return FormatSimple($"{count} ghost battles synced.", $"已同步 {count} 场幽灵对战。");
+        var message = FormatSimple(
+            $"{count} ghost battles synced.",
+            $"已同步 {count} 场幽灵对战。"
+        );
+        return discoveryLimitReached
+            ? message
+                + " "
+                + FormatSimple(
+                    "The server returns up to 200 battles from the last 5 days. Saved local history remains browsable.",
+                    "云端仅返回近 5 天最多 200 场；已保存的本地历史仍可继续浏览。"
+                )
+            : message;
     }
 
     internal static string GhostDeleteUnavailable()

@@ -1,10 +1,13 @@
 #nullable enable
+using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Domain.Cards.Item;
 using BazaarGameShared.Domain.Cards.Skill;
 using BazaarPlusPlus.GameInterop.AssetLoading;
+using BazaarPlusPlus.GameInterop.StaticCards;
 using DG.Tweening;
 using TheBazaar;
 using TheBazaar.AppFramework;
+using TheBazaar.UI;
 using TheBazaar.UI.Tooltips;
 using UnityEngine;
 using UnityEngine.UI;
@@ -15,6 +18,7 @@ internal enum NativeMonsterBoardStatus
 {
     Loading,
     Ready,
+    Partial,
     Empty,
     Failed,
 }
@@ -40,6 +44,17 @@ internal sealed partial class OwnedMonsterBoardPreview : IDisposable
     private string? _signature;
     private bool _disposed;
     private bool _ready;
+    private readonly List<NativeBoardCardRental> _rentals = new();
+    private readonly HashSet<Guid> _missingTemplates = new();
+    private object? _catalog;
+    private bool _fitDirty = true;
+    private int _fitFrames;
+    internal int GeometryVersion { get; private set; }
+    private (int Generation, List<TCardInstanceItem> Items, List<TCardInstanceSkill> Skills)? _next;
+    private List<TCardInstanceItem>? _lastItems;
+    private List<TCardInstanceSkill>? _lastSkills;
+    private string? _lastRequest;
+    private bool _draining;
     private float _itemFooterHeight;
     private float _itemTopInset;
 
@@ -128,6 +143,14 @@ internal sealed partial class OwnedMonsterBoardPreview : IDisposable
 
     internal void SetBounds(Rect bounds, float itemFooterHeight = 0, float itemTopInset = 0)
     {
+        if (
+            _region.anchoredPosition == bounds.position
+            && _region.sizeDelta == bounds.size
+            && _itemFooterHeight == itemFooterHeight
+            && _itemTopInset == itemTopInset
+        )
+            return;
+        _fitDirty = true;
         _region.anchoredPosition = bounds.position;
         _region.sizeDelta = bounds.size;
         _itemFooterHeight = itemFooterHeight;
@@ -148,28 +171,57 @@ internal sealed partial class OwnedMonsterBoardPreview : IDisposable
         List<TCardInstanceSkill> skills
     )
     {
-        if (_disposed || signature == _signature)
+        if (_disposed)
+            return;
+        _lastRequest = signature;
+        _lastItems = items;
+        _lastSkills = skills;
+        var catalog = BppStaticDataAccess.TryGetReadyManagerObject();
+        if (!ReferenceEquals(catalog, _catalog))
+        {
+            _catalog = catalog;
+            _missingTemplates.Clear();
+            _signature = null;
+        }
+        signature += NativeBoardSignature.For(items.Cast<TCardInstance>().Concat(skills));
+        if (signature == _signature)
             return;
         _signature = signature;
         EndPointer();
         _generation++;
         _ready = false;
+        GeometryVersion++;
         _gate.alpha = 0;
         _gate.blocksRaycasts = false;
         _report(NativeMonsterBoardStatus.Loading, null);
-        _pending = ReplaceAfter(_pending, _generation, items, skills);
+        _next = (_generation, items, skills);
+        if (!_draining)
+            _pending = Drain();
     }
 
-    private async Task ReplaceAfter(
-        Task previous,
+    private async Task Drain()
+    {
+        _draining = true;
+        try
+        {
+            while (_next is { } work && !_disposed)
+            {
+                _next = null;
+                await Replace(work.Generation, work.Items, work.Skills);
+            }
+        }
+        finally
+        {
+            _draining = false;
+        }
+    }
+
+    private async Task Replace(
         int generation,
         List<TCardInstanceItem> items,
         List<TCardInstanceSkill> skills
     )
     {
-        await previous;
-        if (_disposed || generation != _generation)
-            return;
         for (var attempt = 0; attempt < 3; attempt++)
         {
             try
@@ -221,21 +273,36 @@ internal sealed partial class OwnedMonsterBoardPreview : IDisposable
                     return;
                 }
                 _view._carpetImage.texture = carpet;
-                // Do not cancel native loading: its pool acquisition has no cancellation cleanup.
-                // A stale generation stays hidden until every rented card has been registered.
-                await _view.HandleBoardState(items, skills, 0);
+                if (_view._skillParent.TryGetComponent<HorizontalLayoutGroup>(out var skillLayout))
+                {
+                    _view._skillSpacing = skillLayout.spacing;
+                    _view._skillHeight = _view._skillParent.sizeDelta.y;
+                    skillLayout.enabled = false;
+                }
+                Exception? partialFailure = null;
+                var missingCount = 0;
+                foreach (var instance in items.Cast<TCardInstance>().Concat(skills))
+                {
+                    if (_disposed || generation != _generation)
+                    {
+                        ClearView();
+                        return;
+                    }
+                    try
+                    {
+                        await AddOwnedCard(instance);
+                    }
+                    catch (Exception error)
+                    {
+                        partialFailure ??= error;
+                        missingCount++;
+                    }
+                }
                 if (_disposed || generation != _generation)
                 {
                     ClearView();
                     return;
                 }
-                if (
-                    _view._activeCards.Count != items.Count
-                    || _view._activeSkills.Count != skills.Count
-                )
-                    throw new InvalidOperationException(
-                        "Native board did not load every requested card."
-                    );
                 RegisterTooltips();
                 _view.Show(0f);
                 _view._visibilitySequence?.Complete();
@@ -246,14 +313,22 @@ internal sealed partial class OwnedMonsterBoardPreview : IDisposable
                 _skillContent.anchoredPosition = Vector2.zero;
                 _skillScroll.horizontalNormalizedPosition = 0;
                 _ready = true;
+                _fitDirty = true;
+                _fitFrames = 2;
                 Fit();
                 _gate.alpha = _region.rect.width > 1 && _region.rect.height > 1 ? 1 : 0;
                 _gate.blocksRaycasts = true;
                 _report(
-                    items.Count + skills.Count == 0
-                        ? NativeMonsterBoardStatus.Empty
-                        : NativeMonsterBoardStatus.Ready,
-                    null
+                    _view._activeCards.Count + _view._activeSkills.Count == 0
+                        ? items.Count + skills.Count == 0
+                            ? NativeMonsterBoardStatus.Empty
+                            : NativeMonsterBoardStatus.Failed
+                        : partialFailure != null
+                            ? NativeMonsterBoardStatus.Partial
+                            : NativeMonsterBoardStatus.Ready,
+                    partialFailure == null
+                        ? null
+                        : new NativeBoardPartialFailure(missingCount, partialFailure)
                 );
             }
             catch (Exception ex)
@@ -277,10 +352,68 @@ internal sealed partial class OwnedMonsterBoardPreview : IDisposable
         }
     }
 
+    private async Task AddOwnedCard(TCardInstance instance)
+    {
+        if (_missingTemplates.Contains(instance.TemplateId))
+            throw new InvalidOperationException($"Template unavailable: {instance.TemplateId}.");
+        var template = BppStaticDataAccess.GetCardTemplate(_catalog, instance.TemplateId);
+        if (template == null)
+        {
+            if (_catalog != null)
+                _missingTemplates.Add(instance.TemplateId);
+            throw new InvalidOperationException($"Template unavailable: {instance.TemplateId}.");
+        }
+        var parent = instance is TCardInstanceItem item
+            ? item.SocketId.HasValue
+            && (int)item.SocketId.Value >= 0
+            && (int)item.SocketId.Value < _view!._sockets.Length
+                ? _view!._sockets[(int)item.SocketId.Value]
+                : _view!._carpetImage.transform
+            : _view!._skillParent;
+        var prefab = await NativeCardPrefabLoader.LoadPrefabAsync(template);
+        if (prefab == null)
+            throw new InvalidOperationException("Native card prefab is unavailable.");
+        var root = await NativeCardPrefabLoader.RentInactiveAsync(template, parent);
+        if (root == null)
+            throw new InvalidOperationException("Native card rental failed.");
+        if (!root.TryGetComponent<CardPreviewBase>(out var card))
+        {
+            UnityEngine.Object.Destroy(root);
+            throw new InvalidOperationException("Native card component is unavailable.");
+        }
+        var rental = new NativeBoardCardRental(card, prefab);
+        _rentals.Add(rental);
+        try
+        {
+            await rental.Prepare(template, instance);
+            if (card is CardPreviewItem itemCard)
+                _view!._activeCards.Add(itemCard);
+            else
+                _view!._activeSkills.Add(card);
+        }
+        catch
+        {
+            rental.Dispose();
+            throw;
+        }
+    }
+
     internal void Fit()
     {
+        if (
+            !_disposed
+            && _lastItems != null
+            && _lastSkills != null
+            && !ReferenceEquals(BppStaticDataAccess.TryGetReadyManagerObject(), _catalog)
+        )
+            Render(_lastRequest!, _lastItems, _lastSkills);
+        if (!_fitDirty && _fitFrames <= 0)
+            return;
         if (!_ready || _view == null || _region.rect.width <= 1 || _region.rect.height <= 1)
             return;
+        _fitDirty = false;
+        _fitFrames--;
+        GeometryVersion++;
         var rect = (RectTransform)_view.transform;
         // Fit the carpet itself. Recursive bounds include card frames and stat gems,
         // whose asymmetric overhang moves the center differently for each lineup.
@@ -327,15 +460,12 @@ internal sealed partial class OwnedMonsterBoardPreview : IDisposable
         if (_view == null)
             return;
         _view._visibilitySequence?.Kill();
-        // Native PoolObject only deactivates/registers; it does not detach from this view.
-        // Keep pooled cards out of the hierarchy that is about to be destroyed.
-        foreach (var card in _view._activeCards)
-            if (card != null)
-                card.transform.SetParent(null, false);
-        foreach (var skill in _view._activeSkills)
-            if (skill != null)
-                skill.transform.SetParent(null, false);
-        _view.HandlePooling();
+        EndPointer();
+        foreach (var rental in _rentals)
+            rental.Dispose();
+        _rentals.Clear();
+        _view._activeCards.Clear();
+        _view._activeSkills.Clear();
         if (_ownedSkillParent != null)
             UnityEngine.Object.Destroy(_ownedSkillParent.gameObject);
         _ownedSkillParent = null;

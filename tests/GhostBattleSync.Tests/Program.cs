@@ -17,6 +17,7 @@ await CorruptBundleBecomesPermanentWithoutRepeatedDownload();
 RecorderPerspectiveManifestKeepsSides();
 LegacyPayloadNormalizesOnceAndIsIdempotent();
 UnknownProjectionAndCountsStayUnknown();
+HistoryGhostRecoveryTests.Run();
 
 Console.WriteLine("Ghost battle V5 sync tests passed.");
 
@@ -175,7 +176,15 @@ static async Task ExpiredUrlRefreshesOnceAndBecomesTerminal()
         };
     });
     fixture.Repository.UpsertGhostBattles("account-local", [record]);
-    var localId = fixture.Repository.ListRecentGhostBattles(10).Single().BattleId;
+    var localId = fixture
+        .Repository.ListGhostBattles(
+            "account-local",
+            BazaarPlusPlus.Game.HistoryPanel.GhostBattleFilter.All,
+            false,
+            new()
+        )
+        .Rows.Single()
+        .BattleId;
     var replayRoot = Path.Combine(fixture.Root, "CombatReplays");
 
     var first = await fixture.Service.DownloadReplayAsync(
@@ -221,7 +230,15 @@ static async Task CorruptBundleBecomesPermanentWithoutRepeatedDownload()
             ),
         ]
     );
-    var localId = fixture.Repository.ListRecentGhostBattles(10).Single().BattleId;
+    var localId = fixture
+        .Repository.ListGhostBattles(
+            "account-local",
+            BazaarPlusPlus.Game.HistoryPanel.GhostBattleFilter.All,
+            false,
+            new()
+        )
+        .Rows.Single()
+        .BattleId;
     var replayRoot = Path.Combine(fixture.Root, "CombatReplays");
 
     var first = await fixture.Service.DownloadReplayAsync(
@@ -417,7 +434,14 @@ static void UnknownProjectionAndCountsStayUnknown()
     );
     using var fixture = new GhostFixture(_ => JsonResponse("{\"battles\":[]}"));
     fixture.Repository.UpsertGhostBattles("account-local", [record]);
-    var local = fixture.Repository.ListRecentGhostBattles(10).Single();
+    var local = fixture
+        .Repository.ListGhostBattles(
+            "account-local",
+            BazaarPlusPlus.Game.HistoryPanel.GhostBattleFilter.All,
+            false,
+            new()
+        )
+        .Rows.Single();
     Assert(
         !local.SnapshotCounts.Known,
         "Hand and skill counts must be unknown before replay download."

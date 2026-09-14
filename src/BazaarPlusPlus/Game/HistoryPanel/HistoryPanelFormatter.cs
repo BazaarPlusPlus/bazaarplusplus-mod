@@ -1,6 +1,8 @@
 #nullable enable
 using System.Globalization;
 using BazaarPlusPlus.Game.HistoryPanel.Data;
+using BazaarPlusPlus.Game.HistoryPanel.Storage;
+using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Localization;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;
@@ -16,6 +18,41 @@ internal enum RunOutcomeTier
 
 internal static class HistoryPanelFormatter
 {
+    public static string RunListText(HistoryRunRecord run) =>
+        $"{HistoryPanelHeroPresentation.DisplayName(run.Hero)} · {FormatRunStatus(run.RawStatus)}\n{Mode(run)} · {HistoryPanelText.RankLabel(run.PlayerRank, run.PlayerRating)}\n{run.Victories ?? 0}–{run.Losses ?? 0} · {FormatTimestamp(run.EndedAtUtc ?? run.LastSeenAtUtc)}";
+
+    public static string GhostListText(HistoryBattleRecord battle) =>
+        $"{battle.OpponentName ?? HistoryPanelText.UnknownOpponent()} · {FormatBattleResult(battle)}\n{HistoryPanelText.DayBadge(battle.Day)} · {HistoryPanelText.RankLabel(battle.OpponentRank, battle.OpponentRating)}\n{FormatTimestamp(battle.RecordedAtUtc)}";
+
+    private static string Mode(HistoryRunRecord run) =>
+        run.GameMode.Trim().ToLowerInvariant() switch
+        {
+            "ranked" => LocalizedTextHelpers.Resolve(new LocalizedTextSet("Ranked", "排位")),
+            "unranked" => HistoryPanelText.Unranked(),
+            _ => HistoryPanelText.Unknown(),
+        };
+
+    public static string RunSummary(HistoryRunRecord? run)
+    {
+        if (run == null)
+            return string.Empty;
+        var duration = (run.EndedAtUtc ?? run.LastSeenAtUtc) - run.StartedAtUtc;
+        return $"{HistoryPanelText.DayBadge(run.FinalDay)} · {HistoryPanelText.HourBadge(run.FinalHour)} · {Math.Max(0, (int)duration.TotalHours):00}:{Math.Max(0, duration.Minutes):00} · {Mode(run)} · {HistoryPanelText.RankLabel(run.PlayerRank, run.PlayerRating)}";
+    }
+
+    public static string RunFacts(HistoryRunRecord? run) =>
+        run == null
+            ? string.Empty
+            : $"{HistoryPanelText.StatHealthShort()}  {run.MaxHealth?.ToString() ?? "—"}\n{HistoryPanelText.StatPrestigeShort()}  {run.Prestige?.ToString() ?? "—"}\n{HistoryPanelText.StatLevelShort()}  {run.Level?.ToString() ?? "—"}\n{HistoryPanelText.StatIncomeShort()}  {run.Income?.ToString() ?? "—"}\n{HistoryPanelText.StatGoldShort()}  {run.Gold?.ToString() ?? "—"}";
+
+    public static string PageRange(HistoryCursor? first, HistoryCursor? last) =>
+        first.HasValue
+        && last.HasValue
+        && DateTimeOffset.TryParse(first.Value.Time, out var start)
+        && DateTimeOffset.TryParse(last.Value.Time, out var end)
+            ? $"{FormatTimestamp(start)} → {FormatTimestamp(end)}"
+            : HistoryPanelText.Unknown();
+
     public static string ShortenRunId(string runId)
     {
         if (string.IsNullOrWhiteSpace(runId))
@@ -55,50 +92,26 @@ internal static class HistoryPanelFormatter
             "completed" => HistoryPanelText.Completed(),
             "abandoned" => HistoryPanelText.Abandoned(),
             "active" => HistoryPanelText.Active(),
-            null => HistoryPanelText.Unknown(),
+            null or "" => HistoryPanelText.Unknown(),
             _ => char.ToUpperInvariant(rawStatus[0]) + rawStatus[1..],
         };
     }
 
     public static string FormatBattleResult(HistoryBattleRecord battle)
     {
-        if (string.IsNullOrWhiteSpace(battle.Result))
-            return HistoryPanelText.Unknown();
-
         return IsBattleWin(battle) ? HistoryPanelText.Win()
             : IsBattleLoss(battle) ? HistoryPanelText.Loss()
-            : battle.Result;
+            : HistoryPanelText.Unknown();
     }
 
-    public static bool IsBattleWin(HistoryBattleRecord battle)
-    {
-        return string.Equals(battle.Result, "Win", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(battle.Result, "Won", StringComparison.OrdinalIgnoreCase);
-    }
+    public static bool IsBattleWin(HistoryBattleRecord battle) =>
+        HistoryPanelGhostBattleFilter.ResolveOutcome(battle) == HistoryPanelGhostBattleOutcome.Won;
 
-    public static bool IsBattleLoss(HistoryBattleRecord battle)
-    {
-        return string.Equals(battle.Result, "Loss", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(battle.Result, "Lost", StringComparison.OrdinalIgnoreCase);
-    }
+    public static bool IsBattleLoss(HistoryBattleRecord battle) =>
+        HistoryPanelGhostBattleFilter.ResolveOutcome(battle) == HistoryPanelGhostBattleOutcome.Lost;
 
-    public static bool IsGhostOpponentEliminated(HistoryBattleRecord? battle)
-    {
-        if (battle == null || battle.Source != HistoryBattleSource.Ghost)
-            return false;
-
-        return battle.IsFinalBattle && IsBattleWinFromLocalPerspective(battle);
-    }
-
-    private static bool IsBattleWinFromLocalPerspective(HistoryBattleRecord battle)
-    {
-        return IsBattleWin(battle)
-            || string.Equals(
-                battle.WinnerCombatantId,
-                "Player",
-                StringComparison.OrdinalIgnoreCase
-            );
-    }
+    public static bool IsGhostOpponentEliminated(HistoryBattleRecord? battle) =>
+        battle?.Source == HistoryBattleSource.Ghost && battle.IsFinalBattle && IsBattleWin(battle);
 
     public static string FormatDayOnly(int? day)
     {

@@ -1,4 +1,5 @@
 #nullable enable
+using BazaarPlusPlus.Game.HistoryPanel;
 using BazaarPlusPlus.Game.HistoryPanel.Storage;
 using BazaarPlusPlus.ModApi.Models;
 using BazaarPlusPlus.Storage.Paths;
@@ -29,12 +30,12 @@ try
 
     var repository = new HistoryPanelRepository(databasePath);
     Assert(
-        repository.ListRecentRuns(10).Single().RunId == "run-delete",
+        repository.ListRuns(new(Limit: 10)).Rows.Single().RunId == "run-delete",
         "Fresh V5 run must be visible."
     );
     var deleteResult = repository.DeleteRun("run-delete");
     Assert(
-        repository.ListRecentRuns(10).Count == 0,
+        repository.ListRuns(new(Limit: 10)).Rows.Count == 0,
         "HistoryPanel DeleteRun must delete the source run."
     );
     Assert(
@@ -61,7 +62,9 @@ try
         DateTimeOffset.UtcNow.AddMinutes(1)
     );
     repository.UpsertGhostBattles("account-local", [first]);
-    var local = repository.ListRecentGhostBattles(10).Single();
+    var local = repository
+        .ListGhostBattles("account-local", GhostBattleFilter.All, false, new())
+        .Rows.Single();
     Assert(!local.SnapshotCounts.Known, "Undownloaded Ghost counts must remain unknown.");
     var localId = local.BattleId;
 
@@ -98,6 +101,8 @@ try
     );
 
     AssertRecentRunProjection(databasePath);
+    HistoryPaginationTests.Run(root);
+    HistoryReadSchedulingTests.Run();
     ReplayMaintenanceStorageTests.Run();
     ReplayPayloadRetentionPolicyTests.Run();
     ReplayPayloadOperationGateTests.Run();
@@ -136,10 +141,7 @@ static GhostBattleImportRecord Ghost(
         Result = "unknown",
     };
 
-// ListRecentRuns projects runs joined to their battles. The recency ordering, the limit, and
-// battle_count's exact eligibility rule (LOCAL source, snapshot row present, all four snapshot
-// documents parseable) are what the panel's list renders from, so they are pinned field by field
-// here — independent of how the query reaches them.
+// Summary pages must remain independent of malformed or absent snapshot documents.
 static void AssertRecentRunProjection(string databasePath)
 {
     using var connection = new SqliteConnection($"Data Source={databasePath}");
@@ -176,28 +178,24 @@ static void AssertRecentRunProjection(string databasePath)
 
     var repository = new HistoryPanelRepository(databasePath);
 
-    var localBattles = repository.ListBattlesByRun("run-newest");
+    var localBattles = repository.ListBattles("run-newest", new()).Rows;
     Assert(
         localBattles.Count > 0 && localBattles.All(battle => !battle.ReplayAvailable),
         "History must project evicted local payloads as unavailable instead of hard-coding replay eligibility."
     );
 
-    var all = repository.ListRecentRuns(10);
+    Assert(
+        localBattles.Count == 4 && localBattles.All(b => b.Snapshots == null),
+        "Battle lists must include facts without decoding snapshots."
+    );
+    Assert(
+        repository.LoadSnapshots("run-newest", "b-ok-1") != null,
+        "Selected detail must load its snapshot."
+    );
+    var all = repository.ListRuns(new(Limit: 10)).Rows;
     Assert(
         all.Select(run => run.RunId).SequenceEqual(["run-newest", "run-middle", "run-oldest"]),
         "Runs must order by ended/last-seen/started recency, newest first."
-    );
-    Assert(
-        all.Single(run => run.RunId == "run-newest").BattleCount == 2,
-        "battle_count must count only LOCAL battles whose snapshot documents all parse."
-    );
-    Assert(
-        all.Single(run => run.RunId == "run-middle").BattleCount == 1,
-        "A run with one countable battle must report exactly one."
-    );
-    Assert(
-        all.Single(run => run.RunId == "run-oldest").BattleCount == 0,
-        "A run with no battles must still be listed, with a zero count."
     );
     Assert(
         all.Single(run => run.RunId == "run-newest").Hero == "Vanessa"
@@ -205,14 +203,10 @@ static void AssertRecentRunProjection(string databasePath)
         "Run scalar columns must survive the battle join."
     );
 
-    var limited = repository.ListRecentRuns(2);
+    var limited = repository.ListRuns(new(Limit: 2)).Rows;
     Assert(
         limited.Select(run => run.RunId).SequenceEqual(["run-newest", "run-middle"]),
         "The limit must keep the most recent runs, not an arbitrary pair."
-    );
-    Assert(
-        limited[0].BattleCount == 2,
-        "Limiting the run list must not change any surviving run's battle_count."
     );
 }
 

@@ -19,6 +19,7 @@ internal sealed class LiveBuildPreviewRenderer : IDisposable
     private LiveBuildPanelSnapshot? _snapshot;
     private LiveItemBoardRowVm[] _rowModels = Array.Empty<LiveItemBoardRowVm>();
     private HashSet<Guid> _candidates = new();
+    private readonly Dictionary<BppItemBoardId, int> _markerVersions = new();
 
     internal LiveBuildPreviewRenderer(
         Transform parent,
@@ -40,6 +41,7 @@ internal sealed class LiveBuildPreviewRenderer : IDisposable
 
     internal void Render(LiveBuildPanelSnapshot snapshot)
     {
+        _markerVersions.Clear();
         _snapshot = snapshot;
         _rowModels = snapshot.Rows;
         _candidates = new HashSet<Guid>(snapshot.CandidateTemplateIds);
@@ -56,7 +58,11 @@ internal sealed class LiveBuildPreviewRenderer : IDisposable
                     false,
                     (status, exception) =>
                     {
-                        _view.SetBoardStatus(board.Id, status);
+                        _view.SetBoardStatus(
+                            board.Id,
+                            status,
+                            (exception as NativeBoardPartialFailure)?.Count ?? 0
+                        );
                         if (exception != null)
                             LiveBuildPreviewLogWriter.ReportCardPreview(
                                 new NativeCardPreviewFailure(
@@ -96,6 +102,7 @@ internal sealed class LiveBuildPreviewRenderer : IDisposable
         {
             if (!_rows.TryGetValue(row.Board.Id, out var preview))
                 continue;
+            preview.Fit();
             var template = preview.TrackPointer(pointer ?? new Vector2(-1, -1));
             if (clicked && row.CanToggleCandidates && template.HasValue)
                 selected = template;
@@ -111,6 +118,12 @@ internal sealed class LiveBuildPreviewRenderer : IDisposable
             return;
         foreach (var row in _rowModels)
         {
+            var version = _rows.TryGetValue(row.Board.Id, out var boardPreview)
+                ? boardPreview.GeometryVersion
+                : -1;
+            if (_markerVersions.TryGetValue(row.Board.Id, out var previous) && previous == version)
+                continue;
+            _markerVersions[row.Board.Id] = version;
             _view.BeginMarkers(row.Board.Id);
             if (_rows.TryGetValue(row.Board.Id, out var preview))
             {
@@ -131,6 +144,7 @@ internal sealed class LiveBuildPreviewRenderer : IDisposable
         foreach (var preview in _rows.Values)
             preview.Dispose();
         _rows.Clear();
+        _markerVersions.Clear();
         _snapshot = null;
         _rowModels = Array.Empty<LiveItemBoardRowVm>();
         _candidates.Clear();

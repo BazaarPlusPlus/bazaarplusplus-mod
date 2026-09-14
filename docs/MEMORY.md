@@ -48,7 +48,7 @@ Reuse these patterns.
 
 - Main-menu scene identity is `SceneID.HeroSelectScene`, but the loaded Unity scene is named `MainMenuScene` in current builds. Use `SceneLoader.ActiveScene` and `IsSceneLoaded` for replay return gates; comparing the scene name to `HeroSelectSceneName` silently prevents reopening history. [`src/BazaarPlusPlus/Game/HistoryPanel/HistoryPanel.cs`]
 
-- Owned `MonsterBoardTooltip` clones must inherit the host canvas sorting: the donor has `overrideSorting=true` at order 0, hiding its opaque, correctly loaded cards behind history at order 26. Before destroying a clone, detach its registered cards/skills before `HandlePooling`; native pooling does not reparent them. Fit the carpet from its own four corners: recursive bounds include card/gem overhang and shift opposing boards differently. [`src/BazaarPlusPlus/GameInterop/MonsterBoardPreview/OwnedMonsterBoardPreview.cs`]
+- Owned `MonsterBoardTooltip` clones must inherit the host canvas sorting: the donor has `overrideSorting=true` at order 0, hiding its opaque, correctly loaded cards behind history at order 26. Settle all rentals, restore prefab layout, and detach before returning to the native pool; pooling does not reparent. Fit the carpet from its own four corners: recursive bounds include card/gem overhang and shift opposing boards differently. [`src/BazaarPlusPlus/GameInterop/MonsterBoardPreview/OwnedMonsterBoardPreview.cs`]
 
 Each of these failed silently, or reported something misleading, at least once.
 

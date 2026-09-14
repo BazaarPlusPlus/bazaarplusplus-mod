@@ -101,26 +101,19 @@ internal static partial class HistoryPanelText
 
     internal static string RankLabel(string? rank, int? rating = null)
     {
-        if (string.IsNullOrWhiteSpace(rank))
-            return Unranked();
-
-        var normalized = rank.Trim();
-        if (string.Equals(normalized, "Legendary", StringComparison.OrdinalIgnoreCase))
-            return rating?.ToString() ?? FormatSimple("LEG", "传说", "傳說");
-
-        if (LanguageCodeMatcher.IsChinese(L.CurrentLanguageCode))
-        {
-            return normalized switch
+        var normalized = rank?.Trim();
+        var label = string.IsNullOrEmpty(normalized) ? Unknown() : normalized!.ToUpperInvariant();
+        if (LanguageCodeMatcher.IsChinese(L.CurrentLanguageCode) && normalized != null)
+            label = normalized.ToLowerInvariant() switch
             {
-                "Bronze" => FormatSimple("BRZ", "青铜", "青銅"),
-                "Silver" => FormatSimple("SLV", "白银", "白銀"),
-                "Gold" => FormatSimple("GLD", "黄金", "黃金"),
-                "Diamond" => FormatSimple("DIA", "钻石", "鑽石"),
-                _ => normalized,
+                "bronze" => FormatSimple("BRZ", "青铜", "青銅"),
+                "silver" => FormatSimple("SLV", "白银", "白銀"),
+                "gold" => FormatSimple("GLD", "黄金", "黃金"),
+                "diamond" => FormatSimple("DIA", "钻石", "鑽石"),
+                "legendary" => FormatSimple("LEG", "传说", "傳說"),
+                _ => label,
             };
-        }
-
-        return normalized.ToUpperInvariant();
+        return rating.HasValue ? $"{label} · {rating.Value}" : label;
     }
 
     internal static string SelectRunToDelete()

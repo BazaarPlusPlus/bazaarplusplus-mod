@@ -1,10 +1,8 @@
 #nullable enable
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.HistoryPanel.Data;
-using BazaarPlusPlus.Game.HistoryPanel.Ghost;
 using BazaarPlusPlus.Game.Input;
 using BazaarPlusPlus.Game.OverlayPanels;
-using BazaarPlusPlus.Game.PvpBattles;
 using BazaarPlusPlus.Game.Supporters;
 using BazaarPlusPlus.Infrastructure;
 using TheBazaar;
@@ -21,7 +19,6 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     private bool _returnAfterReplay;
 
     private readonly HistoryPanelState _state = new();
-    private readonly HistoryPanelPayloadFailureLogGate _payloadFailureLogGate = new();
     private HistoryPanelDependencies? _dependencies;
     private HistoryPanelCoordinator? _coordinator;
     private IHistoryPanelRunState? _runState;
@@ -229,55 +226,6 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     }
 
     private void RefreshSelectedBattlePreview() => RefreshNativeHistoryBoards();
-
-    // Ghost replay payload snapshots stay in the uploader's original perspective.
-    // The preview shows the uploader's board, which is stored on the player side.
-    private PvpBattleSnapshots? ResolveGhostSnapshots(HistoryBattleRecord battle)
-    {
-        if (battle.Source != HistoryBattleSource.Ghost)
-            return battle.Snapshots;
-
-        var replayDirectoryPath = _combatReplayDirectoryPath;
-        if (string.IsNullOrWhiteSpace(replayDirectoryPath))
-            return null;
-
-        var ghostPayloadStore = new GhostBattlePayloadStore(
-            GhostBattlePayloadStore.ResolveDirectory(replayDirectoryPath)
-        );
-        var ghostPayloadResult = ghostPayloadStore.LoadDetailed(battle.BattleId);
-        if (ghostPayloadResult.Status == FileBackedPayloadLoadStatus.Invalid)
-        {
-            _payloadFailureLogGate.Report(
-                battle.BattleId,
-                ghostPayloadResult.Fingerprint ?? "unavailable",
-                HistoryPanelPreviewPayloadReasonCode.PayloadInvalid,
-                ghostPayloadResult.Exception
-            );
-            return null;
-        }
-        if (ghostPayloadResult.Status == FileBackedPayloadLoadStatus.Unreadable)
-        {
-            _payloadFailureLogGate.Report(
-                battle.BattleId,
-                ghostPayloadResult.Fingerprint ?? "unavailable",
-                HistoryPanelPreviewPayloadReasonCode.PayloadUnreadable,
-                ghostPayloadResult.Exception
-            );
-            return null;
-        }
-
-        if (
-            ghostPayloadResult.Status == FileBackedPayloadLoadStatus.Missing
-            || ghostPayloadResult.Status == FileBackedPayloadLoadStatus.Loaded
-        )
-            _payloadFailureLogGate.Clear(battle.BattleId);
-        var ghostPayload = GhostBattlePayloadReader.Normalize(ghostPayloadResult.Payload);
-        var snapshots = ghostPayload?.BattleManifest?.Snapshots;
-        if (snapshots == null)
-            return null;
-
-        return snapshots;
-    }
 
     private void EnsureInitialized()
     {

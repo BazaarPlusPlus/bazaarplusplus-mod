@@ -3,6 +3,7 @@ using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.CombatReplay.Video;
 using BazaarPlusPlus.Game.HistoryPanel.Data;
 using BazaarPlusPlus.Game.HistoryPanel.Ghost;
+using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.Infrastructure;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;
@@ -131,7 +132,8 @@ internal sealed class HistoryPanelReplayService
     public async Task<HistoryPanelReplayAttemptResult> ReplayBattleAsync(
         HistoryBattleRecord? battle,
         bool recordVideo,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken,
+        Func<bool>? canCommit = null
     )
     {
         if (battle == null)
@@ -147,7 +149,7 @@ internal sealed class HistoryPanelReplayService
             );
 
         if (battle.Source == HistoryBattleSource.Ghost)
-            return await ReplayGhostBattleAsync(battle, recordVideo, cancellationToken);
+            return await ReplayGhostBattleAsync(battle, recordVideo, cancellationToken, canCommit);
 
         var runtime = _runtimeAccessor();
         if (runtime == null)
@@ -156,6 +158,7 @@ internal sealed class HistoryPanelReplayService
                 HistoryPanelReplayReasonCode.RuntimeUnavailable
             );
 
+        CheckCommit(cancellationToken, canCommit);
         if (!runtime.ReplaySaved(battle.BattleId, recordVideo))
             return HistoryPanelReplayAttemptResult.Failure(
                 HistoryPanelText.ReplayRejectedForBattle(battle.BattleId),
@@ -170,7 +173,8 @@ internal sealed class HistoryPanelReplayService
     private async Task<HistoryPanelReplayAttemptResult> ReplayGhostBattleAsync(
         HistoryBattleRecord battle,
         bool recordVideo,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken,
+        Func<bool>? canCommit = null
     )
     {
         var runtime = _runtimeAccessor();
@@ -212,7 +216,10 @@ internal sealed class HistoryPanelReplayService
         var ghostPayloadStore = new GhostBattlePayloadStore(
             GhostBattlePayloadStore.ResolveDirectory(replayDirectoryPath)
         );
-        var ghostPayloadResult = ghostPayloadStore.LoadDetailed(battle.BattleId);
+        var ghostPayloadResult = await Task.Run(
+            () => ghostPayloadStore.LoadDetailed(battle.BattleId),
+            cancellationToken
+        );
         if (ghostPayloadResult.Status == FileBackedPayloadLoadStatus.Invalid)
         {
             return HistoryPanelReplayAttemptResult.Failure(
@@ -241,7 +248,10 @@ internal sealed class HistoryPanelReplayService
         if (payload == null)
         {
             var payloadStore = new CombatReplayPayloadStore(replayDirectoryPath);
-            var payloadResult = payloadStore.LoadDetailed(battle.BattleId);
+            var payloadResult = await Task.Run(
+                () => payloadStore.LoadDetailed(battle.BattleId),
+                cancellationToken
+            );
             if (payloadResult.Status == FileBackedPayloadLoadStatus.Invalid)
             {
                 return HistoryPanelReplayAttemptResult.Failure(
@@ -265,6 +275,21 @@ internal sealed class HistoryPanelReplayService
                 HistoryPanelReplayReasonCode.ReplayPayloadMissing
             );
 
+        ghostPayload!.ReplayPayload = payload;
+        if (
+            !GhostBattlePayloadReader.MatchesIdentity(
+                ghostPayload,
+                battle.BattleId,
+                BppClientCacheBridge.TryGetProfileAccountId()?.Trim() ?? string.Empty,
+                battle.OpponentAccountId ?? string.Empty
+            )
+        )
+            return HistoryPanelReplayAttemptResult.Failure(
+                HistoryPanelText.GhostManifestUnavailable(battle.BattleId),
+                HistoryPanelReplayReasonCode.GhostBattleMismatch
+            );
+
+        CheckCommit(cancellationToken, canCommit);
         if (!runtime.ReplayImportedBattle(manifest, payload, recordVideo))
             return HistoryPanelReplayAttemptResult.Failure(
                 HistoryPanelText.ReplayRejectedForGhostBattle(battle.BattleId),
@@ -276,6 +301,13 @@ internal sealed class HistoryPanelReplayService
                 ? HistoryPanelText.StartingReplayForBattle(battle.BattleId)
                 : HistoryPanelText.DownloadedAndStartingReplay(battle.BattleId)
         );
+    }
+
+    private static void CheckCommit(CancellationToken token, Func<bool>? canCommit)
+    {
+        token.ThrowIfCancellationRequested();
+        if (canCommit?.Invoke() == false)
+            throw new OperationCanceledException("History selection is no longer active.", token);
     }
 
     public ReplayPayloadCleanupResult CleanupReplayPayloads(IReadOnlyList<string> battleIds)

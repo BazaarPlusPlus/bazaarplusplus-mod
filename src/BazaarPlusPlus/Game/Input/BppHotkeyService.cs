@@ -116,7 +116,10 @@ internal static class BppHotkeyService
         Keyboard? keyboard = null
     )
     {
-        if (BppKeyBindRowController.IsRebindCaptureActive)
+        if (
+            BppKeyBindRowController.IsRebindCaptureActive
+            || GameInterop.Input.NativeTextInputLease.IsActive
+        )
             return false;
 
         var path = GetBindingPath(actionId);

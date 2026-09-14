@@ -24,6 +24,23 @@ public static class RunLogSchema
     public static int CurrentSchemaVersion => LocalDatabaseSchemaVersion;
     public static string DatabaseFileName => PathConstants.RunLogDatabaseFileName;
 
+    // Stable SQL expressions shared by history queries and their expression indexes.
+    public const string HistoryRunTime = "COALESCE(ended_at_utc,last_seen_at_utc,started_at_utc)";
+    public const string HistoryWhitespace =
+        " \t\n\v\f\r\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000";
+    public const string HistoryHeroKey =
+        "CASE lower(trim(hero,'"
+        + HistoryWhitespace
+        + "')) WHEN 'hero8' THEN 'thedragons' ELSE lower(trim(hero,'"
+        + HistoryWhitespace
+        + "')) END";
+    public const string HistoryRecorderOutcome =
+        "CASE lower(trim(winner_combatant_id,'"
+        + HistoryWhitespace
+        + "')) WHEN 'player' THEN 1 WHEN 'opponent' THEN -1 ELSE CASE lower(trim(result,'"
+        + HistoryWhitespace
+        + "')) WHEN 'win' THEN 1 WHEN 'won' THEN 1 WHEN 'loss' THEN -1 WHEN 'lost' THEN -1 ELSE 0 END END";
+
     public static string BootstrapSql =>
         $"""
             PRAGMA foreign_keys = ON;
@@ -236,6 +253,14 @@ public static class RunLogSchema
                 uploaded_at_utc TEXT NULL,
                 CHECK (status IN ('pending', 'uploaded', 'permanent_failure'))
             );
+
+            CREATE INDEX IF NOT EXISTS idx_runs_history_recent ON runs({HistoryRunTime} DESC, run_id DESC);
+            CREATE INDEX IF NOT EXISTS idx_runs_history_hero ON runs({HistoryHeroKey}, {HistoryRunTime} DESC, run_id DESC);
+            CREATE INDEX IF NOT EXISTS idx_battles_history_local ON battles(run_id, recorded_at_utc DESC, battle_id DESC) WHERE source = 'LOCAL';
+            CREATE INDEX IF NOT EXISTS idx_battles_history_ghost ON battles(local_player_account_id, recorded_at_utc DESC, battle_id DESC) WHERE source = 'GHOST' AND deleted_at_utc IS NULL;
+            CREATE INDEX IF NOT EXISTS idx_battles_history_ghost_outcome ON battles(local_player_account_id, {HistoryRecorderOutcome}, recorded_at_utc DESC, battle_id DESC) WHERE source = 'GHOST' AND deleted_at_utc IS NULL;
+            CREATE INDEX IF NOT EXISTS idx_battles_history_ghost_day ON battles(local_player_account_id, recorded_at_utc DESC, battle_id DESC) WHERE source = 'GHOST' AND deleted_at_utc IS NULL AND day >= 10;
+            CREATE INDEX IF NOT EXISTS idx_battles_history_ghost_day_outcome ON battles(local_player_account_id, {HistoryRecorderOutcome}, recorded_at_utc DESC, battle_id DESC) WHERE source = 'GHOST' AND deleted_at_utc IS NULL AND day >= 10;
 
             CREATE INDEX IF NOT EXISTS idx_{RunEventsTableName}_ts_utc
                 ON {RunEventsTableName}(ts_utc);

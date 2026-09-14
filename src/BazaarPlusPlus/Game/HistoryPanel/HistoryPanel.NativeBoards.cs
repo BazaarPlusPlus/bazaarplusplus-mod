@@ -24,10 +24,9 @@ internal sealed partial class HistoryPanel
         if (_hasPreviewContainerBounds)
             _nativePlayerBoard.SetBounds(_previewContainerBounds);
         var battle = ActiveSelectedBattle;
-        var snapshots =
-            _state.SectionMode == HistorySectionMode.Ghost && battle != null
-                ? ResolveGhostSnapshots(battle)
-                : battle?.Snapshots;
+        var snapshots = _state.DetailBattleId == battle?.BattleId ? _state.DetailSnapshots : null;
+        if (_state.DetailLoading)
+            SetPreviewStatus(HistoryPanelText.LoadingPreview(), true);
         var player = HistoryBattlePreviewProjection.BuildPlayer(
             snapshots,
             $"player:{battle?.BattleId}"
@@ -59,6 +58,14 @@ internal sealed partial class HistoryPanel
             _nativeOpponentBoard?.Dispose();
             _nativeOpponentBoard = null;
         }
+        if (_state.DetailLoading || _state.DetailFailed)
+        {
+            var message = _state.DetailLoading
+                ? HistoryPanelText.LoadingPreview()
+                : HistoryPanelText.PreviewRendererInitFailed();
+            SetPreviewStatus(message, true);
+            _uiView.SetOpponentStatus(message);
+        }
     }
 
     private OwnedMonsterBoardPreview CreateNativeHistoryBoard(bool opponent) =>
@@ -73,8 +80,15 @@ internal sealed partial class HistoryPanel
                     NativeMonsterBoardStatus.Loading => HistoryPanelText.LoadingPreview(),
                     NativeMonsterBoardStatus.Empty => HistoryPanelText.NoLocallyRenderableCards(),
                     NativeMonsterBoardStatus.Failed => HistoryPanelText.PreviewRendererInitFailed(),
+                    NativeMonsterBoardStatus.Partial => HistoryPanelText.PartialPreview(
+                        (exception as NativeBoardPartialFailure)?.Count ?? 1
+                    ),
                     _ => string.Empty,
                 };
+                if (_state.DetailLoading)
+                    message = HistoryPanelText.LoadingPreview();
+                else if (_state.DetailFailed)
+                    message = HistoryPanelText.PreviewRendererInitFailed();
                 if (opponent)
                     _uiView?.SetOpponentStatus(message);
                 else
