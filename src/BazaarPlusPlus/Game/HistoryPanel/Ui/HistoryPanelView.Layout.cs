@@ -16,6 +16,10 @@ internal sealed partial class HistoryPanelView
         internal Button Button = null!;
         internal Image Portrait = null!;
         internal Image Badge = null!;
+        internal Image RankBadge = null!;
+        internal TextMeshProUGUI Rating = null!;
+        internal TextMeshProUGUI UnknownResult = null!;
+        internal TextMeshProUGUI UnknownRank = null!;
         internal string? Hero;
         internal string? Id;
     }
@@ -53,6 +57,14 @@ internal sealed partial class HistoryPanelView
     private TextMeshProUGUI _factsText = null!;
     private bool _factsVisible;
     private HistorySectionMode? _boundSection;
+    private Image _detailOutcome = null!,
+        _detailRank = null!,
+        _summaryRank = null!;
+    private TextMeshProUGUI _detailRating = null!,
+        _summaryRating = null!,
+        _detailUnknownOutcome = null!,
+        _detailUnknownRank = null!,
+        _summaryUnknownRank = null!;
 
     private void CreateLayout()
     {
@@ -134,7 +146,7 @@ internal sealed partial class HistoryPanelView
             Muted
         );
         _archiveList = CreatePageList("Archive", .035f, .225f, .245f, .595f, 116, false);
-        _timeline = CreatePageList("BattleTimeline", .285f, .225f, .095f, .595f, 58, true);
+        _timeline = CreatePageList("BattleTimeline", .285f, .225f, .095f, .595f, 74, true);
         _newer = Button(
             _layout,
             T("Newer", "较新"),
@@ -194,9 +206,18 @@ internal sealed partial class HistoryPanelView
             }
         );
         _heading = Text(_layout, "", .4f, .21f, .54f, .055f, 24, Ink, true);
-        _metadata = Text(_layout, "", .4f, .265f, .54f, .045f, 14, Muted, true);
+        var detailStatus = CreateRect("BattleStatus", _layout, .4f, .265f, .54f, .045f);
+        _detailOutcome = Badge(detailStatus, "BattleResult", 0, .05f, .055f, .9f);
+        _detailUnknownOutcome = Text(detailStatus, "?", 0, .05f, .055f, .9f, 16, Muted, true);
+        _detailRank = Badge(detailStatus, "OpponentRank", .07f, 0, .06f, 1);
+        _detailUnknownRank = Text(detailStatus, "?", .07f, 0, .06f, 1, 16, Muted, true);
+        _detailRating = Text(detailStatus, "", .14f, 0, .18f, 1, 14, Ink);
+        _metadata = Text(detailStatus, "", .33f, 0, .67f, 1, 14, Muted);
         _metadata.textWrappingMode = TextWrappingModes.Normal;
-        _runSummary = Text(_layout, "", .4f, .153f, .45f, .045f, 13, Muted);
+        _runSummary = Text(_layout, "", .4f, .153f, .32f, .045f, 13, Muted);
+        _summaryRank = Badge(_layout, "PlayerRank", .724f, .148f, .031f, .054f);
+        _summaryUnknownRank = Text(_layout, "?", .724f, .148f, .031f, .054f, 16, Muted, true);
+        _summaryRating = Text(_layout, "", .762f, .153f, .085f, .045f, 13, Ink);
         _runFacts = Button(
             _layout,
             T("Run data", "本局数据"),
@@ -284,23 +305,36 @@ internal sealed partial class HistoryPanelView
                 ? TextAlignmentOptions.Center
                 : TextAlignmentOptions.MidlineLeft;
             label.textWrappingMode = TextWrappingModes.Normal;
-            label.rectTransform.anchorMin = new Vector2(timeline ? .04f : .26f, .06f);
-            label.rectTransform.anchorMax = new Vector2(.95f, .94f);
+            label.rectTransform.anchorMin = new Vector2(
+                timeline ? .04f : .26f,
+                timeline ? .38f : .06f
+            );
+            label.rectTransform.anchorMax = new Vector2(timeline ? .31f : .77f, .94f);
             var portrait = CreateRect("Hero", rect, .025f, .11f, .21f, .70f)
                 .gameObject.AddComponent<Image>();
             portrait.raycastTarget = false;
             portrait.preserveAspect = true;
             portrait.color = Color.clear;
-            var badge = CreateRect("Outcome", rect, .86f, .02f, .13f, .22f)
-                .gameObject.AddComponent<Image>();
-            badge.raycastTarget = false;
-            badge.preserveAspect = true;
-            badge.color = Color.clear;
+            var badge = timeline
+                ? Badge(rect, "Outcome", .33f, .08f, .26f, .52f)
+                : Badge(rect, "Outcome", .82f, .71f, .14f, .25f);
+            var rank = timeline
+                ? Badge(rect, "Rank", .65f, .05f, .31f, .56f)
+                : Badge(rect, "Rank", .80f, .05f, .18f, .45f);
+            var unknownResult = Text(badge.transform, "?", 0, 0, 1, 1, 14, Muted, true);
+            var unknownRank = Text(rank.transform, "?", 0, 0, 1, 1, 14, Muted, true);
+            var rating = timeline
+                ? Text(rect, "", .04f, .66f, .92f, .24f, 11, Ink, true)
+                : Text(rect, "", .77f, .49f, .22f, .18f, 10, Ink, true);
             list.Rows[i] = new Row
             {
                 Button = button,
                 Portrait = portrait,
                 Badge = badge,
+                RankBadge = rank,
+                Rating = rating,
+                UnknownResult = unknownResult,
+                UnknownRank = unknownRank,
             };
             button.gameObject.SetActive(false);
         }
@@ -313,6 +347,8 @@ internal sealed partial class HistoryPanelView
         Func<int, string> label,
         Func<int, string?> hero,
         Func<int, Sprite?> badge,
+        Func<int, string?> rank,
+        Func<int, int?> rating,
         int selected
     )
     {
@@ -335,6 +371,8 @@ internal sealed partial class HistoryPanelView
             SetButton(row.Button, label(i), i == selected, !_model!.PageLoading);
             row.Badge.sprite = badge(i);
             row.Badge.color = row.Badge.sprite != null ? Color.white : Color.clear;
+            row.UnknownResult.gameObject.SetActive(row.Badge.sprite == null);
+            BindRank(row.RankBadge, row.Rating, row.UnknownRank, rank(i), rating(i));
             var name = hero(i);
             if (row.Hero != name)
             {
@@ -433,6 +471,8 @@ internal sealed partial class HistoryPanelView
                 i => HistoryPanelFormatter.RunListText(m.Runs[i]),
                 i => m.Runs[i].Hero,
                 i => RunBadge(m.Runs[i]),
+                i => m.Runs[i].PlayerRank,
+                i => m.Runs[i].PlayerRating,
                 m.SelectedRunIndex
             );
         else
@@ -441,39 +481,103 @@ internal sealed partial class HistoryPanelView
                 m.VisibleBattles.Select(b => b.BattleId).ToArray(),
                 i => HistoryPanelFormatter.GhostListText(m.VisibleBattles[i]),
                 i => m.VisibleBattles[i].OpponentHero,
-                i =>
-                    HistoryPanelFormatter.IsBattleWin(m.VisibleBattles[i]) ? _winBadge
-                    : HistoryPanelFormatter.IsBattleLoss(m.VisibleBattles[i]) ? _lossBadge
-                    : null,
+                i => BattleBadge(m.VisibleBattles[i]),
+                i => m.VisibleBattles[i].OpponentRank,
+                i => m.VisibleBattles[i].OpponentRating,
                 m.SelectedBattleIndex
             );
         if (runs)
             BindRows(
                 _timeline,
                 m.VisibleBattles.Select(b => b.BattleId).ToArray(),
-                i =>
-                    $"{HistoryPanelFormatter.FormatDayOnly(m.VisibleBattles[i].Day)} · {HistoryPanelFormatter.FormatBattleResult(m.VisibleBattles[i])}",
+                i => HistoryPanelFormatter.FormatDayOnly(m.VisibleBattles[i].Day),
                 _ => null,
-                _ => null,
+                i => BattleBadge(m.VisibleBattles[i]),
+                i => m.VisibleBattles[i].OpponentRank,
+                i => m.VisibleBattles[i].OpponentRating,
                 m.SelectedBattleIndex
             );
         _heading.text = m.DetailOpponentName;
+        var battle = m.DetailBattle;
+        _detailOutcome.gameObject.SetActive(battle != null);
+        _detailOutcome.sprite = BattleBadge(battle);
+        _detailOutcome.color = _detailOutcome.sprite != null ? Color.white : Color.clear;
+        _detailUnknownOutcome.gameObject.SetActive(battle != null && _detailOutcome.sprite == null);
+        _detailRank.gameObject.SetActive(battle != null);
+        _detailRating.gameObject.SetActive(battle != null);
+        BindRank(
+            _detailRank,
+            _detailRating,
+            _detailUnknownRank,
+            battle?.OpponentRank,
+            battle?.OpponentRating
+        );
+        _detailUnknownRank.gameObject.SetActive(battle != null && _detailRank.sprite == null);
         _metadata.text =
-            m.DetailResultText
-            + " · "
-            + m.DetailMetaText
+            m.DetailMetaText
             + (
                 string.IsNullOrEmpty(m.GhostOpponentEliminatedNoticeText)
                     ? ""
                     : "\n" + m.GhostOpponentEliminatedNoticeText
             );
         _runSummary.text = m.RunSummary;
+        var run = runs ? m.Runs.ElementAtOrDefault(m.SelectedRunIndex) : null;
+        _summaryRank.gameObject.SetActive(run != null);
+        _summaryRating.gameObject.SetActive(run != null);
+        BindRank(
+            _summaryRank,
+            _summaryRating,
+            _summaryUnknownRank,
+            run?.PlayerRank,
+            run?.PlayerRating
+        );
+        _summaryUnknownRank.gameObject.SetActive(run != null && _summaryRank.sprite == null);
         _runFacts.gameObject.SetActive(runs && m.Runs.Count > 0);
         _statusLabel.text = m.StatusMessage ?? "";
         _statusLabel.color = StatusColor(m.StatusSeverity);
         _supporterAttribution?.Bind(m.Supporters, HistoryPanelText.Subtitle());
         RefreshActions();
         UpdateFacts();
+    }
+
+    private static Image Badge(
+        Transform parent,
+        string name,
+        float x,
+        float y,
+        float width,
+        float height
+    )
+    {
+        var image = CreateRect(name, parent, x, y, width, height).gameObject.AddComponent<Image>();
+        image.raycastTarget = false;
+        image.preserveAspect = true;
+        image.color = Color.clear;
+        return image;
+    }
+
+    private Sprite? BattleBadge(HistoryBattleRecord? battle) =>
+        battle == null ? null
+        : HistoryPanelFormatter.IsBattleWin(battle) ? _winBadge
+        : HistoryPanelFormatter.IsBattleLoss(battle) ? _lossBadge
+        : null;
+
+    private void BindRank(
+        Image badge,
+        TextMeshProUGUI ratingLabel,
+        TextMeshProUGUI unknown,
+        string? rank,
+        int? rating
+    )
+    {
+        badge.sprite = _rankBadges.Get(rank);
+        badge.color = badge.sprite != null ? Color.white : Color.clear;
+        unknown.gameObject.SetActive(badge.sprite == null);
+        ratingLabel.text =
+            string.Equals(rank?.Trim(), "Legendary", StringComparison.OrdinalIgnoreCase)
+            && rating.HasValue
+                ? $"ELO {rating.Value}"
+                : string.Empty;
     }
 
     private void CreateFacts()

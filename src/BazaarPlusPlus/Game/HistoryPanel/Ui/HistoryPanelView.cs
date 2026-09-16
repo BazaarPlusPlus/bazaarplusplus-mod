@@ -2,6 +2,7 @@
 using BazaarPlusPlus.GameInterop.AssetLoading;
 using BazaarPlusPlus.GameInterop.Fonts;
 using BazaarPlusPlus.GameInterop.HeroPortraits;
+using BazaarPlusPlus.GameInterop.Ranks;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using BazaarPlusPlus.Localization;
@@ -58,6 +59,7 @@ internal sealed partial class HistoryPanelView : IDisposable
     private Sprite? _lossBadge;
     private Texture2D? _stateAtlas;
     private Sprite[] _stateBadges = Array.Empty<Sprite>();
+    private readonly NativeRankBadgeProvider _rankBadges = new();
     private HistoryPanelViewModel? _model;
     private bool _visible;
     private bool _disposed;
@@ -197,6 +199,8 @@ internal sealed partial class HistoryPanelView : IDisposable
         if (!_visible || _disposed)
             return;
         EnsureCreated();
+        if (_rankBadges.Tick())
+            UpdateContent();
         if (
             (_skin == null || _skin.Any(sprite => sprite == null))
             && _skinLoad == null

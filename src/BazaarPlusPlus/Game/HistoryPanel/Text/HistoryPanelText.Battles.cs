@@ -23,10 +23,6 @@ internal static partial class HistoryPanelText
         "當前戰鬥"
     );
 
-    private static readonly LocalizedTextSet WinText = new("Win", "胜利", "勝利");
-
-    private static readonly LocalizedTextSet LossText = new("Loss", "失败", "失敗");
-
     private static readonly LocalizedTextSet GhostOpponentEliminatedNoticeText = new(
         "After this battle, the challenger is eliminated.",
         "打完这场战斗后，挑战者直接出局。",
@@ -44,10 +40,6 @@ internal static partial class HistoryPanelText
     internal static string SelectBattleForFooter() => Resolve(SelectBattleForFooterText);
 
     internal static string SelectedBattle() => Resolve(SelectedBattleText);
-
-    internal static string Win() => Resolve(WinText);
-
-    internal static string Loss() => Resolve(LossText);
 
     internal static string GhostOpponentEliminatedNotice() =>
         Resolve(GhostOpponentEliminatedNoticeText);
