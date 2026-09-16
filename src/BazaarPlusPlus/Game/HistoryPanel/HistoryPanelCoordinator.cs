@@ -68,7 +68,6 @@ internal sealed partial class HistoryPanelCoordinator : IDisposable
         RefreshAccountLinkIdentityFromGame();
         if (previousAccount != _state.CachedAccountId)
         {
-            _state.GhostBattles.Clear();
             _state.GhostPage = HistoryPage<HistoryBattleRecord>.Empty;
             _state.SelectedGhostBattleIndex = 0;
         }

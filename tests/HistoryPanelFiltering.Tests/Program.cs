@@ -16,10 +16,6 @@ var snapshotCountsType = RequireType(
 );
 var battleSourceType = RequireType("BazaarPlusPlus.Game.HistoryPanel.Data.HistoryBattleSource");
 var ghostFilterType = RequireType("BazaarPlusPlus.Game.HistoryPanel.GhostBattleFilter");
-var ghostBattleFilterType = RequireType(
-    "BazaarPlusPlus.Game.HistoryPanel.HistoryPanelGhostBattleFilter"
-);
-var runHeroFilterType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanelRunHeroFilter");
 var heroPresentationType = RequireType(
     "BazaarPlusPlus.Game.HistoryPanel.HistoryPanelHeroPresentation"
 );
@@ -29,84 +25,15 @@ var dataServiceType = RequireType(
     "BazaarPlusPlus.Game.HistoryPanel.Storage.HistoryPanelDataService"
 );
 
-TestRunHeroFilterShowsAllWhenEmpty();
-TestRunHeroFilterMatchesCaseInsensitiveHeroOnly();
-TestRunHeroFilterMatchesLegacyOnlyHistory();
-TestRunHeroFilterMatchesCanonicalOnlyHistory();
-TestRunHeroFilterMatchesMixedAliasHistoryWithoutRewritingRecords();
-TestRunHeroFilterRejectsHistoryWithoutTheDragons();
 TestRunHeroRosterAddsOneCanonicalTheDragonsAfterTheExistingSeven();
 TestRunHeroPresentationTreatsAliasesAsSelectedAndDisplaysCanonicalName();
 TestCoordinatorCanonicalizesAliasFilterState();
 TestStateSelectedRunUsesFilteredRunList();
+TestPageReplacementUpdatesSelection();
 TestCoordinatorRunSelectionUsesFilteredSpace();
 TestReplayReturnPreservesSelectionAndFilters();
-TestGhostDayFilterRequiresDayTenOrLaterAndKeepsOutcomeFilter();
 
 Console.WriteLine("HistoryPanelFiltering checks passed.");
-
-void TestRunHeroFilterShowsAllWhenEmpty()
-{
-    var run = CreateRun("run-1", "Vanessa");
-
-    Assert(RunHeroMatches(null, run), "Null hero filter should include every run.");
-    Assert(RunHeroMatches("", run), "Empty hero filter should include every run.");
-}
-
-void TestRunHeroFilterMatchesCaseInsensitiveHeroOnly()
-{
-    var vanessa = CreateRun("run-1", "Vanessa");
-    var mak = CreateRun("run-2", "Mak");
-
-    Assert(RunHeroMatches("vanessa", vanessa), "Hero matching should ignore case.");
-    Assert(!RunHeroMatches("Vanessa", mak), "Hero filter should exclude other heroes.");
-}
-
-void TestRunHeroFilterMatchesLegacyOnlyHistory()
-{
-    var legacy = CreateRun("legacy", "Hero8");
-
-    Assert(
-        RunHeroMatches("TheDragons", legacy),
-        "The canonical filter should include legacy-only The Dragons history."
-    );
-}
-
-void TestRunHeroFilterMatchesCanonicalOnlyHistory()
-{
-    var canonical = CreateRun("canonical", "TheDragons");
-
-    Assert(
-        RunHeroMatches("Hero8", canonical),
-        "The legacy filter input should include canonical-only The Dragons history."
-    );
-}
-
-void TestRunHeroFilterMatchesMixedAliasHistoryWithoutRewritingRecords()
-{
-    var legacy = CreateRun("legacy", "Hero8");
-    var canonical = CreateRun("canonical", "TheDragons");
-    var records = new[] { legacy, canonical };
-
-    var matches = records.Where(run => RunHeroMatches("TheDragons", run)).ToArray();
-
-    Assert(matches.Length == 2, "A canonical filter should include both alias forms.");
-    Assert(GetString(legacy, "Hero") == "Hero8", "Filtering must not rewrite the legacy run hero.");
-    Assert(
-        GetString(canonical, "Hero") == "TheDragons",
-        "Filtering must not rewrite the canonical run hero."
-    );
-}
-
-void TestRunHeroFilterRejectsHistoryWithoutTheDragons()
-{
-    var vanessa = CreateRun("vanessa", "Vanessa");
-
-    Assert(
-        !RunHeroMatches("TheDragons", vanessa),
-        "The Dragons filter should reject history with no matching alias."
-    );
-}
 
 void TestRunHeroRosterAddsOneCanonicalTheDragonsAfterTheExistingSeven()
 {
@@ -207,13 +134,47 @@ void TestStateSelectedRunUsesFilteredRunList()
     Assert(GetString(selected, "RunId") == "raw-3", "Selected run should come from filtered runs.");
 }
 
+void TestPageReplacementUpdatesSelection()
+{
+    foreach (var pageName in new[] { "RunPage", "BattlePage", "GhostPage" })
+    {
+        var state = Activator.CreateInstance(stateType)!;
+        var isRun = pageName == "RunPage";
+        var rowsName =
+            isRun ? "Runs"
+            : pageName == "BattlePage" ? "Battles"
+            : "GhostBattles";
+        var selectedMethod =
+            isRun ? "GetSelectedRun"
+            : pageName == "BattlePage" ? "GetSelectedBattle"
+            : "GetSelectedGhostBattle";
+        object? Selected() =>
+            rowsName == "Battles"
+                ? Invoke(stateType, state, selectedMethod)
+                : Invoke(stateType, state, selectedMethod, GetList(state, rowsName));
+        var first = isRun ? CreateRun("first", "Vanessa") : CreateBattle("first", 10, "Won");
+        var next = isRun ? CreateRun("next", "Mak") : CreateBattle("next", 12, "Lost");
+        SetPage(state, pageName, first);
+        Assert(ReferenceEquals(Selected(), first), "Selection must read the published page.");
+        SetPage(state, pageName, next);
+        Assert(
+            GetList(state, rowsName).Count == 1 && ReferenceEquals(Selected(), next),
+            "Replacing a page must replace its visible rows and selection together."
+        );
+        SetPage(state, pageName);
+        Assert(
+            GetList(state, rowsName).Count == 0 && Selected() == null,
+            "Clearing a page must not retain a row selected from the previous page."
+        );
+    }
+}
+
 void TestCoordinatorRunSelectionUsesFilteredSpace()
 {
     var state =
         Activator.CreateInstance(stateType)
         ?? throw new InvalidOperationException("HistoryPanelState should construct.");
-    GetList(state, "Runs").Add(CreateRun("raw-1", "Vanessa"));
-    GetList(state, "Runs").Add(CreateRun("raw-3", "Vanessa"));
+    SetPage(state, "RunPage", CreateRun("raw-1", "Vanessa"), CreateRun("raw-3", "Vanessa"));
     stateType.GetProperty("SelectedRunHero")!.SetValue(state, "Vanessa");
 
     var dataService = Construct(dataServiceType, null, null);
@@ -245,10 +206,8 @@ void TestReplayReturnPreservesSelectionAndFilters()
     var firstRun = CreateRun("run-1", "Vanessa");
     var selectedRun = CreateRun("run-2", "Vanessa");
     var selectedBattle = CreateBattle("battle-2", 12, "Lost");
-    GetList(state, "Runs").Add(firstRun);
-    GetList(state, "Runs").Add(selectedRun);
-    GetList(state, "Battles").Add(CreateBattle("battle-1", 11, "Won"));
-    GetList(state, "Battles").Add(selectedBattle);
+    SetPage(state, "RunPage", firstRun, selectedRun);
+    SetPage(state, "BattlePage", CreateBattle("battle-1", 11, "Won"), selectedBattle);
     stateType.GetProperty("SelectedRunIndex")!.SetValue(state, 1);
     stateType.GetProperty("SelectedBattleIndex")!.SetValue(state, 1);
     stateType.GetProperty("SelectedGhostBattleIndex")!.SetValue(state, 2);
@@ -352,6 +311,21 @@ void TestReplayReturnPreservesSelectionAndFilters()
                 && !ReferenceEquals(GetList(state, "Runs")[0], selectedRun),
             "A normal panel open must read persisted records."
         );
+
+        SetPage(state, "GhostPage", CreateBattle("previous-account-battle", 12, "Won"));
+        stateType.GetProperty("CachedAccountId")!.SetValue(state, "previous-account");
+        Invoke(coordinatorType, coordinator, "Tick", 0f);
+        Assert(
+            GetList(state, "GhostBattles").Count == 0
+                && Invoke(
+                    stateType,
+                    state,
+                    "GetSelectedGhostBattle",
+                    GetList(state, "GhostBattles")
+                ) == null,
+            "An account change must immediately clear the old Ghost page and its selection."
+        );
+        Invoke(coordinatorType, coordinator, "OnPanelHidden");
     }
     finally
     {
@@ -361,48 +335,6 @@ void TestReplayReturnPreservesSelectionAndFilters()
         File.Delete(databasePath);
     }
 }
-
-void TestGhostDayFilterRequiresDayTenOrLaterAndKeepsOutcomeFilter()
-{
-    var all = Enum.Parse(ghostFilterType, "All");
-    var won = Enum.Parse(ghostFilterType, "IWon");
-    var lost = Enum.Parse(ghostFilterType, "ILost");
-
-    Assert(
-        GhostMatches(all, true, CreateBattle("day-10-win", 10, "Won")),
-        "Day >= 10 should pass the day filter."
-    );
-    Assert(
-        GhostMatches(all, true, CreateBattle("day-12-loss", 12, "Lost")),
-        "Day > 10 should pass the day filter."
-    );
-    Assert(
-        !GhostMatches(all, true, CreateBattle("day-9-win", 9, "Won")),
-        "Day 9 should fail the day filter."
-    );
-    Assert(
-        !GhostMatches(all, true, CreateBattle("day-null-win", null, "Won")),
-        "Null day should fail the day filter."
-    );
-    Assert(
-        GhostMatches(won, true, CreateBattle("day-10-win", 10, "Won")),
-        "Day filter should preserve IWon matches."
-    );
-    Assert(
-        !GhostMatches(won, true, CreateBattle("day-10-loss", 10, "Lost")),
-        "Day filter should still exclude losses from IWon."
-    );
-    Assert(
-        GhostMatches(lost, true, CreateBattle("day-10-loss", 10, "Lost")),
-        "Day filter should preserve ILost matches."
-    );
-}
-
-bool RunHeroMatches(string? selectedHero, object run) =>
-    (bool)InvokeStatic(runHeroFilterType, "Matches", selectedHero, run)!;
-
-bool GhostMatches(object filter, bool dayMin10, object battle) =>
-    (bool)InvokeStatic(ghostBattleFilterType, "Matches", filter, dayMin10, battle)!;
 
 object CreateRun(string runId, string hero)
 {
@@ -462,7 +394,6 @@ object CreateBattle(string battleId, int? day, string result)
             null,
             null,
             counts,
-            null,
             false,
             Enum.Parse(battleSourceType, "Ghost"),
             false,
@@ -477,6 +408,15 @@ IList CreateRunList(params object[] runs)
     foreach (var run in runs)
         list.Add(run);
     return list;
+}
+
+void SetPage(object state, string propertyName, params object[] records)
+{
+    var property = stateType.GetProperty(propertyName)!;
+    var rows = Array.CreateInstance(property.PropertyType.GetGenericArguments()[0], records.Length);
+    for (var i = 0; i < records.Length; i++)
+        rows.SetValue(records[i], i);
+    property.SetValue(state, Construct(property.PropertyType, rows, null, null, false, false));
 }
 
 IList GetList(object instance, string propertyName) =>

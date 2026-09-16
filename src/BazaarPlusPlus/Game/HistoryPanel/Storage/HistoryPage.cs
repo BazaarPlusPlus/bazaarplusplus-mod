@@ -20,4 +20,12 @@ internal sealed record HistoryPage<T>(
 )
 {
     internal static HistoryPage<T> Empty { get; } = new(Array.Empty<T>(), null, null, false, false);
+
+    internal int FindIndex(Predicate<T> match)
+    {
+        for (var i = 0; i < Rows.Count; i++)
+            if (match(Rows[i]))
+                return i;
+        return -1;
+    }
 }

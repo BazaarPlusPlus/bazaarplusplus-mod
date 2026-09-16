@@ -14,14 +14,6 @@ internal static class HistoryPanelLogEvents
         [MountDependency, MountReasonCode]
     );
 
-    internal static readonly BppLogFieldDefinition DataDataset = PublicLow(0, "dataset");
-    internal static readonly BppLogFieldDefinition DataRunId = PublicHighShort(1, "run_id");
-    internal static readonly BppLogEventDefinition DataLoadFailed = new(
-        BppLogFeatureScope.HistoryPanel,
-        "history_panel.data.load_failed",
-        [DataDataset, DataRunId]
-    );
-
     internal static readonly BppLogFieldDefinition ReplayRequestId = PublicHighShort(
         0,
         "request_id"

@@ -62,8 +62,7 @@ internal sealed partial class HistoryPanelRepository
             reader =>
                 HistoryPanelRowMapper.ReadLocalBattle(
                     reader,
-                    reader.GetString(reader.GetOrdinal("battle_id")),
-                    null
+                    reader.GetString(reader.GetOrdinal("battle_id"))
                 ),
             ("$runId", runId)
         );

@@ -12,25 +12,6 @@ internal enum HistoryPanelGhostBattleOutcome
 
 internal static class HistoryPanelGhostBattleFilter
 {
-    public static bool Matches(GhostBattleFilter filter, HistoryBattleRecord battle)
-    {
-        var outcome = ResolveOutcome(battle);
-        return filter switch
-        {
-            GhostBattleFilter.IWon => outcome == HistoryPanelGhostBattleOutcome.Won,
-            GhostBattleFilter.ILost => outcome == HistoryPanelGhostBattleOutcome.Lost,
-            _ => true,
-        };
-    }
-
-    public static bool Matches(GhostBattleFilter filter, bool dayMin10, HistoryBattleRecord battle)
-    {
-        if (!Matches(filter, battle))
-            return false;
-
-        return !dayMin10 || (battle.Day.HasValue && battle.Day.Value >= 10);
-    }
-
     internal static HistoryPanelGhostBattleOutcome ResolveOutcome(HistoryBattleRecord battle)
     {
         if (

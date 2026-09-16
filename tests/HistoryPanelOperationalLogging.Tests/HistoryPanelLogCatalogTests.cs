@@ -15,7 +15,6 @@ public sealed class HistoryPanelLogCatalogTests
         var expected = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["history_panel.mount.failed"] = "dependency:Low:None|reason_code:Low:None",
-            ["history_panel.data.load_failed"] = "dataset:Low:None|run_id:High:Short",
             ["history_panel.replay.preflight_completed"] =
                 "request_id:High:Short|battle_id:High:Short|record_video:Low:None|can_record:Low:None|reason_code:Low:None",
             ["history_panel.replay.failed"] =

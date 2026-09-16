@@ -12,6 +12,7 @@ internal static class HistoryPaginationTests
     {
         foreach (var size in new[] { 1000, 10000 })
             CheckRuns(Path.Combine(root, $"pages-{size}.sqlite3"), size);
+        CheckFilterCases(Path.Combine(root, "filter-cases.sqlite3"));
     }
 
     private static void CheckRuns(string path, int count)
@@ -106,10 +107,8 @@ internal static class HistoryPaginationTests
         );
         var battlePage = repository.ListBattles(expected[0], new(Limit: 3));
         Check(
-            battlePage.Rows.Count == 3
-                && battlePage.HasOlder
-                && battlePage.Rows.All(b => b.Snapshots == null),
-            "Battle summary pages must be bounded and avoid decoding snapshots."
+            battlePage.Rows.Count == 3 && battlePage.HasOlder,
+            "Battle summary pages must be bounded."
         );
         Check(
             repository.LoadSnapshots(expected[0], battlePage.Rows[0].BattleId) != null,
@@ -221,6 +220,88 @@ internal static class HistoryPaginationTests
             repository.RestoreHiddenGhost(hidden),
             "Unchanged matching recovery candidate must become visible."
         );
+    }
+
+    private static void CheckFilterCases(string path)
+    {
+        using var db = new SqliteConnection($"Data Source={path}");
+        db.Open();
+        RunLogSchema.EnsureInitialized(db);
+        Execute(
+            db,
+            """
+            INSERT INTO runs (run_id,hero,game_mode,status,started_at_utc,last_seen_at_utc)
+            VALUES ('legacy','Hero8','Ranked','completed','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z'),
+                ('canonical','TheDragons','Ranked','completed','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z'),
+                ('other','Vanessa','Ranked','completed','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z');
+            WITH days(day) AS (VALUES(NULL),(9),(10),(12)),
+                outcomes(name,winner,result) AS (
+                    VALUES('win',NULL,' Lost '),('loss',NULL,' WoN '),
+                        ('winner-win',' OpPoNeNt ','won'),('winner-loss',' PLAYER ','loss'),
+                        ('unknown',NULL,'unknown')
+                )
+            INSERT INTO battles (battle_id,source,remote_battle_id,uploader_account_id,local_player_account_id,recorded_at_utc,day,winner_combatant_id,result,combat_kind)
+            SELECT coalesce(day,'null')||'-'||name,'GHOST',coalesce(day,'null')||'-'||name,'uploader','account','2026-01-01T00:00:00Z',
+                day,winner,result,'PVPCombat' FROM days,outcomes;
+            """
+        );
+        var repository = new HistoryPanelRepository(path);
+        foreach (var hero in new string?[] { null, "", " " })
+            Check(
+                repository.ListRuns(new(), hero).Rows.Count == 3,
+                "An empty hero selection must include every run."
+            );
+        foreach (var hero in new[] { "TheDragons", "Hero8", "tHeDrAgOnS" })
+        {
+            var rows = repository.ListRuns(new(), hero).Rows;
+            Check(
+                rows.Select(r => r.RunId).OrderBy(id => id).SequenceEqual(["canonical", "legacy"])
+                    && rows.Single(r => r.RunId == "canonical").Hero == "TheDragons"
+                    && rows.Single(r => r.RunId == "legacy").Hero == "Hero8",
+                "Either hero alias must select both stored forms without rewriting their values."
+            );
+        }
+        Check(
+            repository.ListRuns(new(), "vanessa").Rows.Single().RunId == "other"
+                && repository.ListRuns(new(), "Mak").Rows.Count == 0,
+            "Hero filtering must ignore case and exclude other heroes."
+        );
+        foreach (var dayMin10 in new[] { false, true })
+        {
+            var days = dayMin10 ? new[] { "10", "12" } : ["null", "9", "10", "12"];
+            foreach (
+                var (filter, outcomes) in new[]
+                {
+                    (
+                        GhostBattleFilter.All,
+                        new[] { "win", "loss", "winner-win", "winner-loss", "unknown" }
+                    ),
+                    (GhostBattleFilter.IWon, new[] { "win", "winner-win" }),
+                    (GhostBattleFilter.ILost, new[] { "loss", "winner-loss" }),
+                }
+            )
+            {
+                var rows = repository.ListGhostBattles("account", filter, dayMin10, new()).Rows;
+                var expected = days.SelectMany(day =>
+                    outcomes.Select(outcome => $"{day}-{outcome}")
+                );
+                Check(
+                    rows.Select(b => b.BattleId)
+                        .OrderBy(id => id)
+                        .SequenceEqual(expected.OrderBy(id => id)),
+                    "Ghost filtering must combine the day cutoff with local outcomes and winner precedence."
+                );
+                if (filter != GhostBattleFilter.All)
+                    Check(
+                        rows.All(b =>
+                            filter == GhostBattleFilter.IWon
+                                ? HistoryPanelFormatter.IsBattleWin(b)
+                                : HistoryPanelFormatter.IsBattleLoss(b)
+                        ),
+                        "Ghost outcome filtering and display must agree in local perspective."
+                    );
+            }
+        }
     }
 
     private static (double P50, double P95) Measure(Action action, int repetitions)

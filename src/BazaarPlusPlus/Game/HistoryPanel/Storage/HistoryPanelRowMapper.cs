@@ -1,6 +1,5 @@
 #nullable enable
 using BazaarPlusPlus.Game.HistoryPanel.Data;
-using BazaarPlusPlus.Game.PvpBattles;
 using Microsoft.Data.Sqlite;
 
 namespace BazaarPlusPlus.Game.HistoryPanel.Storage;
@@ -41,11 +40,7 @@ internal static class HistoryPanelRowMapper
         );
     }
 
-    public static HistoryBattleRecord ReadLocalBattle(
-        SqliteDataReader reader,
-        string battleId,
-        PvpBattleSnapshots? snapshots
-    )
+    public static HistoryBattleRecord ReadLocalBattle(SqliteDataReader reader, string battleId)
     {
         return new HistoryBattleRecord(
             battleId,
@@ -73,7 +68,6 @@ internal static class HistoryPanelRowMapper
             GetNullableString(reader, "winner_combatant_id"),
             GetNullableString(reader, "loser_combatant_id"),
             default,
-            snapshots,
             isFinalBattle: false,
             source: HistoryBattleSource.Local,
             replayAvailable: GetNullableInt32(reader, "has_local_payload") == 1,
