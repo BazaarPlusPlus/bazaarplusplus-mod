@@ -99,23 +99,6 @@ internal static partial class HistoryPanelText
         return $"{items} {Pluralize(items, "item", "items")} · {skills} {Pluralize(skills, "skill", "skills")}";
     }
 
-    internal static string RankLabel(string? rank, int? rating = null)
-    {
-        var normalized = rank?.Trim();
-        var label = string.IsNullOrEmpty(normalized) ? Unknown() : normalized!.ToUpperInvariant();
-        if (LanguageCodeMatcher.IsChinese(L.CurrentLanguageCode) && normalized != null)
-            label = normalized.ToLowerInvariant() switch
-            {
-                "bronze" => FormatSimple("BRZ", "青铜", "青銅"),
-                "silver" => FormatSimple("SLV", "白银", "白銀"),
-                "gold" => FormatSimple("GLD", "黄金", "黃金"),
-                "diamond" => FormatSimple("DIA", "钻石", "鑽石"),
-                "legendary" => FormatSimple("LEG", "传说", "傳說"),
-                _ => label,
-            };
-        return rating.HasValue ? $"{label} · {rating.Value}" : label;
-    }
-
     internal static string SelectRunToDelete()
     {
         return FormatSimple("Select a run to delete.", "请选择要删除的对局。");

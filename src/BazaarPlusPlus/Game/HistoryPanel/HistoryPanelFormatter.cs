@@ -19,10 +19,10 @@ internal enum RunOutcomeTier
 internal static class HistoryPanelFormatter
 {
     public static string RunListText(HistoryRunRecord run) =>
-        $"{HistoryPanelHeroPresentation.DisplayName(run.Hero)} · {FormatRunStatus(run.RawStatus)}\n{Mode(run)} · {HistoryPanelText.RankLabel(run.PlayerRank, run.PlayerRating)}\n{run.Victories ?? 0}–{run.Losses ?? 0} · {FormatTimestamp(run.EndedAtUtc ?? run.LastSeenAtUtc)}";
+        $"{HistoryPanelHeroPresentation.DisplayName(run.Hero)} · {FormatRunStatus(run.RawStatus)}\n{Mode(run)} · {run.Victories ?? 0}–{run.Losses ?? 0}\n{FormatTimestamp(run.EndedAtUtc ?? run.LastSeenAtUtc)}";
 
     public static string GhostListText(HistoryBattleRecord battle) =>
-        $"{battle.OpponentName ?? HistoryPanelText.UnknownOpponent()} · {FormatBattleResult(battle)}\n{HistoryPanelText.DayBadge(battle.Day)} · {HistoryPanelText.RankLabel(battle.OpponentRank, battle.OpponentRating)}\n{FormatTimestamp(battle.RecordedAtUtc)}";
+        $"{battle.OpponentName ?? HistoryPanelText.UnknownOpponent()}\n{HistoryPanelText.DayBadge(battle.Day)}\n{FormatTimestamp(battle.RecordedAtUtc)}";
 
     private static string Mode(HistoryRunRecord run) =>
         run.GameMode.Trim().ToLowerInvariant() switch
@@ -37,7 +37,7 @@ internal static class HistoryPanelFormatter
         if (run == null)
             return string.Empty;
         var duration = (run.EndedAtUtc ?? run.LastSeenAtUtc) - run.StartedAtUtc;
-        return $"{HistoryPanelText.DayBadge(run.FinalDay)} · {HistoryPanelText.HourBadge(run.FinalHour)} · {Math.Max(0, (int)duration.TotalHours):00}:{Math.Max(0, duration.Minutes):00} · {Mode(run)} · {HistoryPanelText.RankLabel(run.PlayerRank, run.PlayerRating)}";
+        return $"{HistoryPanelText.DayBadge(run.FinalDay)} · {HistoryPanelText.HourBadge(run.FinalHour)} · {Math.Max(0, (int)duration.TotalHours):00}:{Math.Max(0, duration.Minutes):00} · {Mode(run)}";
     }
 
     public static string RunFacts(HistoryRunRecord? run) =>
@@ -95,13 +95,6 @@ internal static class HistoryPanelFormatter
             null or "" => HistoryPanelText.Unknown(),
             _ => char.ToUpperInvariant(rawStatus[0]) + rawStatus[1..],
         };
-    }
-
-    public static string FormatBattleResult(HistoryBattleRecord battle)
-    {
-        return IsBattleWin(battle) ? HistoryPanelText.Win()
-            : IsBattleLoss(battle) ? HistoryPanelText.Loss()
-            : HistoryPanelText.Unknown();
     }
 
     public static bool IsBattleWin(HistoryBattleRecord battle) =>

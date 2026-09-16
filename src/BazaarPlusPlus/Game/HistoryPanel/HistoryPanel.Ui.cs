@@ -121,9 +121,6 @@ internal sealed partial class HistoryPanel
             canDeleteSelectedRun
         );
 
-        var detailResultText = hasSelectedBattle
-            ? HistoryPanelFormatter.FormatBattleResult(selectedBattle!)
-            : string.Empty;
         var detailOpponentName = hasSelectedBattle
             ? selectedBattle!.Source == HistoryBattleSource.Ghost
                 ? HistoryPanelText.GhostChallengedYou(
@@ -133,11 +130,6 @@ internal sealed partial class HistoryPanel
             : string.Empty;
         var detailMetaText = hasSelectedBattle
             ? HistoryPanelFormatter.FormatTimestamp(selectedBattle!.RecordedAtUtc)
-                + " · "
-                + HistoryPanelText.RankLabel(
-                    selectedBattle.OpponentRank,
-                    selectedBattle.OpponentRating
-                )
             : string.Empty;
         var detailPlaceholderText = hasSelectedBattle
             ? string.Empty
@@ -242,7 +234,7 @@ internal sealed partial class HistoryPanel
             RecordAndReplayButtonEnabled = buttons.RecordAndReplayButtonEnabled,
             DeleteButtonText = buttons.DeleteButtonText,
             DeleteButtonEnabled = buttons.DeleteButtonEnabled,
-            DetailResultText = detailResultText,
+            DetailBattle = selectedBattle,
             DetailOpponentName = detailOpponentName,
             DetailMetaText = detailMetaText,
             DetailPlaceholderText = detailPlaceholderText,
@@ -344,7 +336,7 @@ internal sealed class HistoryPanelViewModel
 
     public bool DeleteButtonEnabled { get; set; }
 
-    public string DetailResultText { get; set; } = string.Empty;
+    public HistoryBattleRecord? DetailBattle { get; set; }
 
     public string DetailOpponentName { get; set; } = string.Empty;
 

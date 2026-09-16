@@ -71,6 +71,21 @@ public sealed class HistoryPagingArchitectureTests
         Assert.DoesNotContain("Object.Destroy", actions);
     }
 
+    [Fact]
+    public void History_rank_art_uses_native_mapping_without_live_rank_or_rating_substitution()
+    {
+        var ranks = Read("GameInterop/Ranks/NativeRankBadgeProvider.cs");
+        Assert.Contains("source.GetRankBadge(rank)", ranks);
+        Assert.Contains("NativeGlobalAssetLoader.LoadByReferenceAsync<Sprite>", ranks);
+        Assert.DoesNotContain("ClientCache", ranks);
+        var view = Read("Game/HistoryPanel/Ui/HistoryPanelView.Layout.cs");
+        Assert.Contains("i => BattleBadge(m.VisibleBattles[i])", view);
+        Assert.Contains("i => m.VisibleBattles[i].OpponentRank", view);
+        Assert.Contains("i => m.Runs[i].PlayerRank", view);
+        Assert.DoesNotContain("FormatBattleResult", view);
+        Assert.DoesNotContain("RomanConverter", view);
+    }
+
     private static string Read(string path) => File.ReadAllText(Path.Combine(SourceRoot(), path));
 
     private static string SourceRoot(
