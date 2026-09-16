@@ -20,11 +20,11 @@ internal enum GhostBattleFilter
 
 internal sealed class HistoryPanelState
 {
-    public List<HistoryRunRecord> Runs { get; } = new();
+    public IReadOnlyList<HistoryRunRecord> Runs => RunPage.Rows;
 
-    public List<HistoryBattleRecord> Battles { get; } = new();
+    public IReadOnlyList<HistoryBattleRecord> Battles => BattlePage.Rows;
 
-    public List<HistoryBattleRecord> GhostBattles { get; } = new();
+    public IReadOnlyList<HistoryBattleRecord> GhostBattles => GhostPage.Rows;
 
     public HistoryPage<HistoryRunRecord> RunPage { get; set; } =
         HistoryPage<HistoryRunRecord>.Empty;

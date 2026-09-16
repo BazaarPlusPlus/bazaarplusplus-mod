@@ -28,13 +28,6 @@ internal enum HistoryPanelMountReasonCode
     DependencyUnavailable,
 }
 
-internal enum HistoryPanelDataset
-{
-    RecentRuns,
-    GhostBattles,
-    SelectedRunBattles,
-}
-
 internal enum HistoryPanelReplayReasonCode
 {
     Completed,

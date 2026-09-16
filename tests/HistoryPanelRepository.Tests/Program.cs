@@ -185,7 +185,10 @@ static void AssertRecentRunProjection(string databasePath)
     );
 
     Assert(
-        localBattles.Count == 4 && localBattles.All(b => b.Snapshots == null),
+        localBattles
+            .Select(b => b.BattleId)
+            .OrderBy(id => id)
+            .SequenceEqual(["b-bad-json", "b-no-snapshot", "b-ok-1", "b-ok-2"]),
         "Battle lists must include facts without decoding snapshots."
     );
     Assert(

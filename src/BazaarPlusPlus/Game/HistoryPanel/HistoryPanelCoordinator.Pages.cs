@@ -122,9 +122,7 @@ internal sealed partial class HistoryPanelCoordinator
                 if (result?.Runs is { } runs)
                 {
                     _state.RunPage = runs;
-                    _state.Runs.Clear();
-                    _state.Runs.AddRange(runs.Rows);
-                    var index = _state.Runs.FindIndex(r => r.RunId == selectedRun);
+                    var index = runs.FindIndex(r => r.RunId == selectedRun);
                     _state.SelectedRunIndex =
                         index >= 0
                             ? index
@@ -137,9 +135,7 @@ internal sealed partial class HistoryPanelCoordinator
                 else if (result?.Ghosts is { } ghosts)
                 {
                     _state.GhostPage = ghosts;
-                    _state.GhostBattles.Clear();
-                    _state.GhostBattles.AddRange(ghosts.Rows);
-                    var index = _state.GhostBattles.FindIndex(r => r.BattleId == selectedBattle);
+                    var index = ghosts.FindIndex(r => r.BattleId == selectedBattle);
                     _state.SelectedGhostBattleIndex = index >= 0 ? index : 0;
                     LoadSelectedDetail();
                     if (account.Length == 0)
@@ -172,7 +168,6 @@ internal sealed partial class HistoryPanelCoordinator
                     : new(AnchorId: selected)
             );
         ClearDetail();
-        _state.Battles.Clear();
         _state.BattlePage = HistoryPage<HistoryBattleRecord>.Empty;
         if (run == null)
         {
@@ -205,11 +200,9 @@ internal sealed partial class HistoryPanelCoordinator
                         StatusSeverity.Failure
                     );
                 _state.BattlePage = page ?? HistoryPage<HistoryBattleRecord>.Empty;
-                _state.Battles.Clear();
-                _state.Battles.AddRange(_state.BattlePage.Rows);
                 _state.SelectedBattleIndex = Math.Max(
                     0,
-                    _state.Battles.FindIndex(b => b.BattleId == selected)
+                    _state.BattlePage.FindIndex(b => b.BattleId == selected)
                 );
                 LoadSelectedDetail();
                 _requestUiRefresh();
@@ -279,7 +272,6 @@ internal sealed partial class HistoryPanelCoordinator
             return;
         _session.Begin();
         _state.CachedAccountId = account;
-        _state.GhostBattles.Clear();
         _state.GhostPage = HistoryPage<HistoryBattleRecord>.Empty;
         _state.ReplayActionInProgress =
             _state.GhostSyncInProgress =

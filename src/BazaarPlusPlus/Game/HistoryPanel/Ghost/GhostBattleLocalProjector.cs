@@ -61,7 +61,6 @@ internal static class GhostBattleLocalProjector
             ProjectCombatantIdToLocal(rawWinnerCombatantId),
             ProjectCombatantIdToLocal(rawLoserCombatantId),
             ProjectSnapshotCountsToLocal(rawSnapshotCounts),
-            snapshots: null,
             isFinalBattle,
             source: HistoryBattleSource.Ghost,
             replayAvailable,
