@@ -9,15 +9,6 @@ internal static partial class HistoryPanelText
 {
     private static string Resolve(LocalizedTextSet set) => LocalizedTextHelpers.Resolve(set);
 
-    private static string FormatCount(int count, string noun)
-    {
-        var languageCode = L.CurrentLanguageCode;
-        if (LanguageCodeMatcher.IsChinese(languageCode))
-            return $"{noun} {count}";
-
-        return $"{count} {noun}";
-    }
-
     private static string FormatSimple(string english, string chineseMainland)
     {
         return FormatSimple(english, chineseMainland, null);

@@ -35,7 +35,7 @@ internal sealed partial class HistoryPanelView
         internal TextMeshProUGUI UnknownResult = null!;
         internal TextMeshProUGUI UnknownRank = null!;
         internal TextMeshProUGUI Label = null!;
-        internal RunFields? Run;
+        internal RunFields Run = null!;
         internal string? Hero;
         internal string? Id;
     }
@@ -177,8 +177,7 @@ internal sealed partial class HistoryPanelView
             .225f,
             HistoryPanelLayout.ArchiveWidth,
             .595f,
-            HistoryPanelLayout.RunRowHeight,
-            false
+            HistoryPanelLayout.RunRowHeight
         );
         _dayStrip = CreateDayStrip();
         var archivePager = CreateRect(
@@ -303,8 +302,7 @@ internal sealed partial class HistoryPanelView
         float y,
         float width,
         float height,
-        float rowHeight,
-        bool timeline
+        float rowHeight
     )
     {
         var viewport = CreateRect(name, _layout!, x, y, width, height);
@@ -333,12 +331,12 @@ internal sealed partial class HistoryPanelView
                 1,
                 () =>
                 {
-                    if (timeline || !ShowsBothBoards)
+                    if (!ShowsBothBoards)
                         _selectBattle(index);
                     else
                         _selectRun(index);
                 },
-                size: timeline ? 15 : 14
+                size: 14
             );
             var rect = (RectTransform)button.transform;
             rect.anchorMin = new Vector2(0, 1);
@@ -347,40 +345,27 @@ internal sealed partial class HistoryPanelView
             rect.sizeDelta = new Vector2(0, rowHeight - 5);
             rect.anchoredPosition = new Vector2(0, -i * rowHeight);
             var label = button.GetComponentInChildren<TextMeshProUGUI>();
-            label.alignment = timeline
-                ? TextAlignmentOptions.Center
-                : TextAlignmentOptions.MidlineLeft;
+            label.alignment = TextAlignmentOptions.MidlineLeft;
             label.textWrappingMode = TextWrappingModes.Normal;
-            label.rectTransform.anchorMin = new Vector2(
-                timeline ? .04f : .26f,
-                timeline ? .38f : .06f
-            );
-            label.rectTransform.anchorMax = new Vector2(timeline ? .31f : .77f, .94f);
+            label.rectTransform.anchorMin = new Vector2(.26f, .06f);
+            label.rectTransform.anchorMax = new Vector2(.77f, .94f);
             var portrait = CreateRect("Hero", rect, .025f, .11f, .21f, .70f)
                 .gameObject.AddComponent<Image>();
             portrait.raycastTarget = false;
             portrait.preserveAspect = true;
             portrait.color = Color.clear;
-            var badge = timeline
-                ? Badge(rect, "Outcome", .33f, .08f, .26f, .52f)
-                : Badge(rect, "Outcome", .82f, .71f, .14f, .25f);
-            var rank = timeline
-                ? Badge(rect, "Rank", .65f, .05f, .31f, .56f)
-                : Badge(rect, "Rank", .80f, .05f, .18f, .45f);
+            var badge = Badge(rect, "Outcome", .82f, .71f, .14f, .25f);
+            var rank = Badge(rect, "Rank", .80f, .05f, .18f, .45f);
             var unknownResult = Text(badge.transform, "?", 0, 0, 1, 1, 14, Muted, true);
             var unknownRank = Text(rank.transform, "?", 0, 0, 1, 1, 14, Muted, true);
-            var rating = timeline
-                ? Text(rect, "", .04f, .66f, .92f, .24f, 11, Ink, true)
-                : Text(rect, "", .77f, .49f, .22f, .18f, 10, Ink, true);
+            var rating = Text(rect, "", .77f, .49f, .22f, .18f, 10, Ink, true);
             // Identity leads; mode, duration and timestamp stay in the text column.
-            var run = timeline
-                ? null
-                : new RunFields
-                {
-                    Name = Wrapped(Text(rect, "", .245f, .07f, .425f, .28f, 15)),
-                    Meta = Wrapped(Text(rect, "", .245f, .39f, .425f, .22f, 11, Muted)),
-                    Stamp = Wrapped(Text(rect, "", .245f, .68f, .425f, .22f, 11, Muted)),
-                };
+            var run = new RunFields
+            {
+                Name = Wrapped(Text(rect, "", .245f, .07f, .425f, .28f, 15)),
+                Meta = Wrapped(Text(rect, "", .245f, .39f, .425f, .22f, 11, Muted)),
+                Stamp = Wrapped(Text(rect, "", .245f, .68f, .425f, .22f, 11, Muted)),
+            };
             list.Rows[i] = new Row
             {
                 Button = button,
@@ -553,8 +538,6 @@ internal sealed partial class HistoryPanelView
         for (var i = 0; i < _archiveList.Rows.Length; i++)
         {
             var row = _archiveList.Rows[i];
-            if (row?.Run == null)
-                continue;
             var rect = (RectTransform)row.Button.transform;
             rect.sizeDelta = new Vector2(0, _archiveList.Height - 5);
             rect.anchoredPosition = new Vector2(0, -i * _archiveList.Height);
@@ -616,7 +599,7 @@ internal sealed partial class HistoryPanelView
                 i == selected,
                 !_model!.PageLoading
             );
-            if (runFields != null && row.Run != null)
+            if (runFields != null)
             {
                 var fields = runFields(i);
                 row.Run.Name.text = fields.Name;
