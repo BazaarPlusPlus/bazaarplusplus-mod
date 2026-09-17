@@ -24,10 +24,6 @@ public sealed class LobbyLogEventCatalogTests
             ["lobby.version_check.completed"] =
                 "current_version:High:None|latest_version:High:None|update_available:Low:None",
             ["lobby.version_label.degraded"] = "reason_code:Low:None",
-            ["lobby.random_pool_preferences.degraded"] = "pool_kind:Low:None|reason_code:Low:None",
-            ["lobby.hero_pool.degraded"] = "operation:Low:None|reason_code:Low:None",
-            ["lobby.collectible_pool.degraded"] =
-                "operation:Low:None|collection_kind:Low:None|reason_code:Low:None",
         };
 
         Assert.Equal(expected.Count, actual.Count);
