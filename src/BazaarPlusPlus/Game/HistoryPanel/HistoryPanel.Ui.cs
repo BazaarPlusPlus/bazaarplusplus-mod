@@ -153,14 +153,6 @@ internal sealed partial class HistoryPanel
             AccountId = _state.CachedAccountId,
             Title = HistoryPanelText.Title(),
             Supporters = _supporters,
-            CountChipText =
-                _state.SectionMode == HistorySectionMode.Ghost
-                    ? HistoryPanelText.CountGhost(FilteredGhostBattles.Count)
-                    : HistoryPanelText.CountRuns(filteredRuns.Count),
-            BattleChipText =
-                _state.SectionMode == HistorySectionMode.Ghost
-                    ? HistoryPanelText.CountBattles(FilteredGhostBattles.Count)
-                    : HistoryPanelText.CountBattles(_state.Battles.Count),
             DatabaseChipText = databaseChip.Text,
             DatabaseChipSeverity = databaseChip.Severity,
             ServerHealthButtonText = serverHealthDisplay.ButtonText,
@@ -227,10 +219,6 @@ internal sealed class HistoryPanelViewModel
 
     public IReadOnlyList<BPPSupporterSample> Supporters { get; set; } =
         new List<BPPSupporterSample>();
-
-    public string CountChipText { get; set; } = string.Empty;
-
-    public string BattleChipText { get; set; } = string.Empty;
 
     public string DatabaseChipText { get; set; } = string.Empty;
 

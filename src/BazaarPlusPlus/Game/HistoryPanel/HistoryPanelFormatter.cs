@@ -92,18 +92,6 @@ internal static class HistoryPanelFormatter
         return RunOutcomeTier.Misfortune;
     }
 
-    public static string FormatRunStatus(string? rawStatus)
-    {
-        return rawStatus switch
-        {
-            "completed" => HistoryPanelText.Completed(),
-            "abandoned" => HistoryPanelText.Abandoned(),
-            "active" => HistoryPanelText.Active(),
-            null or "" => HistoryPanelText.Unknown(),
-            _ => char.ToUpperInvariant(rawStatus[0]) + rawStatus[1..],
-        };
-    }
-
     public static bool IsBattleWin(HistoryBattleRecord battle) =>
         HistoryPanelGhostBattleFilter.ResolveOutcome(battle) == HistoryPanelGhostBattleOutcome.Won;
 

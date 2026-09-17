@@ -12,12 +12,6 @@ internal static partial class HistoryPanelText
 
     private static readonly LocalizedTextSet UnknownRunText = new("Unknown Run", "未知 Run");
 
-    private static readonly LocalizedTextSet CompletedText = new("Completed", "已完成", "已完成");
-
-    private static readonly LocalizedTextSet AbandonedText = new("Abandoned", "已放弃", "已放棄");
-
-    private static readonly LocalizedTextSet ActiveText = new("Active", "进行中", "進行中");
-
     private static readonly LocalizedTextSet UnknownText = new("Unknown", "未知");
 
     internal static string FilterDayMin10() => Resolve(FilterDayMin10Text);
@@ -25,12 +19,6 @@ internal static partial class HistoryPanelText
     internal static string Unranked() => Resolve(UnrankedText);
 
     internal static string UnknownRun() => Resolve(UnknownRunText);
-
-    internal static string Completed() => Resolve(CompletedText);
-
-    internal static string Abandoned() => Resolve(AbandonedText);
-
-    internal static string Active() => Resolve(ActiveText);
 
     internal static string Unknown() => Resolve(UnknownText);
 
