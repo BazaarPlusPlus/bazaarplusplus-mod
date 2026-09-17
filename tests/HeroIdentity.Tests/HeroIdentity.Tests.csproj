@@ -29,14 +29,6 @@
       Link="HeroVisual.cs"
     />
     <Compile
-      Include="../../src/BazaarPlusPlus/Game/Lobby/RandomHeroPool/RandomHeroPoolHeroIdentity.cs"
-      Link="RandomHeroPoolHeroIdentity.cs"
-    />
-    <Compile
-      Include="../../src/BazaarPlusPlus/Game/Lobby/RandomHeroSkinPool/RandomHeroSkinPoolPreferenceMigration.cs"
-      Link="RandomHeroSkinPoolPreferenceMigration.cs"
-    />
-    <Compile
       Include="../../src/BazaarPlusPlus/Game/CombatReplay/PlaybackUi/CombatReplayHeroIdentity.cs"
       Link="CombatReplayHeroIdentity.cs"
     />

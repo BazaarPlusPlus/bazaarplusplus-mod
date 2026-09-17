@@ -37,7 +37,7 @@ CheckTree(
     },
     (root, tree) =>
     {
-        CheckNativePoolPremises(root, tree);
+        CheckNativeTooltipSuppressionPremises(root, tree);
         // GameBuildInfoResolver probe premise: ServerOption must stay PTR-only. If it
         // appears in online, the resolver would classify online as Ptr on the probe
         // side and (per the disagreement rule) pause uploads — revisit the resolver.
@@ -72,7 +72,7 @@ CheckTree(
     },
     (root, tree) =>
     {
-        CheckNativePoolPremises(root, tree);
+        CheckNativeTooltipSuppressionPremises(root, tree);
         Require(
             ReadTreeFile(root, tree, "TheBazaar", "Config.cs"),
             "class ServerOption",
@@ -91,39 +91,6 @@ if (failures.Count > 0)
 
 Console.WriteLine("PTR compatibility checks passed.");
 return;
-
-void CheckNativePoolPremises(string root, string tree)
-{
-    CheckNativeTooltipSuppressionPremises(root, tree);
-
-    var cosmeticsList = ReadTreeFile(root, tree, "TheBazaar", "CosmeticsListManager.cs");
-    Require(cosmeticsList, "void FetchCosmetics(", "native collectible session boundary");
-    Require(cosmeticsList, "void EquipItem(EquipableItem item)", "native collectible click seam");
-
-    var cosmeticItem = ReadTreeFile(root, tree, "TheBazaar", "CosmeticItem.cs");
-    Require(cosmeticItem, "void SetData(", "native collectible registration seam");
-    Require(cosmeticItem, "void SetEquipState(bool state)", "native collectible visual seam");
-
-    var collectionManager = ReadTreeFile(root, tree, "TheBazaar", "CollectionManager.cs");
-    Require(
-        collectionManager,
-        "void SetRandomizeLoadout(EHero hero, bool randomize)",
-        "online/PTR shared randomized-loadout mode seam"
-    );
-
-    var heroItem = ReadTreeFile(root, tree, string.Empty, "HeroItemView.cs");
-    Require(heroItem, "void Start()", "native hero-card initialization seam");
-    Require(heroItem, "void OnItemSelected(bool showVisuals = true)", "native hero click seam");
-    Require(heroItem, "void UpdateView(EHero selectedHero)", "native hero visual update seam");
-
-    var heroSelect = ReadTreeFile(root, tree, "TheBazaar.UI", "HeroSelectButtonsView.cs");
-    Require(
-        heroSelect,
-        "bool _isProgrammaticSelection",
-        "native programmatic hero-selection marker"
-    );
-    Require(heroSelect, "void OnHeroPurchased(EHero hero)", "native hero-purchase selection seam");
-}
 
 void CheckNativeTooltipSuppressionPremises(string root, string tree)
 {
