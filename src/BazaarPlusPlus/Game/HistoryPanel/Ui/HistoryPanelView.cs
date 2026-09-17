@@ -378,10 +378,16 @@ internal sealed partial class HistoryPanelView : IDisposable
     {
         var rect = new GameObject(name, typeof(RectTransform)).GetComponent<RectTransform>();
         rect.SetParent(parent, false);
-        rect.anchorMin = new Vector2(x, 1 - y - height);
-        rect.anchorMax = new Vector2(x + width, 1 - y);
+        Anchor(rect, HistoryPanelLayout.Anchors(x, y, width, height));
         rect.offsetMin = rect.offsetMax = Vector2.zero;
         return rect;
+    }
+
+    // The single place top-down authoring becomes Unity's bottom-up anchors.
+    private static void Anchor(RectTransform rect, HistoryAnchors anchors)
+    {
+        rect.anchorMin = new Vector2(anchors.MinX, anchors.MinY);
+        rect.anchorMax = new Vector2(anchors.MaxX, anchors.MaxY);
     }
 
     private Image Layer(Transform parent, int spriteIndex, Color color)

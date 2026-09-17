@@ -160,7 +160,6 @@ internal sealed partial class HistoryPanelView
             ReleaseInputFocus();
         }
         _moreRoot?.SetActive(visible);
-        UpdateFacts();
     }
 
     private void RefreshActions()

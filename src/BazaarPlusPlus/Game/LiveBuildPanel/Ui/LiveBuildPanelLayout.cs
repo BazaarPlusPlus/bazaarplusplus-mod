@@ -7,7 +7,11 @@ internal readonly record struct LiveBuildPanelLayout(float Width, float Height)
     internal const float HeaderHeight = 24;
     internal const float RowTitleHeight = 28;
     internal const float RowGap = 12;
-    internal const float MetricsHeight = 28;
+
+    // Two stacked lines per metric cell: an 11px label over a 16px value. Every unit
+    // here comes straight out of BoardHeight, and the carpet is height-constrained.
+    internal const float MetricsHeight = 34;
+    internal const int MetricCells = 4;
     internal const float FooterHeight = 28;
     internal const float SidebarWidth = 290;
     internal const float SidebarGap = 28;

@@ -102,7 +102,6 @@ internal sealed partial class HistoryPanel
                 : _state.Battles.ToList();
 
         var selectedBattle = ActiveSelectedBattle;
-        var hasSelectedBattle = selectedBattle != null;
         var selectedRun = SelectedRun;
         var now = Time.unscaledTime;
         var databaseChip =
@@ -121,25 +120,6 @@ internal sealed partial class HistoryPanel
             canDeleteSelectedRun
         );
 
-        var detailOpponentName = hasSelectedBattle
-            ? selectedBattle!.Source == HistoryBattleSource.Ghost
-                ? HistoryPanelText.GhostChallengedYou(
-                    selectedBattle.OpponentName ?? HistoryPanelText.UnknownOpponent()
-                )
-                : (selectedBattle.OpponentName ?? HistoryPanelText.UnknownOpponent())
-            : string.Empty;
-        var detailMetaText = hasSelectedBattle
-            ? HistoryPanelFormatter.FormatTimestamp(selectedBattle!.RecordedAtUtc)
-            : string.Empty;
-        var detailPlaceholderText = hasSelectedBattle
-            ? string.Empty
-            : HistoryPanelText.SelectBattleForFooter();
-
-        var ghostOpponentEliminatedNoticeText = HistoryPanelFormatter.IsGhostOpponentEliminated(
-            selectedBattle
-        )
-            ? HistoryPanelText.GhostOpponentEliminatedNotice()
-            : string.Empty;
         var serverHealthDisplay = _state.ServerHealthProbeInProgress
             ? HistoryPanelServerHealthFormatter.Checking()
             : HistoryPanelServerHealthFormatter.Idle();
@@ -170,11 +150,6 @@ internal sealed partial class HistoryPanel
                     ? _state.GhostPage.Last
                     : _state.RunPage.Last
             ),
-            RunSummary =
-                _state.SectionMode == HistorySectionMode.Runs
-                    ? HistoryPanelFormatter.RunSummary(selectedRun)
-                    : string.Empty,
-            RunFacts = HistoryPanelFormatter.RunFacts(selectedRun),
             AccountId = _state.CachedAccountId,
             Title = HistoryPanelText.Title(),
             Supporters = _supporters,
@@ -234,11 +209,6 @@ internal sealed partial class HistoryPanel
             RecordAndReplayButtonEnabled = buttons.RecordAndReplayButtonEnabled,
             DeleteButtonText = buttons.DeleteButtonText,
             DeleteButtonEnabled = buttons.DeleteButtonEnabled,
-            DetailBattle = selectedBattle,
-            DetailOpponentName = detailOpponentName,
-            DetailMetaText = detailMetaText,
-            DetailPlaceholderText = detailPlaceholderText,
-            GhostOpponentEliminatedNoticeText = ghostOpponentEliminatedNoticeText,
         };
     }
 }
@@ -253,8 +223,6 @@ internal sealed class HistoryPanelViewModel
     public bool BattleHasNewer { get; set; }
     public bool BattleHasOlder { get; set; }
     public string PageRange { get; set; } = string.Empty;
-    public string RunSummary { get; set; } = string.Empty;
-    public string RunFacts { get; set; } = string.Empty;
     public string Title { get; set; } = string.Empty;
 
     public IReadOnlyList<BPPSupporterSample> Supporters { get; set; } =
@@ -335,14 +303,4 @@ internal sealed class HistoryPanelViewModel
     public string DeleteButtonText { get; set; } = string.Empty;
 
     public bool DeleteButtonEnabled { get; set; }
-
-    public HistoryBattleRecord? DetailBattle { get; set; }
-
-    public string DetailOpponentName { get; set; } = string.Empty;
-
-    public string DetailMetaText { get; set; } = string.Empty;
-
-    public string DetailPlaceholderText { get; set; } = string.Empty;
-
-    public string GhostOpponentEliminatedNoticeText { get; set; } = string.Empty;
 }

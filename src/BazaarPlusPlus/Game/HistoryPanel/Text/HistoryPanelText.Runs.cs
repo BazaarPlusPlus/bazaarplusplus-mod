@@ -34,22 +34,8 @@ internal static partial class HistoryPanelText
 
     internal static string Unknown() => Resolve(UnknownText);
 
-    internal static string StatHealthShort() => FormatSimple("HP", "生命");
-
-    internal static string StatPrestigeShort() => FormatSimple("PRE", "声望", "聲望");
-
-    internal static string StatLevelShort() => FormatSimple("LVL", "等级", "等級");
-
-    internal static string StatIncomeShort() => FormatSimple("INC", "收入", "收入");
-
-    internal static string StatGoldShort() => FormatSimple("GLD", "金币", "金幣");
-
-    internal static string HourBadge(int? hour) =>
-        FormatSimple(
-            hour.HasValue ? $"H{hour.Value}" : "H?",
-            hour.HasValue ? $"{hour.Value}时" : "?时",
-            hour.HasValue ? $"{hour.Value}時" : "?時"
-        );
+    internal static string DurationMinutes(int minutes) =>
+        FormatSimple($"{minutes} min", $"{minutes} 分钟", $"{minutes} 分鐘");
 
     internal static string DayBadge(int? day) =>
         FormatSimple(

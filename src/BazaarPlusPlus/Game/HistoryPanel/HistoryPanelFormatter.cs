@@ -16,10 +16,30 @@ internal enum RunOutcomeTier
     Diamond,
 }
 
+internal readonly record struct HistoryRunRowFields(string Name, string Meta, string Stamp);
+
 internal static class HistoryPanelFormatter
 {
-    public static string RunListText(HistoryRunRecord run) =>
-        $"{HistoryPanelHeroPresentation.DisplayName(run.Hero)} · {FormatRunStatus(run.RawStatus)}\n{Mode(run)} · {run.Victories ?? 0}–{run.Losses ?? 0}\n{FormatTimestamp(run.EndedAtUtc ?? run.LastSeenAtUtc)}";
+    // The status word is deliberately absent: RunBadge already encodes
+    // completed/abandoned/active, and repeating it cost the row its strongest line.
+    public static HistoryRunRowFields RunRowFields(HistoryRunRecord run) =>
+        new(
+            HistoryPanelHeroPresentation.DisplayName(run.Hero),
+            Meta(run),
+            FormatTimestamp(run.EndedAtUtc ?? run.LastSeenAtUtc)
+        );
+
+    // A finished run's duration is a real play session. An unfinished one has no EndedAtUtc,
+    // so the same subtraction measures start-to-last-seen instead — "85:09" for a run left
+    // open overnight. Show it only where it means something.
+    private static string Meta(HistoryRunRecord run)
+    {
+        var head = $"{Mode(run)} · {HistoryPanelText.DayBadge(run.FinalDay)}";
+        if (run.EndedAtUtc is not { } ended)
+            return head;
+        var span = ended - run.StartedAtUtc;
+        return $"{head} · {HistoryPanelText.DurationMinutes(Math.Max(0, (int)span.TotalMinutes))}";
+    }
 
     public static string GhostListText(HistoryBattleRecord battle) =>
         $"{battle.OpponentName ?? HistoryPanelText.UnknownOpponent()}\n{HistoryPanelText.DayBadge(battle.Day)}\n{FormatTimestamp(battle.RecordedAtUtc)}";
@@ -31,19 +51,6 @@ internal static class HistoryPanelFormatter
             "unranked" => HistoryPanelText.Unranked(),
             _ => HistoryPanelText.Unknown(),
         };
-
-    public static string RunSummary(HistoryRunRecord? run)
-    {
-        if (run == null)
-            return string.Empty;
-        var duration = (run.EndedAtUtc ?? run.LastSeenAtUtc) - run.StartedAtUtc;
-        return $"{HistoryPanelText.DayBadge(run.FinalDay)} · {HistoryPanelText.HourBadge(run.FinalHour)} · {Math.Max(0, (int)duration.TotalHours):00}:{Math.Max(0, duration.Minutes):00} · {Mode(run)}";
-    }
-
-    public static string RunFacts(HistoryRunRecord? run) =>
-        run == null
-            ? string.Empty
-            : $"{HistoryPanelText.StatHealthShort()}  {run.MaxHealth?.ToString() ?? "—"}\n{HistoryPanelText.StatPrestigeShort()}  {run.Prestige?.ToString() ?? "—"}\n{HistoryPanelText.StatLevelShort()}  {run.Level?.ToString() ?? "—"}\n{HistoryPanelText.StatIncomeShort()}  {run.Income?.ToString() ?? "—"}\n{HistoryPanelText.StatGoldShort()}  {run.Gold?.ToString() ?? "—"}";
 
     public static string PageRange(HistoryCursor? first, HistoryCursor? last) =>
         first.HasValue
@@ -102,14 +109,6 @@ internal static class HistoryPanelFormatter
 
     public static bool IsBattleLoss(HistoryBattleRecord battle) =>
         HistoryPanelGhostBattleFilter.ResolveOutcome(battle) == HistoryPanelGhostBattleOutcome.Lost;
-
-    public static bool IsGhostOpponentEliminated(HistoryBattleRecord? battle) =>
-        battle?.Source == HistoryBattleSource.Ghost && battle.IsFinalBattle && IsBattleWin(battle);
-
-    public static string FormatDayOnly(int? day)
-    {
-        return HistoryPanelText.DayBadge(day);
-    }
 
     public static string FormatTimestamp(DateTimeOffset value)
     {
