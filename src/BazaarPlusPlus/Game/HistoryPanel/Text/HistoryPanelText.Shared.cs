@@ -31,14 +31,4 @@ internal static partial class HistoryPanelText
     {
         return LocalizedTextHelpers.FormatSimple(english, chineseMainland, chineseTraditional);
     }
-
-    private static string ResolveChinese(string chineseMainland, string? chineseTraditional)
-    {
-        return ChineseScriptConverter.Convert(chineseMainland, chineseTraditional, L.CurrentMode);
-    }
-
-    private static string Pluralize(int count, string singular, string plural)
-    {
-        return count == 1 ? singular : plural;
-    }
 }

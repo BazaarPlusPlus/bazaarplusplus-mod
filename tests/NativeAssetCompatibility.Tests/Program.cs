@@ -174,7 +174,6 @@ RequireAbsent(
     sourceTexts,
     [
         string.Concat("NativeCardPreview", "PrefabResolver"),
-        string.Concat("Monster", "BoardTooltip"),
         string.Concat("_smallItem", "Reference"),
         string.Concat("_mediumItem", "Reference"),
         string.Concat("_largeItem", "Reference"),

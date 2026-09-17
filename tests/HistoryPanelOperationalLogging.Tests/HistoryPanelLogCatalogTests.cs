@@ -34,7 +34,6 @@ public sealed class HistoryPanelLogCatalogTests
             ["history_panel.preview.static_data_degraded"] = "reason_code:Low:None",
             ["history_panel.preview.payload_degraded"] =
                 "battle_id:High:Short|reason_code:Low:None",
-            ["history_panel.row.skipped"] = "battle_id:High:Short|reason_code:Low:None",
             ["history_panel.open.failed"] = "reason_code:Low:None",
             ["history_panel.open.skipped"] = "reason_code:Low:None",
             ["history_panel.card_preview.degraded"] =
@@ -63,7 +62,6 @@ public sealed class HistoryPanelLogCatalogTests
                 "history_panel.preview.payload_degraded",
                 "history_panel.preview.socket_effect_degraded",
                 "history_panel.preview.static_data_degraded",
-                "history_panel.row.skipped",
             },
             stormed.Keys.OrderBy(value => value, StringComparer.Ordinal)
         );

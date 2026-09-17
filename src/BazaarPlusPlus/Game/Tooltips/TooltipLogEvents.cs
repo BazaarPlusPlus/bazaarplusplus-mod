@@ -194,20 +194,6 @@ internal static class TooltipLogEvents
         [EncounterProbeRecoveredProbe]
     );
 
-    internal static readonly BppLogFieldDefinition CardPreviewHoverFailedOperation = PublicLow(
-        0,
-        "operation"
-    );
-    internal static readonly BppLogFieldDefinition CardPreviewHoverFailedReasonCode = PublicLow(
-        1,
-        "reason_code"
-    );
-    internal static readonly BppLogEventDefinition CardPreviewHoverFailed = new(
-        BppLogFeatureScope.Tooltips,
-        "tooltips.card_preview.hover_failed",
-        [CardPreviewHoverFailedOperation, CardPreviewHoverFailedReasonCode]
-    );
-
     internal static readonly BppLogFieldDefinition PackageMerchantSummaryReasonCode = PublicLow(
         0,
         "reason_code"

@@ -29,12 +29,6 @@ internal static partial class HistoryPanelText
         "打完這場戰鬥後，挑戰者直接出局。"
     );
 
-    private static readonly LocalizedTextSet GhostOpponentEliminatedShortText = new(
-        "Challenger Out",
-        "挑战者出局",
-        "挑戰者出局"
-    );
-
     internal static string UnknownOpponent() => Resolve(UnknownOpponentText);
 
     internal static string SelectBattleForFooter() => Resolve(SelectBattleForFooterText);
@@ -44,32 +38,8 @@ internal static partial class HistoryPanelText
     internal static string GhostOpponentEliminatedNotice() =>
         Resolve(GhostOpponentEliminatedNoticeText);
 
-    internal static string GhostOpponentEliminatedShort() =>
-        Resolve(GhostOpponentEliminatedShortText);
-
-    internal static string PlayerSideShort() => FormatSimple("YOU", "我方", "我方");
-
-    internal static string OpponentSideShort() => FormatSimple("OPP", "对手", "對手");
-
-    internal static string GhostChallengerSideShort() => FormatSimple("CHA", "挑战者", "挑戰者");
-
-    internal static string GhostDefenderSideShort() => FormatSimple("YOU", "你", "你");
-
     internal static string GhostChallengedYou(string name) =>
         FormatSimple($"{name} challenged you", $"{name} 挑战了你", $"{name} 挑戰了你");
-
-    internal static string LoadedGhostBattles(int count)
-    {
-        return FormatSimple($"{count} ghost battles loaded.", $"已载入 {count} 场幽灵对战。");
-    }
-
-    internal static string GhostHistoryLoadFailed(string details)
-    {
-        return FormatSimple(
-            $"Ghost history load failed: {details}",
-            $"幽灵历史加载失败：{details}"
-        );
-    }
 
     internal static string GhostSyncUnavailable()
     {
@@ -133,11 +103,6 @@ internal static partial class HistoryPanelText
     internal static string SyncingGhostBattles()
     {
         return FormatSimple("Syncing ghost battles...", "正在同步幽灵对战...");
-    }
-
-    internal static string BattleLoadFailed(string details)
-    {
-        return FormatSimple($"Couldn't load battles: {details}", $"载入战斗失败：{details}");
     }
 
     internal static string SelectBattleToReplay()

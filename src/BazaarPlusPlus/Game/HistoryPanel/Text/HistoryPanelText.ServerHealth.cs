@@ -62,16 +62,6 @@ internal static partial class HistoryPanelText
 
     internal static string DatabaseChip(string status) => $"{Resolve(DatabasePrefixText)} {status}";
 
-    internal static string RunLogDatabasePathUnavailable()
-    {
-        return FormatSimple("History data is unavailable.", "对局数据暂不可用。");
-    }
-
-    internal static string LoadedRuns(int count)
-    {
-        return FormatSimple($"{count} runs loaded.", $"已载入 {count} 场对局。");
-    }
-
     internal static string ServerHealthConnected(long roundTripMilliseconds)
     {
         return FormatSimple(
@@ -88,11 +78,6 @@ internal static partial class HistoryPanelText
             $"游戏与服务器联通性检测失败，耗时 {roundTripMilliseconds} ms：{details}",
             $"遊戲與伺服器連通性檢測失敗，耗時 {roundTripMilliseconds} ms：{details}"
         );
-    }
-
-    internal static string DatabaseFileMissing()
-    {
-        return FormatSimple("No history data yet.", "暂未找到对局数据。");
     }
 
     internal static string HistoryLoadFailed(string details)
