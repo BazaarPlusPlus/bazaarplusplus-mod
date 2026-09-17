@@ -96,11 +96,6 @@ internal enum HistoryPanelPreviewPayloadReasonCode
     PayloadUnreadable,
 }
 
-internal enum HistoryPanelRowReasonCode
-{
-    SnapshotDeserializeFailed,
-}
-
 internal enum HistoryPanelOpenReasonCode
 {
     InstanceUnavailable,

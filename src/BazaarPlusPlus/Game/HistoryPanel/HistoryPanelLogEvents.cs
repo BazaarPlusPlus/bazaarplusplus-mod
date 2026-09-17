@@ -161,15 +161,6 @@ internal static class HistoryPanelLogEvents
         new BppLogStormPolicy([PreviewPayloadReasonCode])
     );
 
-    internal static readonly BppLogFieldDefinition RowBattleId = PublicHighShort(0, "battle_id");
-    internal static readonly BppLogFieldDefinition RowReasonCode = PublicLow(1, "reason_code");
-    internal static readonly BppLogEventDefinition RowSkipped = new(
-        BppLogFeatureScope.HistoryPanel,
-        "history_panel.row.skipped",
-        [RowBattleId, RowReasonCode],
-        new BppLogStormPolicy([RowReasonCode])
-    );
-
     internal static readonly BppLogFieldDefinition OpenReasonCode = PublicLow(0, "reason_code");
     internal static readonly BppLogEventDefinition OpenFailed = new(
         BppLogFeatureScope.HistoryPanel,

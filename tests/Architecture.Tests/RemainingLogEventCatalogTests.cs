@@ -31,7 +31,6 @@ public sealed class RemainingLogEventCatalogTests
                     "outcome:Low:None|reason_code:Low:None|template_id:High:None|card_instance_id:High:Hash",
                 ["tooltips.encounter_probe.degraded"] = "probe:Low:None|reason_code:Low:None",
                 ["tooltips.encounter_probe.recovered"] = "probe:Low:None",
-                ["tooltips.card_preview.hover_failed"] = "operation:Low:None|reason_code:Low:None",
                 ["tooltips.package_merchant_summary.degraded"] =
                     "reason_code:Low:None|merchant_template_id:High:None",
             }

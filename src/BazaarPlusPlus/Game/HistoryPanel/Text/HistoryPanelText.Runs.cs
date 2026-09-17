@@ -6,18 +6,6 @@ namespace BazaarPlusPlus.Game.HistoryPanel;
 
 internal static partial class HistoryPanelText
 {
-    private static readonly LocalizedTextSet SelectRunSubtitleText = new(
-        "Select a run to inspect its recorded battles.",
-        "选择一个 run 查看其记录战斗。",
-        "選擇一個 run 檢視其記錄戰鬥。"
-    );
-
-    private static readonly LocalizedTextSet AllFilterText = new("All", "全部");
-
-    private static readonly LocalizedTextSet IWonFilterText = new("I Won", "我赢了");
-
-    private static readonly LocalizedTextSet ILostFilterText = new("I Lost", "我输了");
-
     private static readonly LocalizedTextSet FilterDayMin10Text = new("≥10d", "≥10天", "≥10天");
 
     private static readonly LocalizedTextSet UnrankedText = new("Normal", "普通对局", "普通對局");
@@ -31,14 +19,6 @@ internal static partial class HistoryPanelText
     private static readonly LocalizedTextSet ActiveText = new("Active", "进行中", "進行中");
 
     private static readonly LocalizedTextSet UnknownText = new("Unknown", "未知");
-
-    internal static string SelectRunSubtitle() => Resolve(SelectRunSubtitleText);
-
-    internal static string FilterAll() => Resolve(AllFilterText);
-
-    internal static string FilterIWon() => Resolve(IWonFilterText);
-
-    internal static string FilterILost() => Resolve(ILostFilterText);
 
     internal static string FilterDayMin10() => Resolve(FilterDayMin10Text);
 
@@ -77,27 +57,6 @@ internal static partial class HistoryPanelText
             day.HasValue ? $"{day.Value}天" : "?天",
             day.HasValue ? $"{day.Value}天" : "?天"
         );
-
-    internal static string RunOutcomeBubbleLabel(RunOutcomeTier tier)
-    {
-        return tier switch
-        {
-            RunOutcomeTier.Diamond => FormatSimple("DIA", "钻石"),
-            RunOutcomeTier.Gold => FormatSimple("GLD", "黄金", "黃金"),
-            RunOutcomeTier.Silver => FormatSimple("SLV", "白银", "白銀"),
-            RunOutcomeTier.Bronze => FormatSimple("BRZ", "青铜", "青銅"),
-            _ => FormatSimple("MIS", "惨淡", "慘淡"),
-        };
-    }
-
-    internal static string BoardSummary(int items, int skills)
-    {
-        var languageCode = L.CurrentLanguageCode;
-        if (LanguageCodeMatcher.IsChinese(languageCode))
-            return ResolveChinese($"{items} 物品 · {skills} 技能", $"{items} 物品 · {skills} 技能");
-
-        return $"{items} {Pluralize(items, "item", "items")} · {skills} {Pluralize(skills, "skill", "skills")}";
-    }
 
     internal static string SelectRunToDelete()
     {
