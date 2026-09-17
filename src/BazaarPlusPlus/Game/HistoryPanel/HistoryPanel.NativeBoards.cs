@@ -33,8 +33,8 @@ internal sealed partial class HistoryPanel
         );
         var playerSkills = snapshots?.PlayerSkills.Items;
         _nativePlayerBoard.Render(
-            $"{player.Signature}:{player.Board.Cards.Count}:{playerSkills?.Count}",
-            NativeMonsterBoardItemMapper.Map(player.Board, "history-item"),
+            $"{player.Signature}:{player.Cards.Count}:{playerSkills?.Count}",
+            NativeMonsterBoardItemMapper.Map(player, "history-item"),
             NativeHistorySkills(playerSkills)
         );
         if (_uiView.ShowsBothBoards)
@@ -48,8 +48,8 @@ internal sealed partial class HistoryPanel
             );
             var skills = snapshots?.OpponentSkills.Items;
             _nativeOpponentBoard.Render(
-                $"{opponent.Signature}:{opponent.Board.Cards.Count}:{skills?.Count}",
-                NativeMonsterBoardItemMapper.Map(opponent.Board, "history-item"),
+                $"{opponent.Signature}:{opponent.Cards.Count}:{skills?.Count}",
+                NativeMonsterBoardItemMapper.Map(opponent, "history-item"),
                 NativeHistorySkills(skills)
             );
         }
