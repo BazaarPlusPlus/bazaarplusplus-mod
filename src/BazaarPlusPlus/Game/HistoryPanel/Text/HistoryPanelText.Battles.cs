@@ -11,35 +11,24 @@ internal static partial class HistoryPanelText
         "未知对手"
     );
 
-    private static readonly LocalizedTextSet SelectBattleForFooterText = new(
-        "Select a battle to view both boards.",
-        "选择一场战斗，查看双方阵容。",
-        "選擇一場戰鬥，查看雙方陣容。"
-    );
-
     private static readonly LocalizedTextSet SelectedBattleText = new(
         "Selected",
         "当前战斗",
         "當前戰鬥"
     );
 
-    private static readonly LocalizedTextSet GhostOpponentEliminatedNoticeText = new(
-        "After this battle, the challenger is eliminated.",
-        "打完这场战斗后，挑战者直接出局。",
-        "打完這場戰鬥後，挑戰者直接出局。"
-    );
-
     internal static string UnknownOpponent() => Resolve(UnknownOpponentText);
-
-    internal static string SelectBattleForFooter() => Resolve(SelectBattleForFooterText);
 
     internal static string SelectedBattle() => Resolve(SelectedBattleText);
 
-    internal static string GhostOpponentEliminatedNotice() =>
-        Resolve(GhostOpponentEliminatedNoticeText);
+    // Board ownership. In Runs the lower board is the local player's; in Ghost the ONLY
+    // board shown is the challenger's, because ghost payloads stay in recorder perspective
+    // (ADR-0002) and NativeBoards renders BuildPlayer, which reads Snapshots.PlayerHand.
+    internal static string BoardYou() => FormatSimple("You", "你", "你");
 
-    internal static string GhostChallengedYou(string name) =>
-        FormatSimple($"{name} challenged you", $"{name} 挑战了你", $"{name} 挑戰了你");
+    internal static string BoardOpponent() => FormatSimple("Opponent", "对手", "對手");
+
+    internal static string BoardChallenger() => FormatSimple("Challenger", "挑战者", "挑戰者");
 
     internal static string GhostSyncUnavailable()
     {

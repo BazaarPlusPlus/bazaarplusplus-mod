@@ -16,6 +16,8 @@
     <Compile Include="../AsyncLoadCache.Tests/*.cs" />
     <Compile Include="../../src/BazaarPlusPlus/GameInterop/MonsterBoardPreview/NativeMonsterBoardLayout.cs" />
     <Compile Include="../../src/BazaarPlusPlus/Game/LiveBuildPanel/Ui/LiveBuildPanelLayout.cs" />
+    <Compile Include="../../src/BazaarPlusPlus/Game/HistoryPanel/Ui/HistoryPanelLayout.cs" />
+    <Compile Include="../../src/BazaarPlusPlus/Game/HistoryPanel/Ui/HistoryTimelineScroll.cs" />
     <Compile Include="../../src/BazaarPlusPlus/GameInterop/MonsterBoardPreview/NativeMonsterBoardTooltipGate.cs" />
     <Compile Include="../../src/BazaarPlusPlus/Game/MusicNotes/MusicNoteSocketInference.cs" />
     <Compile Include="../GraphicsUpscaling.Tests/*.cs" />

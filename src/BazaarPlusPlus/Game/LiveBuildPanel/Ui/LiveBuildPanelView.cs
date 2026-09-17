@@ -72,7 +72,14 @@ internal sealed class LiveBuildPanelView : IDisposable
     private TextMeshProUGUI? _corpusDetail;
     private TextMeshProUGUI? _navigationLabel;
     private TextMeshProUGUI? _pager;
-    private TextMeshProUGUI? _stats;
+    private RectTransform? _metrics;
+    private readonly TextMeshProUGUI[] _metricLabels = new TextMeshProUGUI[
+        LiveBuildPanelLayout.MetricCells
+    ];
+    private readonly TextMeshProUGUI[] _metricValues = new TextMeshProUGUI[
+        LiveBuildPanelLayout.MetricCells
+    ];
+    private TextMeshProUGUI? _guidance;
     private TextMeshProUGUI? _hint;
     private Button? _refreshButton;
     private Button? _closeButton;
@@ -154,7 +161,7 @@ internal sealed class LiveBuildPanelView : IDisposable
         var sidebarRuleImage = sidebarRule.gameObject.AddComponent<Image>();
         sidebarRuleImage.color = new Color(.58f, .43f, .20f, .35f);
         sidebarRuleImage.raycastTarget = false;
-        foreach (var dividerY in new[] { .11f, .65f })
+        foreach (var dividerY in new[] { .11f, .70f })
         {
             var divider = Rect("SectionDivider", _sidebar, .08f, dividerY, .84f, 0);
             divider.sizeDelta = new Vector2(0, 1);
@@ -210,7 +217,22 @@ internal sealed class LiveBuildPanelView : IDisposable
         _previousButton = NavigationButton(_previous, forward: false);
         _pager = Text(_layout, "", 0, 0, 0, 0, 17, Ink, true);
         _nextButton = NavigationButton(_next, forward: true);
-        _stats = Text(_layout, "", .025f, .307f, .95f, .032f, 14);
+        // One fixed cell per metric: a run-on line silently ellipsized the last one away.
+        _metrics = Rect("MatchMetrics", _layout, 0, 0, 0, 0);
+        for (var cell = 0; cell < LiveBuildPanelLayout.MetricCells; cell++)
+        {
+            var slot = Rect(
+                "Metric",
+                _metrics,
+                cell / (float)LiveBuildPanelLayout.MetricCells,
+                0,
+                1f / LiveBuildPanelLayout.MetricCells,
+                1
+            );
+            _metricLabels[cell] = Text(slot, "", 0, 0, 1, .42f, 11, Muted);
+            _metricValues[cell] = Text(slot, "", 0, .42f, 1, .58f, 16);
+        }
+        _guidance = Text(_layout, "", 0, 0, 0, 0, 14, Muted);
         _hint = Text(_layout, "", .02f, .969f, .96f, .022f, 12, Muted, true);
         _markerRoot = Rect("CandidateMarkers", _root.transform, 0, 0, 1, 1);
         var foreground = _markerRoot.gameObject.AddComponent<Canvas>();
@@ -277,19 +299,36 @@ internal sealed class LiveBuildPanelView : IDisposable
                 : "0 / 0";
         _previousButton!.interactable = _nextButton!.interactable =
             snapshot.RecommendationCount > 1;
-        _stats!.text =
-            snapshot.MatchesState == LiveBuildMatchesState.HasRecommendation
-                ? string.Join(
-                    "     ·     ",
-                    new[]
-                    {
-                        $"{LiveBuildPanelText.MatchRateLabel()}  {LiveBuildPanelText.MatchRateValue(snapshot.MatchTenWinRateBps)}",
-                        $"{LiveBuildPanelText.MatchSampleLabel()}  {LiveBuildPanelText.MatchSampleValue(snapshot.MatchTenWinRunCount)}",
-                        $"{LiveBuildPanelText.MatchFinalDayLabel()}  {LiveBuildPanelText.MatchFinalDayValue(snapshot.MatchP75FinalDay)}",
-                        $"{LiveBuildPanelText.MatchMatchedLabel()}  {LiveBuildPanelText.MatchMatchedValue(snapshot.MatchMatchedCardCount, snapshot.CandidateTemplateIds.Count)}",
-                    }
+        var hasRecommendation = snapshot.MatchesState == LiveBuildMatchesState.HasRecommendation;
+        _metrics!.gameObject.SetActive(hasRecommendation);
+        _guidance!.gameObject.SetActive(!hasRecommendation);
+        _guidance.text = hasRecommendation ? string.Empty : snapshot.MatchesGuidance;
+        if (hasRecommendation)
+        {
+            SetMetric(
+                0,
+                LiveBuildPanelText.MatchRateLabel(),
+                LiveBuildPanelText.MatchRateValue(snapshot.MatchTenWinRateBps)
+            );
+            SetMetric(
+                1,
+                LiveBuildPanelText.MatchSampleLabel(),
+                LiveBuildPanelText.MatchSampleValue(snapshot.MatchTenWinRunCount)
+            );
+            SetMetric(
+                2,
+                LiveBuildPanelText.MatchFinalDayLabel(),
+                LiveBuildPanelText.MatchFinalDayValue(snapshot.MatchP75FinalDay)
+            );
+            SetMetric(
+                3,
+                LiveBuildPanelText.MatchMatchedLabel(),
+                LiveBuildPanelText.MatchMatchedValue(
+                    snapshot.MatchMatchedCardCount,
+                    snapshot.CandidateTemplateIds.Count
                 )
-                : snapshot.MatchesGuidance;
+            );
+        }
         foreach (var row in snapshot.Rows)
         {
             var ui = _rows[row.Board.Id];
@@ -507,8 +546,9 @@ internal sealed class LiveBuildPanelView : IDisposable
             return;
         ApplyHeaderRail(left, width);
         Place(_portrait!.rectTransform, 0, 2, 24, 24);
+        Place(_metrics!, left, _geometry.MetricsTop, width, LiveBuildPanelLayout.MetricsHeight);
         Place(
-            _stats!.rectTransform,
+            _guidance!.rectTransform,
             left,
             _geometry.MetricsTop,
             width,
@@ -548,7 +588,8 @@ internal sealed class LiveBuildPanelView : IDisposable
             56
         );
         Place(_supporterHost!, contentLeft, _geometry.Height - 286, contentWidth, 240);
-        Place((RectTransform)_corpusDetail!.transform.parent, contentLeft - 352, 212, 340, 110);
+        // Anchored under the line it explains, not at a fixed offset over the boards.
+        Place((RectTransform)_corpusDetail!.transform.parent, contentLeft, 290, contentWidth, 110);
         Place(
             _hint!.rectTransform,
             left,
@@ -623,6 +664,12 @@ internal sealed class LiveBuildPanelView : IDisposable
             LiveBuildRefreshSeverity.Pending => new Color(.59f, .76f, .89f),
             _ => Muted,
         };
+
+    private void SetMetric(int cell, string label, string value)
+    {
+        _metricLabels[cell].text = label;
+        _metricValues[cell].text = value;
+    }
 
     private static void SetButtonText(Button button, string value) =>
         button.GetComponentInChildren<TextMeshProUGUI>(true).text = value;

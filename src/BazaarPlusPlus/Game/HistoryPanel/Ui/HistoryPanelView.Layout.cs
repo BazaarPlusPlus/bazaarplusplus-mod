@@ -2,7 +2,6 @@
 using BazaarPlusPlus.Game.HistoryPanel.Data;
 using BazaarPlusPlus.GameInterop.Heroes;
 using BazaarPlusPlus.GameInterop.HeroPortraits;
-using BazaarPlusPlus.Infrastructure.UiTokens;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -11,6 +10,21 @@ namespace BazaarPlusPlus.Game.HistoryPanel.Ui;
 
 internal sealed partial class HistoryPanelView
 {
+    // Hidden in Ghost mode, where the same archive rows carry battles.
+    private sealed class RunFields
+    {
+        internal TextMeshProUGUI Name = null!;
+        internal TextMeshProUGUI Meta = null!;
+        internal TextMeshProUGUI Stamp = null!;
+
+        internal void SetActive(bool active)
+        {
+            Name.gameObject.SetActive(active);
+            Meta.gameObject.SetActive(active);
+            Stamp.gameObject.SetActive(active);
+        }
+    }
+
     private sealed class Row
     {
         internal Button Button = null!;
@@ -20,8 +34,31 @@ internal sealed partial class HistoryPanelView
         internal TextMeshProUGUI Rating = null!;
         internal TextMeshProUGUI UnknownResult = null!;
         internal TextMeshProUGUI UnknownRank = null!;
+        internal TextMeshProUGUI Label = null!;
+        internal RunFields? Run;
         internal string? Hero;
         internal string? Id;
+    }
+
+    // One selectable opponent in the run's timeline.
+    private sealed class DayChip
+    {
+        internal Button Button = null!;
+        internal Image Rank = null!;
+        internal TextMeshProUGUI Unknown = null!;
+        internal TextMeshProUGUI Day = null!;
+        internal TextMeshProUGUI Name = null!;
+        internal TextMeshProUGUI Rating = null!;
+        internal Image Outcome = null!;
+        internal Image Portrait = null!;
+        internal string? Hero;
+    }
+
+    private sealed class DayStrip
+    {
+        internal ScrollRect Scroll = null!;
+        internal DayChip[] Chips = new DayChip[40];
+        internal readonly HistoryTimelineScroll Position = new();
     }
 
     private sealed class PageList
@@ -33,13 +70,10 @@ internal sealed partial class HistoryPanelView
     }
 
     private PageList _archiveList = null!;
-    private PageList _timeline = null!;
+    private DayStrip _dayStrip = null!;
     private TextMeshProUGUI _title = null!,
-        _heading = null!,
-        _metadata = null!,
         _statusLabel = null!,
-        _pageLabel = null!,
-        _runSummary = null!;
+        _pageLabel = null!;
     private Button _runsTab = null!,
         _ghostTab = null!,
         _older = null!,
@@ -47,24 +81,16 @@ internal sealed partial class HistoryPanelView
         _latest = null!,
         _battleOlder = null!,
         _battleNewer = null!,
-        _dayFilter = null!,
-        _runFacts = null!;
+        _dayFilter = null!;
     private readonly Dictionary<string, Button> _heroes = new();
     private readonly Dictionary<GhostBattleFilter, Button> _outcomes = new();
     private GameObject _heroFilters = null!,
-        _ghostFilters = null!,
-        _factsRoot = null!;
-    private TextMeshProUGUI _factsText = null!;
-    private bool _factsVisible;
+        _ghostFilters = null!;
     private HistorySectionMode? _boundSection;
-    private Image _detailOutcome = null!,
-        _detailRank = null!,
-        _summaryRank = null!;
-    private TextMeshProUGUI _detailRating = null!,
-        _summaryRating = null!,
-        _detailUnknownOutcome = null!,
-        _detailUnknownRank = null!,
-        _summaryUnknownRank = null!;
+    private RectTransform _opponentTitle = null!,
+        _playerTitle = null!;
+    private TextMeshProUGUI _opponentOwner = null!,
+        _playerOwner = null!;
 
     private void CreateLayout()
     {
@@ -145,106 +171,129 @@ internal sealed partial class HistoryPanelView
             11,
             Muted
         );
-        _archiveList = CreatePageList("Archive", .035f, .225f, .245f, .595f, 116, false);
-        _timeline = CreatePageList("BattleTimeline", .285f, .225f, .095f, .595f, 74, true);
-        _newer = Button(
+        _archiveList = CreatePageList(
+            "Archive",
+            HistoryPanelLayout.ArchiveLeft,
+            .225f,
+            HistoryPanelLayout.ArchiveWidth,
+            .595f,
+            HistoryPanelLayout.RunRowHeight,
+            false
+        );
+        _dayStrip = CreateDayStrip();
+        var archivePager = CreateRect(
+            "ArchivePager",
             _layout,
+            HistoryPanelLayout.ArchiveLeft,
+            HistoryPanelLayout.PagerTop,
+            HistoryPanelLayout.ArchiveWidth,
+            HistoryPanelLayout.PagerHeight
+        );
+        _newer = Button(
+            archivePager,
             T("Newer", "较新"),
-            .035f,
-            .835f,
-            .073f,
-            .033f,
+            0,
+            0,
+            .32f,
+            1,
             () => NavigateArchive(-1),
             size: 14
         );
         _older = Button(
-            _layout,
+            archivePager,
             T("Older", "较早"),
-            .111f,
-            .835f,
-            .073f,
-            .033f,
+            .34f,
+            0,
+            .32f,
+            1,
             () => NavigateArchive(1),
             size: 14
         );
         _latest = Button(
-            _layout,
+            archivePager,
             T("Latest", "最新"),
-            .187f,
-            .835f,
-            .086f,
-            .033f,
+            .68f,
+            0,
+            .32f,
+            1,
             () => NavigateArchive(0),
             size: 14
         );
-        _pageLabel = Text(_layout, "", .035f, .17f, .245f, .043f, 12, Muted);
+        _pageLabel = Text(
+            _layout,
+            "",
+            HistoryPanelLayout.ArchiveLeft,
+            .17f,
+            HistoryPanelLayout.ArchiveWidth,
+            .043f,
+            12,
+            Muted
+        );
         _pageLabel.textWrappingMode = TextWrappingModes.Normal;
         _battleNewer = Button(
             _layout,
             "↑",
-            .29f,
-            .835f,
-            .038f,
-            .033f,
-            () =>
-            {
-                _timeline.ResetScroll = true;
-                _pageBattles?.Invoke(-1);
-            }
+            HistoryPanelLayout.TimelineLeft,
+            HistoryPanelLayout.PagerTop,
+            HistoryPanelLayout.TimelinePagerWidth,
+            HistoryPanelLayout.PagerHeight,
+            () => _pageBattles?.Invoke(-1)
         );
         _battleOlder = Button(
             _layout,
             "↓",
-            .335f,
-            .835f,
-            .038f,
-            .033f,
-            () =>
-            {
-                _timeline.ResetScroll = true;
-                _pageBattles?.Invoke(1);
-            }
+            HistoryPanelLayout.TimelinePagerRightLeft,
+            HistoryPanelLayout.PagerTop,
+            HistoryPanelLayout.TimelinePagerWidth,
+            HistoryPanelLayout.PagerHeight,
+            () => _pageBattles?.Invoke(1)
         );
-        _heading = Text(_layout, "", .4f, .21f, .54f, .055f, 24, Ink, true);
-        var detailStatus = CreateRect("BattleStatus", _layout, .4f, .265f, .54f, .045f);
-        _detailOutcome = Badge(detailStatus, "BattleResult", 0, .05f, .055f, .9f);
-        _detailUnknownOutcome = Text(detailStatus, "?", 0, .05f, .055f, .9f, 16, Muted, true);
-        _detailRank = Badge(detailStatus, "OpponentRank", .07f, 0, .06f, 1);
-        _detailUnknownRank = Text(detailStatus, "?", .07f, 0, .06f, 1, 16, Muted, true);
-        _detailRating = Text(detailStatus, "", .14f, 0, .18f, 1, 14, Ink);
-        _metadata = Text(detailStatus, "", .33f, 0, .67f, 1, 14, Muted);
-        _metadata.textWrappingMode = TextWrappingModes.Normal;
-        _runSummary = Text(_layout, "", .4f, .153f, .32f, .045f, 13, Muted);
-        _summaryRank = Badge(_layout, "PlayerRank", .724f, .148f, .031f, .054f);
-        _summaryUnknownRank = Text(_layout, "?", .724f, .148f, .031f, .054f, 16, Muted, true);
-        _summaryRating = Text(_layout, "", .762f, .153f, .085f, .045f, 13, Ink);
-        _runFacts = Button(
+        // Battle identity, rank and outcome live in the timeline; the title names the owner.
+        _opponentTitle = CreateRect(
+            "OpponentBoardTitle",
             _layout,
-            T("Run data", "本局数据"),
-            .855f,
-            .157f,
-            .09f,
-            .035f,
-            () =>
-            {
-                _factsVisible = !_factsVisible;
-                UpdateFacts();
-            },
-            size: 13
+            HistoryPanelLayout.DetailLeft,
+            HistoryPanelLayout.OpponentTitleTop,
+            HistoryPanelLayout.DetailWidth,
+            HistoryPanelLayout.BoardTitleHeight
         );
-        _opponentPreview = CreateRect("OpponentBoardBounds", _layout, .39f, .32f, .56f, .235f);
+        _opponentOwner = Text(_opponentTitle, "", 0, 0, .11f, 1, 14, Muted);
+        _opponentPreview = CreateRect(
+            "OpponentBoardBounds",
+            _layout,
+            HistoryPanelLayout.DetailLeft,
+            HistoryPanelLayout.OpponentBoardTop,
+            HistoryPanelLayout.DetailWidth,
+            HistoryPanelLayout.OpponentBoardHeight
+        );
         _opponentStatus = Text(_opponentPreview, "", 0, .4f, 1, .2f, 17, Muted, true);
-        _preview = CreateRect("PlayerBoardBounds", _layout, .39f, .59f, .56f, .25f);
+        _preview = CreateRect(
+            "PlayerBoardBounds",
+            _layout,
+            HistoryPanelLayout.DetailLeft,
+            HistoryPanelLayout.PlayerBoardTop,
+            HistoryPanelLayout.DetailWidth,
+            HistoryPanelLayout.PlayerBoardHeight
+        );
         _previewStatus = Text(_preview, "", 0, .35f, 1, .3f, 17, Muted, true);
+        // The lower board's ownership title. In Ghost this is the ONLY board and it belongs
+        // to the challenger, so the wording is section-dependent, never hardcoded.
+        _playerTitle = CreateRect(
+            "PlayerBoardTitle",
+            _layout,
+            HistoryPanelLayout.DetailLeft,
+            HistoryPanelLayout.PlayerTitleTop,
+            HistoryPanelLayout.DetailWidth,
+            HistoryPanelLayout.BoardTitleHeight
+        );
+        _playerOwner = Text(_playerTitle, "", 0, 0, .3f, 1, 14, Muted);
         _statusLabel = Text(_layout, "", .04f, .953f, .91f, .03f, 12, Muted);
         CreateActions();
-        CreateFacts();
     }
 
     private void NavigateArchive(int direction)
     {
         _archiveList.ResetScroll = true;
-        _timeline.ResetScroll = true;
         _pageArchive?.Invoke(direction);
     }
 
@@ -287,10 +336,7 @@ internal sealed partial class HistoryPanelView
                     if (timeline || !ShowsBothBoards)
                         _selectBattle(index);
                     else
-                    {
-                        _timeline.ResetScroll = true;
                         _selectRun(index);
-                    }
                 },
                 size: timeline ? 15 : 14
             );
@@ -326,6 +372,15 @@ internal sealed partial class HistoryPanelView
             var rating = timeline
                 ? Text(rect, "", .04f, .66f, .92f, .24f, 11, Ink, true)
                 : Text(rect, "", .77f, .49f, .22f, .18f, 10, Ink, true);
+            // Identity leads; mode, duration and timestamp stay in the text column.
+            var run = timeline
+                ? null
+                : new RunFields
+                {
+                    Name = Wrapped(Text(rect, "", .245f, .07f, .425f, .28f, 15)),
+                    Meta = Wrapped(Text(rect, "", .245f, .39f, .425f, .22f, 11, Muted)),
+                    Stamp = Wrapped(Text(rect, "", .245f, .68f, .425f, .22f, 11, Muted)),
+                };
             list.Rows[i] = new Row
             {
                 Button = button,
@@ -335,10 +390,196 @@ internal sealed partial class HistoryPanelView
                 Rating = rating,
                 UnknownResult = unknownResult,
                 UnknownRank = unknownRank,
+                Label = label,
+                Run = run,
             };
             button.gameObject.SetActive(false);
         }
         return list;
+    }
+
+    private DayStrip CreateDayStrip()
+    {
+        var viewport = CreateRect(
+            "BattleTimeline",
+            _layout!,
+            HistoryPanelLayout.TimelineLeft,
+            HistoryPanelLayout.TimelineTop,
+            HistoryPanelLayout.TimelineWidth,
+            HistoryPanelLayout.TimelineHeight
+        );
+        viewport.gameObject.AddComponent<RectMask2D>();
+        viewport.gameObject.AddComponent<Image>().color = Color.clear;
+        var scroll = viewport.gameObject.AddComponent<ScrollRect>();
+        scroll.viewport = viewport;
+        // A run has no hard battle cap: the win target ends it at 10 wins, but losses only
+        // drain prestige, so the rail scrolls and pages rather than assuming a fixed count.
+        scroll.horizontal = false;
+        scroll.movementType = ScrollRect.MovementType.Clamped;
+        scroll.scrollSensitivity = 45;
+        var content = CreateRect("Chips", viewport, 0, 0, 1, 1);
+        content.anchorMin = new Vector2(0, 1);
+        content.anchorMax = Vector2.one;
+        content.pivot = new Vector2(.5f, 1);
+        scroll.content = content;
+        var strip = new DayStrip { Scroll = scroll };
+        for (var i = 0; i < strip.Chips.Length; i++)
+        {
+            var slot = i;
+            var button = Button(content, "", 0, 0, 1, 1, () => _selectBattle(slot), size: 11);
+            var rect = (RectTransform)button.transform;
+            rect.anchorMin = new Vector2(0, 1);
+            rect.anchorMax = Vector2.one;
+            rect.pivot = new Vector2(.5f, 1);
+            rect.sizeDelta = new Vector2(0, HistoryPanelLayout.DayChipHeight - 5);
+            rect.anchoredPosition = new Vector2(0, -i * HistoryPanelLayout.DayChipHeight);
+            // The button's own label is unused; each field has its own slot.
+            button.GetComponentInChildren<TextMeshProUGUI>().gameObject.SetActive(false);
+            var portrait = CreateRect("OpponentHero", rect, .06f, .10f, .28f, .49f)
+                .gameObject.AddComponent<Image>();
+            portrait.raycastTarget = false;
+            portrait.preserveAspect = true;
+            portrait.color = Color.clear;
+            var day = Wrapped(Text(rect, "", .35f, .18f, .30f, .28f, 11, Ink, true));
+            var rank = Badge(rect, "OpponentRank", .70f, .08f, .24f, .36f);
+            var unknown = Text(rank.transform, "?", 0, 0, 1, 1, 11, Muted, true);
+            var rating = Wrapped(Text(rect, "", .66f, .41f, .32f, .24f, 10, Ink, true));
+            // TMP's vertical ellipsis path clears the entire number when the native
+            // font's line metrics exceed the slot, even if every digit fits horizontally.
+            rating.overflowMode = TextOverflowModes.Overflow;
+            var name = Wrapped(Text(rect, "", .08f, .66f, .84f, .20f, 10, Ink, true));
+            var outcome = CreateRect("Outcome", rect, .08f, .90f, .84f, 0)
+                .gameObject.AddComponent<Image>();
+            outcome.rectTransform.sizeDelta = new Vector2(0, HistoryPanelLayout.DayChipOutcomeBar);
+            outcome.raycastTarget = false;
+            outcome.color = Color.clear;
+            strip.Chips[i] = new DayChip
+            {
+                Button = button,
+                Rank = rank,
+                Unknown = unknown,
+                Day = day,
+                Name = name,
+                Rating = rating,
+                Outcome = outcome,
+                Portrait = portrait,
+            };
+            button.gameObject.SetActive(false);
+        }
+        return strip;
+    }
+
+    private void BindDayStrip(IReadOnlyList<HistoryBattleRecord> battles, int selected)
+    {
+        var strip = _dayStrip;
+        var step = HistoryPanelLayout.DayChipHeight;
+        for (var i = 0; i < strip.Chips.Length; i++)
+        {
+            var chip = strip.Chips[i];
+            chip.Button.gameObject.SetActive(i < battles.Count);
+            if (i >= battles.Count)
+                continue;
+            // Keep the page's newest-first order, matching the archive and pager arrows.
+            var battle = battles[i];
+            SetButton(chip.Button, string.Empty, i == selected, !_model!.PageLoading);
+            var hasRating = BindRank(
+                chip.Rank,
+                chip.Rating,
+                chip.Unknown,
+                battle.OpponentRank,
+                battle.OpponentRating
+            );
+            Anchor(
+                chip.Rank.rectTransform,
+                HistoryPanelLayout.Anchors(.70f, hasRating ? .08f : .185f, .24f, .36f)
+            );
+            chip.Day.text = HistoryPanelText.DayBadge(battle.Day);
+            chip.Name.text = string.IsNullOrWhiteSpace(battle.OpponentName)
+                ? HistoryPanelText.UnknownOpponent()
+                : battle.OpponentName;
+            chip.Outcome.color =
+                HistoryPanelFormatter.IsBattleWin(battle) ? new Color(.62f, .80f, .54f)
+                : HistoryPanelFormatter.IsBattleLoss(battle) ? new Color(.90f, .40f, .31f)
+                : Color.clear;
+            var hero = battle.OpponentHero;
+            if (chip.Hero != hero)
+            {
+                chip.Hero = hero;
+                chip.Portrait.color = Color.clear;
+                _portraits.RemoveAll(p => p.Target == chip.Portrait);
+                if (TheDragonsHeroIdentity.TryResolve(hero, out var identity))
+                    _portraits.Add(
+                        (
+                            chip.Portrait,
+                            HeroPortraitSpriteProvider.LoadDefaultPortraitAsync(identity),
+                            _generation
+                        )
+                    );
+            }
+        }
+        strip.Scroll.content.sizeDelta = new Vector2(0, battles.Count * step);
+        var hasSelection = selected >= 0 && selected < battles.Count;
+        var position = strip.Scroll.content.anchoredPosition;
+        var offset = strip.Position.Bind(
+            hasSelection ? battles[selected].BattleId : null,
+            hasSelection ? selected : -1,
+            battles.Count,
+            position.y,
+            strip.Scroll.viewport.rect.height
+        );
+        if (position.y != offset)
+        {
+            strip.Scroll.StopMovement();
+            strip.Scroll.content.anchoredPosition = new Vector2(position.x, offset);
+        }
+    }
+
+    // MEMORY gotcha: NoWrap + Ellipsis at a scaled font can hit TMP's m_characterCount == 0
+    // branch and drop the whole block. Every row label opts out, as the existing ones do.
+    private static TextMeshProUGUI Wrapped(TextMeshProUGUI text)
+    {
+        text.textWrappingMode = TextWrappingModes.Normal;
+        return text;
+    }
+
+    // Archive rows carry runs in one section and battles in the other. Runs get the
+    // laid-out fields; battles keep the single wrapped label, and the shared badges move
+    // to the slots that suit whichever is showing.
+    private void ApplyArchiveRowMode(bool runs)
+    {
+        _archiveList.Height = runs
+            ? HistoryPanelLayout.RunRowHeight
+            : HistoryPanelLayout.GhostRowHeight;
+        for (var i = 0; i < _archiveList.Rows.Length; i++)
+        {
+            var row = _archiveList.Rows[i];
+            if (row?.Run == null)
+                continue;
+            var rect = (RectTransform)row.Button.transform;
+            rect.sizeDelta = new Vector2(0, _archiveList.Height - 5);
+            rect.anchoredPosition = new Vector2(0, -i * _archiveList.Height);
+            row.Run.SetActive(runs);
+            row.Label.gameObject.SetActive(!runs);
+            Anchor(
+                row.Portrait.rectTransform,
+                runs
+                    ? HistoryPanelLayout.Anchors(.025f, .14f, .20f, .72f)
+                    : HistoryPanelLayout.Anchors(.025f, .11f, .21f, .70f)
+            );
+            Anchor(
+                (RectTransform)row.Badge.transform,
+                runs
+                    ? HistoryPanelLayout.Anchors(.84f, .25f, .13f, .48f)
+                    : HistoryPanelLayout.Anchors(.82f, .71f, .14f, .25f)
+            );
+            Anchor(
+                row.Rating.rectTransform,
+                runs
+                    ? HistoryPanelLayout.Anchors(.66f, .66f, .17f, .20f)
+                    : HistoryPanelLayout.Anchors(.77f, .49f, .22f, .18f)
+            );
+            row.Rating.alignment = TextAlignmentOptions.Center;
+        }
     }
 
     private void BindRows(
@@ -349,7 +590,8 @@ internal sealed partial class HistoryPanelView
         Func<int, Sprite?> badge,
         Func<int, string?> rank,
         Func<int, int?> rating,
-        int selected
+        int selected,
+        Func<int, HistoryRunRowFields>? runFields = null
     )
     {
         var offset = Mathf.Max(0, list.Scroll.content.anchoredPosition.y);
@@ -368,11 +610,35 @@ internal sealed partial class HistoryPanelView
             row.Id = ids[i];
             if (row.Id == topId)
                 newTop = i;
-            SetButton(row.Button, label(i), i == selected, !_model!.PageLoading);
+            SetButton(
+                row.Button,
+                runFields == null ? label(i) : string.Empty,
+                i == selected,
+                !_model!.PageLoading
+            );
+            if (runFields != null && row.Run != null)
+            {
+                var fields = runFields(i);
+                row.Run.Name.text = fields.Name;
+                row.Run.Meta.text = fields.Meta;
+                row.Run.Stamp.text = fields.Stamp;
+            }
             row.Badge.sprite = badge(i);
             row.Badge.color = row.Badge.sprite != null ? Color.white : Color.clear;
             row.UnknownResult.gameObject.SetActive(row.Badge.sprite == null);
-            BindRank(row.RankBadge, row.Rating, row.UnknownRank, rank(i), rating(i));
+            var hasRating = BindRank(
+                row.RankBadge,
+                row.Rating,
+                row.UnknownRank,
+                rank(i),
+                rating(i)
+            );
+            Anchor(
+                row.RankBadge.rectTransform,
+                runFields != null
+                    ? HistoryPanelLayout.Anchors(.68f, hasRating ? .14f : .265f, .13f, .47f)
+                    : HistoryPanelLayout.Anchors(.80f, .05f, .18f, .45f)
+            );
             var name = hero(i);
             if (row.Hero != name)
             {
@@ -431,8 +697,30 @@ internal sealed partial class HistoryPanelView
             _boundSection = m.SectionMode;
             _layoutFrames = 2;
             _archiveList.ResetScroll = true;
-            _preview!.anchorMin = new Vector2(.39f, runs ? .16f : .19f);
-            _preview.anchorMax = new Vector2(.95f, runs ? .41f : .67f);
+            ApplyArchiveRowMode(runs);
+            // Ghost drops the upper board, so the surviving title follows the board up.
+            Anchor(
+                _playerTitle,
+                HistoryPanelLayout.Anchors(
+                    HistoryPanelLayout.DetailLeft,
+                    runs ? HistoryPanelLayout.PlayerTitleTop : HistoryPanelLayout.GhostTitleTop,
+                    HistoryPanelLayout.DetailWidth,
+                    HistoryPanelLayout.BoardTitleHeight
+                )
+            );
+            // Authored top-down like every other rect, so the two y conventions no longer
+            // have to be reconciled by hand at this one call site.
+            Anchor(
+                _preview!,
+                HistoryPanelLayout.Anchors(
+                    HistoryPanelLayout.DetailLeft,
+                    runs ? HistoryPanelLayout.PlayerBoardTop : HistoryPanelLayout.GhostBoardTop,
+                    HistoryPanelLayout.DetailWidth,
+                    runs
+                        ? HistoryPanelLayout.PlayerBoardHeight
+                        : HistoryPanelLayout.GhostBoardHeight
+                )
+            );
         }
         _title.text = m.Title;
         SetButton(_runsTab, HistoryPanelText.RunsTab(), runs);
@@ -454,8 +742,12 @@ internal sealed partial class HistoryPanelView
                 pair.Key == m.GhostBattleFilter
             );
         SetButton(_dayFilter, HistoryPanelText.FilterDayMin10(), m.GhostDayMin10);
-        _timeline.Scroll.gameObject.SetActive(runs);
+        _dayStrip.Scroll.gameObject.SetActive(runs);
         _opponentPreview!.gameObject.SetActive(runs);
+        _opponentTitle.gameObject.SetActive(runs);
+        _opponentOwner.text = HistoryPanelText.BoardOpponent();
+        // Runs shows your board below the opponent's; Ghost shows only the challenger's.
+        _playerOwner.text = runs ? HistoryPanelText.BoardYou() : HistoryPanelText.BoardChallenger();
         _battleNewer.gameObject.SetActive(runs);
         _battleOlder.gameObject.SetActive(runs);
         _newer.interactable = m.HasNewer && !m.PageLoading;
@@ -468,12 +760,13 @@ internal sealed partial class HistoryPanelView
             BindRows(
                 _archiveList,
                 m.Runs.Select(r => r.RunId).ToArray(),
-                i => HistoryPanelFormatter.RunListText(m.Runs[i]),
+                _ => string.Empty,
                 i => m.Runs[i].Hero,
                 i => RunBadge(m.Runs[i]),
                 i => m.Runs[i].PlayerRank,
                 i => m.Runs[i].PlayerRating,
-                m.SelectedRunIndex
+                m.SelectedRunIndex,
+                i => HistoryPanelFormatter.RunRowFields(m.Runs[i])
             );
         else
             BindRows(
@@ -487,57 +780,11 @@ internal sealed partial class HistoryPanelView
                 m.SelectedBattleIndex
             );
         if (runs)
-            BindRows(
-                _timeline,
-                m.VisibleBattles.Select(b => b.BattleId).ToArray(),
-                i => HistoryPanelFormatter.FormatDayOnly(m.VisibleBattles[i].Day),
-                _ => null,
-                i => BattleBadge(m.VisibleBattles[i]),
-                i => m.VisibleBattles[i].OpponentRank,
-                i => m.VisibleBattles[i].OpponentRating,
-                m.SelectedBattleIndex
-            );
-        _heading.text = m.DetailOpponentName;
-        var battle = m.DetailBattle;
-        _detailOutcome.gameObject.SetActive(battle != null);
-        _detailOutcome.sprite = BattleBadge(battle);
-        _detailOutcome.color = _detailOutcome.sprite != null ? Color.white : Color.clear;
-        _detailUnknownOutcome.gameObject.SetActive(battle != null && _detailOutcome.sprite == null);
-        _detailRank.gameObject.SetActive(battle != null);
-        _detailRating.gameObject.SetActive(battle != null);
-        BindRank(
-            _detailRank,
-            _detailRating,
-            _detailUnknownRank,
-            battle?.OpponentRank,
-            battle?.OpponentRating
-        );
-        _detailUnknownRank.gameObject.SetActive(battle != null && _detailRank.sprite == null);
-        _metadata.text =
-            m.DetailMetaText
-            + (
-                string.IsNullOrEmpty(m.GhostOpponentEliminatedNoticeText)
-                    ? ""
-                    : "\n" + m.GhostOpponentEliminatedNoticeText
-            );
-        _runSummary.text = m.RunSummary;
-        var run = runs ? m.Runs.ElementAtOrDefault(m.SelectedRunIndex) : null;
-        _summaryRank.gameObject.SetActive(run != null);
-        _summaryRating.gameObject.SetActive(run != null);
-        BindRank(
-            _summaryRank,
-            _summaryRating,
-            _summaryUnknownRank,
-            run?.PlayerRank,
-            run?.PlayerRating
-        );
-        _summaryUnknownRank.gameObject.SetActive(run != null && _summaryRank.sprite == null);
-        _runFacts.gameObject.SetActive(runs && m.Runs.Count > 0);
+            BindDayStrip(m.VisibleBattles, m.SelectedBattleIndex);
         _statusLabel.text = m.StatusMessage ?? "";
         _statusLabel.color = StatusColor(m.StatusSeverity);
         _supporterAttribution?.Bind(m.Supporters, HistoryPanelText.Subtitle());
         RefreshActions();
-        UpdateFacts();
     }
 
     private static Image Badge(
@@ -562,7 +809,7 @@ internal sealed partial class HistoryPanelView
         : HistoryPanelFormatter.IsBattleLoss(battle) ? _lossBadge
         : null;
 
-    private void BindRank(
+    private bool BindRank(
         Image badge,
         TextMeshProUGUI ratingLabel,
         TextMeshProUGUI unknown,
@@ -573,49 +820,10 @@ internal sealed partial class HistoryPanelView
         badge.sprite = _rankBadges.Get(rank);
         badge.color = badge.sprite != null ? Color.white : Color.clear;
         unknown.gameObject.SetActive(badge.sprite == null);
-        ratingLabel.text =
+        var hasRating =
             string.Equals(rank?.Trim(), "Legendary", StringComparison.OrdinalIgnoreCase)
-            && rating.HasValue
-                ? $"ELO {rating.Value}"
-                : string.Empty;
-    }
-
-    private void CreateFacts()
-    {
-        var rect = CreateRect("RunFacts", _layout!, .43f, .32f, .48f, .30f);
-        var canvas = rect.gameObject.AddComponent<Canvas>();
-        canvas.overrideSorting = true;
-        canvas.sortingOrder = BppOverlaySorting.PanelForeground;
-        rect.gameObject.AddComponent<GraphicRaycaster>();
-        rect.gameObject.AddComponent<Image>().color = new Color(.075f, .05f, .03f, 1);
-        Panel(rect, 0, 0, 1, 1);
-        Button(
-            rect,
-            HistoryPanelText.Close(),
-            .76f,
-            .05f,
-            .2f,
-            .13f,
-            () =>
-            {
-                _factsVisible = false;
-                UpdateFacts();
-            },
-            size: 14
-        );
-        _factsText = Text(rect, "", .07f, .22f, .86f, .7f, 20);
-        _factsText.textWrappingMode = TextWrappingModes.Normal;
-        _factsRoot = rect.gameObject;
-        _factsRoot.SetActive(false);
-    }
-
-    private void UpdateFacts()
-    {
-        if (_factsRoot == null || _model == null)
-            return;
-        _factsRoot.SetActive(
-            _factsVisible && ShowsBothBoards && _model.Runs.Count > 0 && !_moreVisible
-        );
-        _factsText.text = _model.RunFacts;
+            && rating.HasValue;
+        ratingLabel.text = hasRating ? rating.GetValueOrDefault().ToString() : string.Empty;
+        return hasRating;
     }
 }

@@ -63,5 +63,17 @@ public sealed class LiveBuildPanelLayoutTests
         Assert.True(
             carpetHeight + LiveBuildPanelLayout.BadgeHeight + 8 <= panel.BoardHeight + .001f
         );
+
+        // Each metric cell must stay wide enough for an 11px label without ellipsizing.
+        var cellWidth = contentWidth / LiveBuildPanelLayout.MetricCells;
+        Assert.True(cellWidth >= 120);
+    }
+
+    [Fact]
+    public void Metric_cell_stacks_an_11px_label_over_a_16px_value()
+    {
+        // Two stacked lines, so the label must not eat the value's half of the row.
+        Assert.True(LiveBuildPanelLayout.MetricsHeight * .42f >= 13);
+        Assert.True(LiveBuildPanelLayout.MetricsHeight * .58f >= 18);
     }
 }
