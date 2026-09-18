@@ -36,7 +36,7 @@ Where new code goes. This is the trap list, not a map of what exists:
 - Reusable adapters over The Bazaar/Unity runtime surfaces go in `GameInterop/`. Feature workflows, UI state, product policy, filtering and classification rules, upload decisions, and storage orchestration go in `Game/`. Mentioning a game enum or DTO is not on its own a reason to move logic into `GameInterop/`.
 - When two features need the same runtime, prefab, or static-data behavior, extract the adapter to `GameInterop/<Concept>/` and have both consume that seam. Reuse the seam rather than importing another feature's internals.
 - Patches reach feature services through `BppPatchHost`, the static service locator — never constructor injection. Shared Harmony reflection helpers and native runtime adapters live in `GameInterop/` or `Infrastructure/`, not inside a feature directory.
-- Establishing a boundary the compiler cannot enforce means adding or extending an architecture test in the same change.
+- Establishing a boundary the compiler cannot enforce means adding or extending an architecture test, never as source text (ADR-0009), in the same change.
 
 ## Project Rules
 

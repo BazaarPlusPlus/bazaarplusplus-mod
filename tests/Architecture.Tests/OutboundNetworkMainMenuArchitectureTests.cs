@@ -1,38 +1,14 @@
+using BazaarPlusPlus.TestSupport;
 using Xunit;
 
 namespace Architecture.Tests;
 
-public sealed class OutboundNetworkArchitectureTests
+public sealed class OutboundNetworkMainMenuArchitectureTests
 {
-    [Fact]
-    public void Build_seed_target_delegates_transport_and_contains_no_inline_csharp()
-    {
-        var root = RepoRoot();
-        var targets = File.ReadAllText(
-            Path.Combine(root, "src", "BazaarPlusPlus", "RemoteEmbeddedData.targets")
-        );
-        var fetcher = File.ReadAllText(
-            Path.Combine(root, "build", "RemoteEmbeddedDataFetcher", "RemoteEmbeddedDataFetch.cs")
-        );
-        var script = File.ReadAllText(Path.Combine(root, "run.sh"));
-
-        Assert.Contains("RemoteEmbeddedDataFetcherProject", targets);
-        Assert.Contains("<Exec", targets);
-        Assert.DoesNotContain("RoslynCodeTaskFactory", targets);
-        Assert.DoesNotContain("<![CDATA[", targets);
-        Assert.Contains("HttpClient", fetcher);
-        Assert.Contains("PromoteSeedSet", fetcher);
-        Assert.Contains("run_seed_gates", script);
-        Assert.Contains("TestKind=EmbeddedSeed", script);
-        Assert.Contains("promote \"$staging_directory\"", script);
-        Assert.Contains("for arg in \"$@\"", script);
-        Assert.DoesNotContain("local args=(\"$@\")", script);
-    }
-
     [Fact]
     public void Main_menu_controller_delegates_release_protocol_and_request_lifecycle()
     {
-        var root = RepoRoot();
+        var root = TestInputs.RepoRoot;
         var controller = File.ReadAllText(
             Path.Combine(
                 root,
@@ -76,14 +52,5 @@ public sealed class OutboundNetworkArchitectureTests
         Assert.DoesNotContain("BepInEx", adapter, StringComparison.Ordinal);
         Assert.DoesNotContain("UnityEngine", lifecycle, StringComparison.Ordinal);
         Assert.DoesNotContain("BepInEx", lifecycle, StringComparison.Ordinal);
-    }
-
-    private static string RepoRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory != null && !File.Exists(Path.Combine(directory.FullName, "CLAUDE.md")))
-            directory = directory.Parent;
-        return directory?.FullName
-            ?? throw new InvalidOperationException("Could not locate repository root.");
     }
 }

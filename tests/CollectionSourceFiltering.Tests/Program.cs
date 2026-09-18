@@ -5,6 +5,7 @@ using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Game.CollectionPanel.Sources;
 using BazaarPlusPlus.GameInterop.Heroes;
 using BazaarPlusPlus.GameInterop.HeroPortraits;
+using BazaarPlusPlus.TestSupport;
 
 var ailaId1 = Guid.Parse("11111111-1111-1111-1111-111111111111");
 var ailaId2 = Guid.Parse("22222222-2222-2222-2222-222222222222");
@@ -503,14 +504,9 @@ AssertThrows<InvalidOperationException>(
     "Invalid hero validation should be independent of segment ordering."
 );
 
-var currentCatalogPath = Path.Combine(
-    "src",
-    "BazaarPlusPlus",
-    "Data",
-    "CollectionSources",
-    "collection-sources.json"
+var currentCatalogJson = TestInputs.Fixture(
+    "src/BazaarPlusPlus/Data/CollectionSources/collection-sources.json"
 );
-var currentCatalogJson = File.ReadAllText(currentCatalogPath);
 var currentCatalog = CollectionSourceCatalog.Build(currentCatalogJson);
 AssertEqual(
     74,

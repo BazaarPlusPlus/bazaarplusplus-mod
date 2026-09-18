@@ -1,4 +1,5 @@
 using BazaarGameShared.Domain.Core.Types;
+using BazaarPlusPlus.TestSupport;
 using Newtonsoft.Json.Linq;
 using Xunit;
 
@@ -72,7 +73,7 @@ public sealed class EncounterPreviewCacheTests : IDisposable
         var identity = Identity(etag: "etag-a");
         store.Save(identity, Snapshot());
 
-        var document = JObject.Parse(File.ReadAllText(store.CachePath));
+        var document = JObject.Parse(TestInputs.Scratch(store.CachePath));
         document["schemaVersion"] = EncounterPreviewCacheStore.SchemaVersion + 1;
         File.WriteAllText(store.CachePath, document.ToString());
 
@@ -80,7 +81,7 @@ public sealed class EncounterPreviewCacheTests : IDisposable
         Assert.Equal("schema-mismatch", schemaReason);
 
         store.Save(identity, Snapshot());
-        document = JObject.Parse(File.ReadAllText(store.CachePath));
+        document = JObject.Parse(TestInputs.Scratch(store.CachePath));
         document.Remove("levelUps");
         File.WriteAllText(store.CachePath, document.ToString());
         Assert.False(store.TryLoad(identity, out _, out var missingLevelUpsReason));

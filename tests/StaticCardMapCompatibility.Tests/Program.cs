@@ -1,6 +1,7 @@
 using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Infra.Serialization;
 using BazaarPlusPlus.GameInterop.StaticCards;
+using BazaarPlusPlus.TestSupport;
 using Microsoft.Data.Sqlite;
 using Newtonsoft.Json;
 
@@ -61,9 +62,9 @@ try
         );
         cmd.ExecuteNonQuery();
     }
-    var original = File.ReadAllBytes(path);
+    var original = TestInputs.ScratchBytes(path);
     var loaded = CompatibleCardMapReader.Read(path, out var omitted);
-    if (loaded.Count != 1 || omitted != 1 || !original.SequenceEqual(File.ReadAllBytes(path)))
+    if (loaded.Count != 1 || omitted != 1 || !original.SequenceEqual(TestInputs.ScratchBytes(path)))
         throw new Exception("Read-only database recovery changed the source or lost valid data.");
 }
 finally

@@ -2,6 +2,7 @@
 dist/
 bin/
 obj/
+*.sarif
 native/windows/build/
 *.obj
 *.lib

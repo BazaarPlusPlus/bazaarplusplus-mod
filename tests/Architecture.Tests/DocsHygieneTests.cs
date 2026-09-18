@@ -1,6 +1,6 @@
 #nullable enable
-using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
+using BazaarPlusPlus.TestSupport;
 using Xunit;
 
 namespace Architecture.Tests;
@@ -30,7 +30,7 @@ public class DocsHygieneTests
     [Fact]
     public void Always_loaded_docs_stay_within_their_byte_budgets()
     {
-        var repoRoot = RepoRoot();
+        var repoRoot = TestInputs.RepoRoot;
         var overBudget = new List<string>();
 
         foreach (var (relative, maxBytes) in AlwaysLoadedBudgets)
@@ -60,7 +60,7 @@ public class DocsHygieneTests
     [Fact]
     public void Documentation_file_references_resolve()
     {
-        var repoRoot = RepoRoot();
+        var repoRoot = TestInputs.RepoRoot;
         var broken = new List<string>();
 
         // Only path-shaped references are checked. A bare `RunLogSchema.cs` in prose names a type's
@@ -75,7 +75,7 @@ public class DocsHygieneTests
         {
             var relativeDoc = Path.GetRelativePath(repoRoot, doc).Replace('\\', '/');
             var lineNumber = 0;
-            foreach (var line in File.ReadLines(doc))
+            foreach (var line in SplitLines(TestInputs.Markdown(relativeDoc)))
             {
                 lineNumber++;
                 foreach (Match match in reference.Matches(line))
@@ -91,7 +91,7 @@ public class DocsHygieneTests
                     if (!match.Groups["start"].Success)
                         continue;
 
-                    var total = File.ReadLines(resolved).Count();
+                    var total = TestInputs.LineCount(resolved);
                     var start = int.Parse(match.Groups["start"].Value);
                     var end = match.Groups["end"].Success
                         ? int.Parse(match.Groups["end"].Value)
@@ -119,7 +119,7 @@ public class DocsHygieneTests
     [Fact]
     public void Documentation_links_resolve()
     {
-        var repoRoot = RepoRoot();
+        var repoRoot = TestInputs.RepoRoot;
         var link = new Regex(@"\[[^\]]*\]\((?<target>[^)]+)\)", RegexOptions.Compiled);
         var broken = new List<string>();
 
@@ -128,7 +128,7 @@ public class DocsHygieneTests
             var relativeDoc = Path.GetRelativePath(repoRoot, doc).Replace('\\', '/');
             var docDir = Path.GetDirectoryName(doc)!;
             var lineNumber = 0;
-            foreach (var line in File.ReadLines(doc))
+            foreach (var line in SplitLines(TestInputs.Markdown(relativeDoc)))
             {
                 lineNumber++;
                 foreach (Match match in link.Matches(line))
@@ -191,9 +191,11 @@ public class DocsHygieneTests
             yield return path;
     }
 
-    private static string RepoRoot([CallerFilePath] string thisFile = "")
+    private static IEnumerable<string> SplitLines(string text)
     {
-        var testDir = Path.GetDirectoryName(thisFile)!;
-        return Path.GetFullPath(Path.Combine(testDir, "..", ".."));
+        using var reader = new StringReader(text);
+        string? line;
+        while ((line = reader.ReadLine()) != null)
+            yield return line;
     }
 }

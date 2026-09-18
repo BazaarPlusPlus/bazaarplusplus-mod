@@ -1,4 +1,5 @@
 using BazaarPlusPlus.Game.Supporters;
+using BazaarPlusPlus.TestSupport;
 
 TestAttributionText();
 TestEmptyInputReturnsNoSample();
@@ -41,7 +42,9 @@ static void TestCatalogDocumentRejectsEmptyPayload()
 
 static void TestEmbeddedCatalogSeedHasAtLeastFiveEntries()
 {
-    var document = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "supporter-list.json"));
+    var document = TestInputs.Scratch(
+        Path.Combine(AppContext.BaseDirectory, "supporter-list.json")
+    );
     var result = SupporterCatalogDocument.Parse(document);
 
     AssertTrue(result.Succeeded, "The embedded supporter seed must parse.");
