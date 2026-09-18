@@ -1,6 +1,7 @@
 #nullable enable
 using System.Text.Json;
 using BazaarPlusPlus.Storage.RunLog;
+using BazaarPlusPlus.TestSupport;
 
 internal static class RunLogSchemaReleaseContractTests
 {
@@ -15,7 +16,7 @@ internal static class RunLogSchemaReleaseContractTests
                 $"History database release contract was not copied to '{contractPath}'."
             );
 
-        using var contract = JsonDocument.Parse(File.ReadAllText(contractPath));
+        using var contract = JsonDocument.Parse(TestInputs.Scratch(contractPath));
         var root = contract.RootElement;
         Equal(1, root.GetProperty("formatVersion").GetInt32(), "contract format version");
         Equal(

@@ -4,6 +4,7 @@ using System.Net.Sockets;
 using System.Security;
 using System.Text;
 using BazaarPlusPlus.RemoteEmbeddedDataFetcher;
+using BazaarPlusPlus.TestSupport;
 
 await TestFetchValidatesStatusLengthAndJsonAndCleansTemporaryFiles();
 await TestFetchRetriesTransientTransportFailure();
@@ -33,7 +34,7 @@ static async Task TestFetchValidatesStatusLengthAndJsonAndCleansTemporaryFiles()
         }
         Equal(
             " [\"new\"] ",
-            File.ReadAllText(destination),
+            TestInputs.Scratch(destination),
             "A valid fetch should replace the seed."
         );
 
@@ -42,7 +43,7 @@ static async Task TestFetchValidatesStatusLengthAndJsonAndCleansTemporaryFiles()
         await MustFailFetch(destination, HttpStatusCode.OK, "not-json", 1);
         Equal(
             " [\"new\"] ",
-            File.ReadAllText(destination),
+            TestInputs.Scratch(destination),
             "Failed transport validation must preserve the canonical bytes."
         );
         False(
@@ -75,7 +76,7 @@ static async Task TestFetchRetriesTransientTransportFailure()
         Equal(2, handler.RequestCount, "A transient transport failure should be retried once.");
         Equal(
             "[\"recovered\"]",
-            File.ReadAllText(destination),
+            TestInputs.Scratch(destination),
             "The successful retry should publish the downloaded seed."
         );
     }
@@ -143,7 +144,7 @@ static async Task TestFetchRetriesTransientHttpStatus()
         Equal(2, handler.RequestCount, "A service-unavailable response should be retried once.");
         Equal(
             "[\"recovered\"]",
-            File.ReadAllText(destination),
+            TestInputs.Scratch(destination),
             "The successful status retry should publish the downloaded seed."
         );
     }
@@ -176,7 +177,7 @@ static async Task TestFetchStopsAfterBoundedTransientRetries()
         Equal(5, handler.RequestCount, "Transient retries must stop after five attempts.");
         Equal(
             "[\"old\"]",
-            File.ReadAllText(destination),
+            TestInputs.Scratch(destination),
             "Exhausted retries must preserve the canonical seed."
         );
         False(
@@ -252,24 +253,24 @@ static void TestSeedSetPromotionIsAtomicAcrossFiles()
 
         Equal(
             "old-voice",
-            File.ReadAllText(seeds[0].CanonicalPath),
+            TestInputs.Scratch(seeds[0].CanonicalPath),
             "Rollback must restore file one."
         );
         Equal(
             "old-builds",
-            File.ReadAllText(seeds[1].CanonicalPath),
+            TestInputs.Scratch(seeds[1].CanonicalPath),
             "Rollback must restore file two."
         );
 
         RemoteEmbeddedDataFetch.PromoteSeedSet(seeds);
         Equal(
             "new-voice",
-            File.ReadAllText(seeds[0].CanonicalPath),
+            TestInputs.Scratch(seeds[0].CanonicalPath),
             "Promotion should replace file one."
         );
         Equal(
             "new-builds",
-            File.ReadAllText(seeds[1].CanonicalPath),
+            TestInputs.Scratch(seeds[1].CanonicalPath),
             "Promotion should replace file two."
         );
     }
@@ -386,12 +387,12 @@ static async Task TestFetchDataRejectsBadSchemaWithoutChangingCanonicalSet()
 
         Equal(
             "old-voice",
-            File.ReadAllText(voicePath),
+            TestInputs.Scratch(voicePath),
             "A failed seed gate must preserve voice bytes."
         );
         Equal(
             "old-builds",
-            File.ReadAllText(buildsPath),
+            TestInputs.Scratch(buildsPath),
             "A failed seed gate must preserve build bytes."
         );
         False(

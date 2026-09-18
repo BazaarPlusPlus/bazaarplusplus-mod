@@ -17,6 +17,7 @@ using BazaarPlusPlus.ModApi.Bundle;
 using BazaarPlusPlus.ModApi.Clients;
 using BazaarPlusPlus.Storage.Paths;
 using BazaarPlusPlus.Storage.RunLog;
+using BazaarPlusPlus.TestSupport;
 using MessagePack;
 using Microsoft.Data.Sqlite;
 
@@ -118,7 +119,7 @@ try
         var file = Path.Combine(PathConstants.BundleOutbox(root), reader.GetString(1));
         Assert(reader.GetString(2) == "pending", "new outbox row should be pending");
         Assert(File.Exists(file), "sealed bundle file should exist");
-        var opened = BundleV5Codec.Open(File.ReadAllBytes(file));
+        var opened = BundleV5Codec.Open(TestInputs.ScratchBytes(file));
         Assert(opened.Manifest.BundleId == bundleId, "file identity should match outbox");
         Assert(opened.Manifest.Screenshot == null, "screenshot-disabled run should be Run-only");
         var payload = RunPayloadV5Codec.Decode(opened.RunPayload);
@@ -128,7 +129,7 @@ try
             payload.ReplayableBattleIds.SequenceEqual(new[] { "battle-seal-001" }),
             "composer should use the shared replayability contract"
         );
-        var runBundle = RunBundleV5Contract.Open(File.ReadAllBytes(file));
+        var runBundle = RunBundleV5Contract.Open(TestInputs.ScratchBytes(file));
         Assert(runBundle.Succeeded, "sealed bundle should satisfy the Run Bundle contract");
         Assert(
             runBundle.Value!.TryGetReplayableBattle("battle-seal-001", out _),

@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using BazaarPlusPlus.ModApi.Bundle;
+using BazaarPlusPlus.TestSupport;
 using MessagePack;
 using MessagePack.Resolvers;
 
@@ -40,7 +41,7 @@ void MessagePackDtoGraphIsPublic()
 void GoldenVector()
 {
     using var manifestJson = JsonDocument.Parse(
-        File.ReadAllText(Path.Combine(fixtures, "run-only.manifest.json"))
+        TestInputs.Scratch(Path.Combine(fixtures, "run-only.manifest.json"))
     );
     var root = manifestJson.RootElement;
     var run = root.GetProperty("run");
@@ -296,7 +297,7 @@ void RunPayloadRoundTrip()
     Equal("battle-000", decoded.ReplayableBattleIds[0], "Run payload replayable IDs");
     SequenceEqual(
         Convert.FromBase64String(
-            File.ReadAllText(Path.Combine(fixtures, "run-payload-v5.fixture.b64")).Trim()
+            TestInputs.Scratch(Path.Combine(fixtures, "run-payload-v5.fixture.b64")).Trim()
         ),
         encoded,
         "stable Run payload fixture"
@@ -554,7 +555,7 @@ void WriteBigEndian(byte[] bytes, int offset, int value)
 }
 
 byte[] ReadBundle(string name) =>
-    Convert.FromBase64String(File.ReadAllText(Path.Combine(fixtures, name)).Trim());
+    Convert.FromBase64String(TestInputs.Scratch(Path.Combine(fixtures, name)).Trim());
 
 void ThrowsReason(Action action, string code, string reason)
 {

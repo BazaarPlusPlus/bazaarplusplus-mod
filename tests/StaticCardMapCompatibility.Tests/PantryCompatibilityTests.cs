@@ -9,6 +9,7 @@ using BazaarGameShared.Domain.Values;
 using BazaarGameShared.Domain.Values.ReferenceValues;
 using BazaarGameShared.Infra.Serialization;
 using BazaarPlusPlus.GameInterop.StaticCards;
+using BazaarPlusPlus.TestSupport;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -16,7 +17,7 @@ internal static class PantryCompatibilityTests
 {
     internal static void Run()
     {
-        var json = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Pantry.json"));
+        var json = TestInputs.Scratch(Path.Combine(AppContext.BaseDirectory, "Pantry.json"));
         var nativeAlreadySupportsPantry = NativeSupports(json);
         var map = CompatibleCardMapReader.ReadRows([json], out var omitted);
         Check(omitted == 0 && map.Count == 1, "Pantry must be retained in the catalog.");

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text;
+using BazaarPlusPlus.TestSupport;
 
 var projectRoot = Environment.GetEnvironmentVariable("ProjectRoot");
 if (string.IsNullOrWhiteSpace(projectRoot))
@@ -148,13 +149,13 @@ try
     AssertFalse(File.Exists(marker), "Repair must not recreate the obsolete launch-mode marker.");
     AssertEqual(
         "TRAMPOLINE STUB",
-        File.ReadAllText(exe),
+        TestInputs.Scratch(exe),
         "run.sh build should restore the trampoline stub as the launched executable.\n"
             + result.Output
     );
     AssertEqual(
         "UNITY current executable",
-        File.ReadAllText(orig),
+        TestInputs.Scratch(orig),
         "Repair must preserve the fresh Steam-updated executable, not the stale .orig."
     );
     AssertFalse(
@@ -173,7 +174,7 @@ try
     var backup = Directory.GetDirectories(backups, "*.app").Single();
     AssertEqual(
         "UNITY arm64",
-        File.ReadAllText(Path.Combine(backup, "Contents", "MacOS", "The Bazaar")),
+        TestInputs.Scratch(Path.Combine(backup, "Contents", "MacOS", "The Bazaar")),
         "Repair must preserve the duplicate contents in its external backup."
     );
     result = RunProcess(
