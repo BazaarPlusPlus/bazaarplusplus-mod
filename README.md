@@ -1,3 +1,11 @@
+> [!WARNING]
+> **本仓库已归档（只读）。** BazaarPlusPlus 的开发已迁移至 monorepo：
+> **[BazaarPlusPlus/BazaarPlusPlus](https://github.com/BazaarPlusPlus/BazaarPlusPlus)** → [`bazaarplusplus-mod/`](https://github.com/BazaarPlusPlus/BazaarPlusPlus/tree/master/bazaarplusplus-mod)
+>
+> 这里只保留迁移前的提交历史，供查阅。Issue / PR 请提交到主仓库；下载安装请前往 [bazaarplusplus.com/download](https://bazaarplusplus.com/download)。以下内容为归档时的快照，可能已过时。
+>
+> **Archived (read-only).** Development moved to the monorepo linked above; this repository is kept for its commit history only. Please file issues and pull requests there. The content below is a snapshot and may be outdated.
+
 # BazaarPlusPlus
 
 面向《The Bazaar》的 BepInEx 5 模组。它不改变游戏平衡，只做信息增强与记录：战斗界面增强、附魔 / 升级预览、run 记录与历史回放、终局自动截图与阵容推荐，以及可选的后台云同步。
